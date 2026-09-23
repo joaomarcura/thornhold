@@ -1,0 +1,57 @@
+export const STATES = Object.freeze({ MENU:'MAIN_MENU', LOBBY:'LOBBY', LOADING:'LOADING', PREP:'PREPARATION', ACTIVE:'MATCH_ACTIVE', END:'MATCH_END', RETURN:'RETURN_TO_LOBBY' });
+export const BALANCE = {
+  tick: 20, snapshot: 10, maxElves: 8, cell: 2.2, maxTier: null, visualTier: 4,
+  prep: 50, finalAge: 210, hungerAge: 480, hungerGrace: 45, hungerRate: 0.004,
+  vision: { troll: 28, elf: 24 }, interactRange: 6.5,
+  movement:{sprint:1.25,trollRadius:.64,elfRadius:.37},
+  construction:{initialHealth:.15,breachCooldown:12,enemyClearance:5,gateClearance:4,limits:{core:1,wall:1,tower:5,mine:2,workshop:1},upgradeSeconds:3},
+  economy:{richWood:1.65,finalRichWood:2.5,workshopGather:.3,workshopRepair:.2},
+  progression:{structureGrowth:1.18,costGrowth:1.35,woodCostGrowth:1.25,trollDamageGrowth:1.12,healthGrowth:1.14},
+  wisps:{gold:65,wood:15,hireGrowth:1.32,trainSeconds:6,income:1.4,incomeGrowth:1.25,upgradeGold:70,upgradeWood:20,costGrowth:1.5,seconds:4,hp:55,externalBonus:1.6,range:25,regrowSeconds:35},
+  combat:{buffer:.18,lightWindup:.1,heavyWindup:.32,comboWindow:2.8,comboBonus:.25,openingSeconds:1.2,openingBonus:.2},
+  elf: { hp: 85, speed: 6.4, gold: 150, wood: 110, gather: 10, gatherInterval: 0.65, repair: 42, repairCost: 3 },
+  troll: { hp: 1500, speed: 5.8, damage: 30, interval: 1.05, range: 3.6, armor: 1, gold: 0, goldPerDamage: 0.36, regen: 1.5, regenPerLevel:6, damageGrowth:1.28,speedFactor:.88,healthPerLevel:320,armorPerLevel:3,movementPerLevel:.08,siegePerLevel:.3,finalSiege:1.35,regenDelay:6,exposureGrace:9,exposureRate:.035,heavy: 2.25,heavyRecovery:1.3, heavyCooldown: 4, dashCooldown: 7,dashDuration:.4,dashSpeed:2.5, roarCooldown: 18,roarRange:9,roarDuration:2 },
+  structures: {
+    core: { name:'Núcleo', gold:65, wood:25, hp:360, radius:1.55, seconds:4, income:3, growth:1.85, upgradeGold:100, upgradeWood:35, color:0xe4c37a },
+    wall: { name:'Barricada', gold:35, wood:40, hp:850, radius:1.05, seconds:3, growth:1.9, upgradeGold:85, upgradeWood:30, color:0xa48862 },
+    tower: { name:'Torre', gold:70, wood:35, hp:260, radius:0.9, seconds:4, damage:12, interval:1.2, range:17, growth:1.65, upgradeGold:90, upgradeWood:40, color:0x81cabb },
+    mine: { name:'Mina', gold:85, wood:35, hp:200, radius:1.05, seconds:5, income:1.3, growth:1.7, upgradeGold:110, upgradeWood:45, color:0xc2a54c },
+    workshop: { name:'Oficina', gold:100, wood:50, hp:250, radius:1.1, seconds:5, growth:1.6, upgradeGold:125, upgradeWood:45, color:0x748fa3 }
+  },
+  branches: {
+    power:{name:'Balista',description:'Mais dano por disparo',damage:1.45,interval:1,range:0,armorPierce:0},
+    rapid:{name:'Rajada',description:'Disparos mais rápidos',damage:0.9,interval:0.6,range:0,armorPierce:0},
+    frost:{name:'Gelo',description:'Reduz a velocidade do Troll',damage:0.8,interval:1,range:2,armorPierce:0,slow:0.65},
+    pierce:{name:'Ruptura',description:'Ignora armadura e amplia alcance',damage:1,interval:1,range:5,armorPierce:1}
+  },
+  upgrades: {
+    damage:{name:'Fúria',description:'Dano; crescimento suave após nível 4',cost:75,growth:1.8,max:null},
+    speed:{name:'Frenesi',description:'Reduz intervalo; ganhos decrescentes',cost:90,growth:1.85,max:null},
+    health:{name:'Vitalidade',description:'Mais vida máxima',cost:90,growth:1.8,max:null},
+    armor:{name:'Pele de pedra',description:'Mais armadura',cost:85,growth:1.8,max:null},
+    regen:{name:'Vigor',description:'Mais regeneração fora de combate',cost:65,growth:1.85,max:null},
+    movement:{name:'Passos largos',description:'Mais movimento; ganhos decrescentes',cost:70,growth:1.85,max:null},
+    siege:{name:'Quebra-fortaleza',description:'Mais dano a estruturas',cost:110,growth:1.9,max:null},
+    utility:{name:'Rugido ancestral',description:'Rugido e esquiva; ganhos decrescentes',cost:80,growth:1.8,max:null}
+  },
+  difficulty: { easy:{think:1.6,repair:0.38,retreat:0.15},normal:{think:0.7,repair:0.68,retreat:0.32},hard:{think:0.28,repair:0.88,retreat:0.48} }
+};
+export const DEFAULT_SETTINGS = { elfSlots:5, difficulty:'normal', seed:'THORNHOLD', mapSize:'compact', preparation:50, private:true, local:false, region:'SA', takeover:true, allowRoles:true };
+export const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+export const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
+export const mitigation=armor=>1/(1+0.055*Math.max(0,armor));
+// Saturation prevents numeric overflow; there is no purchasable gameplay tier cap.
+export const scaled=(base,growth,level)=>Math.min(Number.MAX_SAFE_INTEGER,base*Math.pow(growth,Math.min(512,Math.max(0,level))));
+export const tierScale=(growth,tier)=>scaled(Math.pow(growth,Math.min(3,tier-1)),BALANCE.progression.structureGrowth,Math.max(0,tier-4));
+export const structureHP=(kind,tier)=>BALANCE.structures[kind].hp*tierScale(kind==='wall'?1.85:1.5,tier);
+export const towerDamage=tier=>BALANCE.structures.tower.damage*tierScale(BALANCE.structures.tower.growth,tier);
+export const income=s=>(BALANCE.structures[s.kind].income||0)*tierScale(BALANCE.structures[s.kind].growth,s.tier);
+export const upgradeCost=s=>({gold:Math.round(scaled(BALANCE.structures[s.kind].upgradeGold*Math.pow(1.9,Math.min(3,s.tier-1)),BALANCE.progression.costGrowth,s.tier-4)),wood:Math.round(scaled(BALANCE.structures[s.kind].upgradeWood*Math.pow(1.5,Math.min(3,s.tier-1)),BALANCE.progression.woodCostGrowth,s.tier-4))});
+export const trollCost=(key,level)=>Math.round(scaled(BALANCE.upgrades[key].cost*Math.pow(BALANCE.upgrades[key].growth,Math.min(4,level)),BALANCE.progression.costGrowth,level-4));
+export const trollHealth=level=>scaled(BALANCE.troll.hp+Math.min(4,level)*BALANCE.troll.healthPerLevel,BALANCE.progression.healthGrowth,level-4);
+export const wispCost=count=>({gold:Math.round(scaled(BALANCE.wisps.gold,BALANCE.wisps.hireGrowth,count)),wood:Math.round(scaled(BALANCE.wisps.wood,1.15,count))});
+export const wispUpgradeCost=level=>({gold:Math.round(scaled(BALANCE.wisps.upgradeGold,BALANCE.wisps.costGrowth,level-1)),wood:Math.round(scaled(BALANCE.wisps.upgradeWood,1.3,level-1))});
+export const wispIncome=w=>scaled(BALANCE.wisps.income,BALANCE.wisps.incomeGrowth,w.level-1)*(w.rich?BALANCE.wisps.externalBonus:1);
+export function scaling(alive,totalIncome,bases,time) {
+  return 1+Math.min(0.32,Math.max(0,alive-1)*0.04)+Math.min(0.12,totalIncome/600)+Math.min(0.08,bases*0.01)+Math.min(0.1,time/6000);
+}

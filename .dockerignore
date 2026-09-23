@@ -1,0 +1,7 @@
+node_modules
+artifacts
+telemetry
+.git
+.codex
+.agents
+*.log

@@ -1,0 +1,87 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { generateMap, validateBase, index, pathfind } from '../shared/map.js';
+import { Match } from '../shared/simulation.js';
+import { BALANCE as B, STATES, distance } from '../shared/config.js';
+import { SessionService } from '../server/sessions.js';
+
+const slots=(n=2,type='human')=>[{id:'t',role:'troll',occupant:{type,name:'Troll'}},...Array.from({length:n},(_,i)=>({id:'e'+i,role:'elf',occupant:{type,name:'Elfo '+i}}))];
+const match=(n=2)=>new Match({seed:'TEST-'+n},slots(n));
+function completedBase(m,id='e0'){
+  const u=m.unit(id),b=m.map.bases[0];u.x=b.x+4.4;u.z=b.z;
+  assert.equal(m.act(id,{type:'build',kind:'core',x:b.x,z:b.z}),undefined);
+  for(let i=0;i<100;i++)m.step(.05);return {u,b,core:m.structures.find(s=>s.kind==='core')};
+}
+test('Seed determinística e corte de entrada única em 40 mapas',()=>{
+  assert.deepEqual(generateMap('same'),generateMap('same'));
+  assert.notDeepEqual(generateMap('same').bases,generateMap('different').bases);
+  for(const size of ['compact','large'])for(let seed=0;seed<20;seed++){const m=generateMap('seed-'+seed,size);assert.equal(m.validation.length,12);assert.ok(m.validation.every(v=>v.valid&&v.openings===1&&v.gateIsCutVertex));}
+});
+test('Validador rejeita passagem alternativa e entrada selada',()=>{
+  const m=generateMap(),b=m.bases[0];m.grid[index(m,b.cx-b.rx,b.cz)]=0;assert.equal(validateBase(m,b).valid,false);
+  m.grid[index(m,b.cx-b.rx,b.cz)]=1;m.grid[index(m,b.gate.cx,b.gate.cz)]=1;assert.equal(validateBase(m,b).valid,false);
+});
+test('Pathfinding conecta o spawn a cada interior pelo portão',()=>{
+  const m=generateMap();for(const b of m.bases){const path=pathfind(m,m.trollSpawn,b);assert.ok(path.length);assert.ok(path.some(p=>distance(p,b.gate)<.1));assert.equal(pathfind(m,m.trollSpawn,b,new Set([index(m,b.gate.cx,b.gate.cz)])).length,0);}
+});
+test('Construção consome recursos, é progressiva e gera renda real',()=>{
+  const m=match(),u=m.unit('e0'),b=m.map.bases[0];u.x=b.x+4.4;u.z=b.z;
+  assert.equal(m.act(u.id,{type:'build',kind:'core',x:b.x,z:b.z}),undefined);const s=m.structures[0];assert.equal(u.gold,85);assert.equal(u.wood,85);assert.equal(s.progress,0);assert.equal(s.hp,s.maxHp*.15);
+  for(let i=0;i<100;i++)m.step(.05);assert.equal(s.progress,1);assert.equal(s.hp,s.maxHp);assert.ok(u.gold>85);
+  assert.match(m.act(u.id,{type:'build',kind:'core',x:b.x,z:b.z+4.4}),/já possui/);
+});
+test('Servidor rejeita construção remota, terreno, sobreposição, protótipos e recursos falsos',()=>{
+  const m=match(),u=m.unit('e0'),b=m.map.bases[0],gold=u.gold;
+  for(const command of [{type:'build',kind:'core',x:b.x,z:b.z},{type:'build',kind:'constructor',x:u.x,z:u.z},{type:'build',kind:'__proto__',x:u.x,z:u.z},{type:'build',kind:'core',x:NaN,z:0}])assert.equal(typeof m.act(u.id,command),'string');
+  assert.equal(u.gold,gold);const {core}=completedBase(m);assert.match(m.act(u.id,{type:'build',kind:'tower',x:core.x,z:core.z}),/ocupado/);
+  m.input(u.id,{x:Infinity,z:NaN,speed:999,gold:999999});m.step(.05);assert.ok(Number.isFinite(u.x));assert.ok(u.gold<9999);
+});
+test('Coleta física esgota árvore; cooldown e reparo custam os mesmos recursos',()=>{
+  const m=match(),{u,core,b}=completedBase(m),t=m.trees[0];u.x=t.x+1;u.z=t.z;const wood=u.wood;
+  m.act(u.id,{type:'gather',target:t.id});assert.equal(u.wood,wood+B.elf.gather);m.act(u.id,{type:'gather',target:t.id});assert.equal(u.wood,wood+B.elf.gather);
+  t.amount=3;m.time+=1;m.act(u.id,{type:'gather',target:t.id});assert.equal(t.amount,0);
+  u.x=b.x+3;u.z=b.z;core.hp-=100;const before=u.gold;m.act(u.id,{type:'repair',target:core.id});assert.equal(u.gold,before-3);assert.equal(core.hp,core.maxHp-58);
+});
+test('Dano econômico limitado ao HP aplicado, sem overkill ou alvo já morto',()=>{
+  const m=match(),t=m.unit('t'),e=m.unit('e0');const before=t.gold;
+  assert.equal(m.damage(e,9999,t,'melee'),B.elf.hp);assert.equal(m.damage(e,9999,t,'melee'),0);assert.ok(t.gold>before&&t.gold<100);
+  assert.equal(m.damage(m.unit('e1'),Infinity,t,'melee'),0);
+});
+test('Cooldowns, preparação e bloqueio físico não dependem do cliente',()=>{
+  const m=match(),t=m.unit('t'),start={x:t.x,z:t.z};m.input(t.id,{x:1,z:0,sprint:true});m.step(.1);assert.equal(t.x,start.x);assert.match(m.act(t.id,{type:'attack'}),/selo/);
+  m.state=STATES.ACTIVE;const e=m.unit('e0');e.x=t.x;e.z=t.z+2;t.yaw=0;m.act(t.id,{type:'attack'});const hp=e.hp;m.act(t.id,{type:'attack'});assert.equal(e.hp,hp);
+  const b=m.map.bases[0];t.x=(b.cx-b.rx)*m.map.cell-2;t.z=b.cz*m.map.cell;m.input(t.id,{x:1,z:0});for(let i=0;i<20;i++){m.input(t.id,{x:1,z:0});m.step(.05);}assert.ok(t.x<(b.cx-b.rx)*m.map.cell);
+});
+test('Fog de guerra omite unidades, economia, construções e eventos inimigos',()=>{
+  const m=match(),{u,core}=completedBase(m),t=m.unit('t');u.x=core.x;u.z=core.z+2;
+  const s=m.snapshot(t.id);assert.ok(!s.units.some(e=>e.id===u.id));assert.ok(!s.structures.some(e=>e.id===core.id));assert.ok(!s.events.some(e=>e.entity===core.id));assert.ok(!JSON.stringify(s).includes('bounty'));
+  t.x=u.x;t.z=u.z+2;const visible=m.snapshot(t.id).units.find(e=>e.id===u.id);assert.ok(visible);assert.equal(visible.gold,undefined);assert.equal(visible.levels,undefined);
+});
+test('Transferência aliada impede valores negativos e griefing',()=>{
+  const m=match(),a=m.unit('e0'),b=m.unit('e1');assert.equal(m.act(a.id,{type:'transfer',target:b.id,gold:25,wood:10}),undefined);assert.equal(a.gold,125);assert.equal(b.gold,175);
+  assert.ok(m.act(a.id,{type:'transfer',target:b.id,gold:-20,wood:0}));assert.ok(m.act(a.id,{type:'transfer',target:'t',gold:10,wood:0}));assert.ok(m.act(a.id,{type:'attack'}));
+});
+test('Vitórias simétricas, resultado imutável e punição por inatividade',()=>{
+  const m=match(1);m.unit('t').hp=0;m.unit('t').alive=false;m.step(.05);assert.equal(m.state,STATES.END);assert.equal(m.winner,'elves');const time=m.time;m.step(1);assert.equal(m.time,time);
+  const n=match(1);n.unit('e0').alive=false;n.step(.05);assert.equal(n.winner,'troll');
+  const hunger=match();hunger.state=STATES.ACTIVE;hunger.time=B.hungerAge+1;const hp=hunger.unit('t').hp;hunger.step(1);assert.ok(hunger.unit('t').hp<hp);
+});
+test('IA usa os mesmos atributos em fácil, normal e difícil',()=>{
+  for(const difficulty of Object.keys(B.difficulty)){const m=new Match({difficulty},slots(2,'bot'));assert.equal(m.unit('t').maxHp,B.troll.hp);assert.equal(m.unit('e0').gold,B.elf.gold);assert.equal(m.unit('e0').maxHp,B.elf.hp);}
+});
+test('Partidas autônomas 1v1, 1v2, 1v5 e 1v8 completam todo o ciclo',()=>{
+  const cases=[...[1,2,5,8].map(n=>({n,seed:'TEST-'+n,difficulty:'normal'})),{n:5,seed:'SIM-2',difficulty:'easy'}];
+  // Infinite progression can exceed the former 20-minute cap. Pacing is measured separately
+  // by the 20 Hz audit, which preserves unfinished games instead of treating them as wins.
+  for(const {n,seed,difficulty} of cases){const m=new Match({seed,difficulty},slots(n,'bot'));for(let i=0;i<18000&&m.state!==STATES.END;i++)m.step(.1);assert.equal(m.state,STATES.END,seed);assert.ok(['troll','elves'].includes(m.winner));assert.ok(m.stats.trollDamage>0);assert.ok(m.stats.produced>0);assert.ok(m.stats.upgrades>0);assert.ok(m.winner==='elves'||m.stats.basesDestroyed>0);assert.ok(m.stats.basesDestroyed<=n);}
+});
+test('Lobby: autorização, slots, readiness, sessão privada e revanche',()=>{
+  const service=new SessionService(),host=service.addClient('host','Host'),guest=service.addClient('guest','Guest'),r=service.create(host,{role:'troll',settings:{elfSlots:2,private:true},password:'secret',fillBots:true});
+  assert.equal(service.list().length,0);assert.throws(()=>service.join(guest,{code:r.id,password:'wrong'}),/Senha/);service.join(guest,{code:r.id,password:'secret'});
+  assert.throws(()=>service.start(r,host),/prontos/);assert.throws(()=>service.configure(r,guest,{elfSlots:8}),/host/);
+  service.changeSlot(r,guest,{slot:'e0',action:'claim'});assert.equal(r.slots.filter(s=>s.occupant?.clientId==='guest').length,1);
+  assert.throws(()=>service.changeSlot(r,guest,{slot:'t0',action:'claim'}),/indisponível/);
+  for(const m of r.members.values())m.ready=true;service.start(r,host);assert.equal(r.match.units.length,3);assert.throws(()=>service.changeSlot(r,host,{slot:'e1',action:'remove'}),/bloqueada/);
+  service.disconnect(guest);assert.equal(r.match.unit('e0').controller,'bot');service.resume(guest);assert.equal(r.match.unit('e0').controller,'human');
+  r.match.unit('t0').alive=false;r.match.step(.05);r.state=r.match.state;service.returnToLobby(r,host);assert.equal(r.state,STATES.LOBBY);assert.equal(r.members.size,2);assert.ok([...r.members.values()].every(m=>!m.ready));for(const m of r.members.values())m.ready=true;service.start(r,host);assert.equal(r.match.time,0);
+});

@@ -1,0 +1,28 @@
+{
+  "name": "thornhold",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Thornhold — authoritative asymmetric 3D multiplayer vertical slice",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node --test tests/*.test.js",
+    "simulate": "node scripts/simulate.js",
+    "balance": "node scripts/balance.js",
+    "audit:combat": "node scripts/combat-audit.js",
+    "audit:progression": "node scripts/progression-audit.js",
+    "audit:compare": "node scripts/compare-progression.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "three": "0.180.0",
+    "ws": "8.21.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "agent-browser": "^0.38.1"
+  }
+}
