@@ -53,6 +53,18 @@ test('IA recua de cerco perigoso e recupera vida sem ganhar atributos',()=>{
   const speed=B.troll.speed,maxHp=u.maxHp;c.troll(m,u);assert.equal(c.retreating,true);assert.equal(c.brain.state,'retreat');assert.ok(c.destination);assert.ok(distance(c.destination,u)>5);assert.equal(u.maxHp,maxHp);assert.equal(B.troll.speed,speed);
   Object.assign(u,c.destination);m.time=65;u.lastHit=60;c.troll(m,u);assert.equal(c.brain.state,'recover');assert.equal(c.destination,null);
 });
+test('IA encontra rota de fuga fora da barricada enquanto o Elfo repara sob fogo de torre',()=>{
+  const m=new Match({seed:'THORNHOLD'},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},{id:'e0',role:'elf',occupant:{type:'human',name:'Elf'}}]),t=m.unit('t'),elf=m.unit('e0'),c=new AIController('normal'),base=m.map.bases[4];m.state=STATES.ACTIVE;m.time=157;
+  t.controller='bot';m.controllers.set(t.id,c);
+  const d=Math.max(.001,distance(base,base.gate)),ix=(base.x-base.gate.x)/d,iz=(base.z-base.gate.z)/d;
+  Object.assign(t,{x:190.1,z:83.4,hp:500,maxHp:2520,lastHit:m.time});Object.assign(elf,{x:194.6,z:86.1,gold:10000,wood:10000,baseId:base.id});
+  const wall={id:'repair-loop-wall',kind:'wall',owner:elf.id,baseId:base.id,x:base.gate.x,z:base.gate.z,hp:1312,maxHp:2035,tier:2,progress:1,healthProgress:1,lastHit:-100,lastShot:-100,bounty:500};
+  const tower={id:'repair-loop-tower',kind:'tower',owner:elf.id,baseId:base.id,x:base.gate.x+ix*10,z:base.gate.z+iz*10,hp:540,maxHp:540,tier:2,branch:'power',progress:1,healthProgress:1,lastHit:-100,lastShot:-100,bounty:100};
+  m.structures.push(wall,tower);let retreated=false,minHp=t.hp,maxDistance=distance(t,base.gate);const states=new Set();
+  for(let i=0;i<500&&t.alive;i++){if(i%22===0)m.act(elf.id,{type:'repair',target:wall.id});m.step(.05);minHp=Math.min(minHp,t.hp);maxDistance=Math.max(maxDistance,distance(t,base.gate));states.add(c.brain?.state);if(c.retreating&&distance(t,base.gate)>7){retreated=true;break;}}
+  const diagnostic=JSON.stringify({hp:t.hp,wall:wall.hp,state:c.brain?.state,retreating:c.retreating,maxDistance,states:[...states],risk:c.brain?.riskScore,metrics:c.metrics});
+  assert.equal(t.alive,true,diagnostic);assert.equal(retreated,true,diagnostic);assert.ok(minHp>0);
+});
 test('Espada lendária encerra recuperação e dificuldades maiores sustentam o assalto',()=>{
   assert.ok(B.difficulty.easy.retreat>B.difficulty.normal.retreat&&B.difficulty.normal.retreat>B.difficulty.hard.retreat);
   const m=match(),u=m.unit('t'),c=new AIController('hard');m.state=STATES.ACTIVE;m.time=B.finalAge+50;u.hp=u.maxHp*.3;u.levels.damage=5;u.levels.siege=5;

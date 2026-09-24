@@ -71,11 +71,12 @@ export class TrollBrain {
         if(recovering){this.state='recover';c.stop(u);return;}
         this.state='retreat';
         if(!this.safePoint||risk(this.safePoint)>2||distance(u,this.safePoint)<2){
-          const options=[],blocked=c.navigationBlocks(m,u);
+          const options=[],blocked=c.navigationBlocks(m,u),obstacles=[...c.discovered.values()].filter(e=>e.kind);
           for(const radius of [12,22,32])for(let i=0;i<12;i++){
             const p={x:u.x+Math.sin(i*Math.PI/6)*radius,z:u.z+Math.cos(i*Math.PI/6)*radius};
             const cell=toCell(m.map,p);
-            if(walkable(m.map,cell.x,cell.z)&&!blocked.has(index(m.map,cell.x,cell.z)))options.push({...p,score:risk(p)*8+radius});
+            const clear=[[0,0],[B.movement.trollRadius,0],[-B.movement.trollRadius,0],[0,B.movement.trollRadius],[0,-B.movement.trollRadius]].every(([dx,dz])=>{const edge=toCell(m.map,{x:p.x+dx,z:p.z+dz});return walkable(m.map,edge.x,edge.z);})&&!obstacles.some(s=>distance(p,s)<B.structures[s.kind].radius+B.movement.trollRadius);
+            if(clear&&!blocked.has(index(m.map,cell.x,cell.z)))options.push({...p,score:risk(p)*8+radius});
           }
           options.sort((a,b)=>a.score-b.score);
           this.safePoint=options.find(p=>pathfind(m.map,u,p,c.navigationBlocks(m,u)).length)||m.map.trollSpawn;
