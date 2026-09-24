@@ -15,6 +15,8 @@ npm start
 
 Abra **http://localhost:3000**. No Windows, também é possível executar **Iniciar Thornhold.cmd**. As dependências já instaladas permitem jogar sem CDN ou conexão com serviços externos.
 
+A interface inicia em português. Use o botão **EN/PT** no cabeçalho ou no HUD para alternar para inglês durante a partida; a preferência fica salva neste navegador.
+
 1. Escolha **Jogar contra bots**, seu papel e a quantidade de Elfos.
 2. No lobby, configure seed, preparação, mapa e bots; marque **Estou pronto**.
 3. Inicie. Como Elfo, siga uma trilha até uma clareira e construa o núcleo; como Troll, aguarde o selo cair.
@@ -87,7 +89,7 @@ O Troll aparece como um losango laranja quando a equipe o avista. Ao sair da vis
 
 - Criação/entrada por código e senha, browser público, filtros, Quick Play, troca de papel, mover humanos, adicionar/remover bots, abrir/fechar slots, Ready, host migrado, resultado e revanche.
 - Um único `Match` para humanos e IA. Desconexões podem transferir o mesmo personagem para IA. Recarregar a aba retoma a sessão por token enquanto o servidor e a sala permanecem ativos.
-- Mapa determinístico com doze refúgios de três tamanhos, estoques de madeira diferentes, platôs e baixadas ligados por rampas. Trilhas com bifurcações atravessam uma floresta sólida; o minimapa revela o terreno explorado. Cada clareira tem um único portão validado pelo servidor.
+- Mapa determinístico com doze refúgios de três tamanhos e quantidades diferentes de árvores, cada uma com estoque atual de 1.000 madeiras, além de platôs e baixadas ligados por rampas. Trilhas com bifurcações atravessam uma floresta sólida; o minimapa revela o terreno explorado. Cada clareira tem um único portão validado pelo servidor.
 - Núcleo com renda crescente, barricada reparável, cinco torres por Elfo, quatro especializações de torre, mina e oficina. Obras, coleta, melhorias e destruição usam recursos reais e alteram o estado compartilhado.
 - Wisps formados no núcleo: um por árvore, produção contínua sem consumir o tronco, evolução sem nível máximo e transferência para árvores externas com maior rendimento e exposição. Árvores esgotadas pela coleta manual rebrotam após 35 segundos se não houver uma construção no local.
 - Loja do Troll com nove equipamentos, três espaços e sugestões de Cerco, Caçador e Sustentação. Itens comprados ficam na coleção; trocar exige cinco segundos fora de combate. Oito atributos e tiers de estruturas evoluem sem limite de nível, com custos crescentes e ganhos decrescentes de velocidade.
@@ -112,7 +114,7 @@ npm run audit:progression -- 6 artifacts/progression-current-20hz.json
 ```
 
 - `npm test`: regras, física, economia, fog, mapa, simulações completas e cenários de rede A–G com conexões WebSocket independentes.
-- `npm run verify`: sintaxe, testes de regras/rede e os fluxos críticos de navegador para upgrades, recursos, stun, reassentamento, placar e resultado.
+- `npm run verify`: sintaxe, testes de regras/rede e os fluxos críticos de navegador para upgrades, recursos, stun, reassentamento, placar, resultado e alternância PT-BR/EN.
 - `npm run balance`: HP, DPS, tempo para romper barricada, tempo para matar o Troll e retorno do investimento econômico por tier. Gera `artifacts/balance.json`.
 - `npm run simulate -- 240`: partidas determinísticas em 1v2/1v3/1v5/1v8 e três dificuldades. Gera `artifacts/simulations.json`, incluindo win rate, duração, dano, renda, primeira ruptura, melhorias e sobreviventes. O teste não concede bônus de vitória nem altera regras por resultado.
 - O servidor grava resultados reais em `telemetry/matches.jsonl`.

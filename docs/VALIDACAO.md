@@ -5,9 +5,10 @@ Os testes exercitam o código real, não telas simuladas. As conexões chamadas 
 ## Candidata 0.2.0-alpha.2 — 24/09/2026
 
 - 81 testes de regras, física, IA e rede aprovados.
-- 50 arquivos JavaScript aprovados por `node --check`, incluindo a infraestrutura de release.
+- 52 arquivos JavaScript aprovados por `node --check`, incluindo a infraestrutura de release.
 - `browser-review.js`: upgrade do Núcleo, atualização no mesmo tick, foco de seleção e ícones unificados.
 - `browser-stun-scoreboard.js`: stun autoritativo, placar ao vivo, contador de reassentamento, MVP e tabela final, sem exceções JavaScript.
+- `browser-i18n.js`: preferência persistente e troca ao vivo PT-BR/EN no menu, ajuda, lobby, HUD, seleção, loja e resultado, sem exceções JavaScript.
 - Estoque de árvores elevado para 1.000 madeiras, incluindo árvores ricas e rebrote. Em 100 partidas: 41 vitórias Troll, 59 Elfos, mediana 10:37 e nenhuma inconclusiva.
 - Baseline anterior de 100 partidas: 49 vitórias Troll, 51 Elfos, média 14:38, mediana 14:46, nenhuma inconclusiva.
 - Regressão de 60 partidas após stun/reassentamento: 33 vitórias Troll, 27 Elfos, média 14:58, mediana 15:50 e nenhuma inconclusiva. Foram usados 102 stuns em 45 partidas.

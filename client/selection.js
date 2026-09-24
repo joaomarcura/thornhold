@@ -3,8 +3,9 @@ import { baseAt } from '../shared/map.js';
 import { icon } from './icons.js';
 import { resource, resourceCost } from './resources.js';
 import { upgradeStatus } from '../shared/upgrade-rules.js';
+import { localeCode } from './i18n.js';
 
-const number=n=>Math.floor(n||0).toLocaleString('pt-BR');
+const number=n=>Math.floor(n||0).toLocaleString(localeCode());
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const price=resourceCost;
 const meter=(value,label)=>`<div class="job-meter"><span>${label}</span><i><b style="width:${Math.max(0,Math.min(100,value*100))}%"></b></i></div>`;

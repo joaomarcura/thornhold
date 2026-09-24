@@ -1,0 +1,71 @@
+import { chromium } from '@playwright/test';
+import assert from 'node:assert/strict';
+import { createGameServer } from '../server/index.js';
+import { STATES } from '../shared/config.js';
+
+const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false});
+const channel=process.env.PLAYWRIGHT_CHANNEL||(process.platform==='win32'?'msedge':undefined);
+const browser=await chromium.launch({headless:true,args:['--enable-unsafe-swiftshader'],...(channel?{channel}:{})});
+const page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[],report={};
+page.on('pageerror',error=>errors.push(error.message));
+try{
+  await page.goto('http://127.0.0.1:'+app.port);
+  await page.getByText('Servidor conectado',{exact:false}).waitFor();
+  assert.equal(await page.locator('html').getAttribute('lang'),'pt-BR');
+  await page.locator('[data-do=language]').click();
+  await page.getByRole('button',{name:/Play against bots/}).waitFor();
+  assert.equal(await page.locator('html').getAttribute('lang'),'en');
+  assert.equal(await page.title(),'Thornhold — The Last Clearing');
+  assert.equal(await page.evaluate(()=>localStorage.getItem('thornhold-locale')),'en');
+  report.menu=true;
+
+  await page.reload();
+  await page.getByText('Server connected',{exact:false}).waitFor();
+  await page.locator('[data-do=help]').click();
+  const helpText=await page.locator('.help-modal').innerText();
+  assert.doesNotMatch(helpText,/\b(Encontre|construa|Clique|coletar|Explore depois|golpe|Mover|Correr|Girar|Espaço|Botão|Bolinha|Núcleo)\b/i);
+  await page.locator('.help-modal [data-do=close]').first().click();report.help=true;
+  await page.getByRole('button',{name:'Play against bots',exact:false}).click();
+  await page.getByText('Your first refuge.',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Create local match →',exact:true}).click();
+  await page.getByText('Choose your side. The forest will do the rest.',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Ready up',exact:true}).click();
+  await page.getByRole('button',{name:'Start expedition →',exact:true}).click();
+  await page.locator('#role-name').waitFor();
+  await page.getByText('KEEPER OF THE CLEARING',{exact:true}).waitFor();
+  await page.getByText('LIVE SCOREBOARD',{exact:true}).waitFor();
+  const live=[...app.sessions.rooms.values()][0].match,elf=live.units.find(unit=>unit.controller==='human'),base=live.map.bases[0];live.controllers.clear();
+  Object.assign(elf,{x:base.x+4.4,z:base.z,gold:1000,wood:1000});
+  assert.equal(live.act(elf.id,{type:'build',kind:'core',x:base.x,z:base.z}),undefined);
+  const core=live.structures.find(structure=>structure.owner===elf.id);core.progress=core.healthProgress=1;core.hp=core.maxHp;delete core.job;
+  await page.waitForTimeout(500);
+  await page.locator('#core-shortcut').click();
+  await page.waitForTimeout(300);
+  const selectionText=await page.locator('#selection-panel').innerText();
+  assert.match(selectionText,/Next upgrade/);
+  assert.doesNotMatch(selectionText,/\b(Nível|Construção|melhoria|Produção|Ritmo|árvores livres)\b/i);
+  report.selection=true;
+  report.lobbyAndHud=true;
+
+  await page.locator('#hud [data-do=language]').click();
+  await page.getByText('GUARDIÃO DA CLAREIRA',{exact:true}).waitFor();
+  assert.equal(await page.locator('html').getAttribute('lang'),'pt-BR');
+  report.liveSwitch=true;
+
+  await page.locator('#hud [data-do=language]').click();
+  await page.getByText('KEEPER OF THE CLEARING',{exact:true}).waitFor();
+  const match=[...app.sessions.rooms.values()][0].match,human=match.units.find(unit=>unit.controller==='human'),troll=match.units.find(unit=>unit.role==='troll');
+  match.controllers.clear();match.state=STATES.ACTIVE;match.time=60;match.damage(troll,troll.hp,human,'tower','i18n-test');
+  await page.getByText('MATCH MVP',{exact:true}).waitFor();
+  await page.getByText('Elf victory.',{exact:true}).waitFor();
+  await page.getByRole('columnheader',{name:'Player',exact:true}).waitFor();
+  report.results=true;
+  await page.locator('[data-do=return]').click();
+  await page.locator('[data-do=slot][data-slot=t0][data-action=claim]').click();
+  const ready=page.locator('[data-do=ready]');if((await ready.innerText()).includes('Ready up'))await ready.click();
+  await page.locator('[data-do=start]').click();await page.getByText('FOREST TROLL',{exact:true}).waitFor();
+  await page.locator('#hotbar [data-do=shop]').click();await page.getByText('FOREST ARSENAL',{exact:true}).waitFor();
+  const shopText=await page.locator('#shop').innerText();assert.doesNotMatch(shopText,/\b(Equipamentos|Proteção|Relíquia|Espaço livre|Cerco|Caçador|Sustentação)\b/i);report.shop=true;
+  assert.deepEqual(errors,[]);report.errors=errors;
+  console.log(report);
+}finally{await browser.close();await app.close();}
