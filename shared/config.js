@@ -7,7 +7,10 @@ export const BALANCE = {
   vision: { troll: 30, elf: 24 }, interactRange: 6.5,
   movement:{sprint:1.25,trollRadius:.64,elfRadius:.37},
   construction:{initialHealth:.15,breachCooldown:45,enemyClearance:5,gateClearance:4,limits:{core:1,wall:1,tower:5,mine:5,workshop:1},upgradeSeconds:3},
-  economy:{richWood:1.65,finalRichWood:2.5,workshopGather:.3,workshopRepair:.2,trollLobbyBonus:[0,0,.08,.12,.16,.2,.2,.2,.18],trollBountyFactor:[0,1.3,1.5,1.45,1.45,1.375,1.4,1.25,1.1],trollMapBounty:{compact:.9,large:1.1}},
+  economy:{richWood:1.65,finalRichWood:2.5,workshopGather:.3,workshopRepair:.2,trollLobbyBonus:[0,0,.08,.12,.16,.2,.2,.2,.18],trollBountyFactor:[0,1.3,1.5,1.45,1.45,1.375,1.4,1.25,1.1],trollMapBounty:{compact:.9,large:1.1},trollScenarioBounty:{
+    compact:{easy:[1,1.12,1,1,1,.98,1,1,1],normal:[1,1.12,1,1,1,.98,1,1,1.1],hard:[1,1.12,1,1,1,.98,1,1,1.1]},
+    large:{easy:[1,1.12,1,1,1,1,1,1,.91],normal:[1,1.12,1,1,1,1,1,1,.91],hard:[1,1.12,1,1,1,1,1,1,.93]}
+  }},
   progression:{structureGrowth:1.18,costGrowth:1.35,woodCostGrowth:1.25,trollDamageGrowth:1.12,healthGrowth:1.14},
   wisps:{gold:65,wood:15,hireGrowth:1.32,trainSeconds:6,income:1.4,incomeGrowth:1.25,upgradeGold:70,upgradeWood:20,costGrowth:1.5,seconds:4,hp:55,externalBonus:1.6,range:25,regrowSeconds:35},
   combat:{buffer:.18,lightWindup:.1,heavyWindup:.32,comboWindow:2.8,comboBonus:.25,openingSeconds:1.2,openingBonus:.2},
