@@ -91,7 +91,7 @@ Versão candidata: `0.2.0-alpha.1`. Cenário principal de balanceamento: um Trol
 - [x] `REL-002` Definir versão explícita e versões de protocolo, balanceamento e IA.
 - [x] `REL-003` Criar `npm run verify` com sintaxe, regras/rede e fluxos críticos de navegador.
 - [x] `REL-004` Executar a verificação em CI e preservar capturas como artefatos.
-- [ ] `REL-005` Gerar baseline pareada de 100 partidas com versão, hash do Git, hash de configuração e matriz de seeds.
+- [x] `REL-005` Gerar baseline pareada de 100 partidas com versão, hash do Git, hash de configuração e matriz de seeds.
 - [x] `REL-006` Atualizar a documentação e marcar auditorias históricas que foram superadas.
 
 ### Etapa 1 — fechar o gameplay principal

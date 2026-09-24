@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "sourceArtifact": "artifacts/v0.2.0-alpha.1-baseline-100.json",
+  "sourceSha256": "1b6b8a5d38412e0c2ba7ea44b73043f289b1075ec1302ee44f212696f03f99f4",
+  "sourceBytes": 42301381,
+  "metadata": {
+    "release": { "game": "0.2.0-alpha.1", "protocol": 1, "balance": 2, "ai": 2 },
+    "gitCommit": "78a2ae5fc92fc9601b8ca99bfdef48f843ae94f7",
+    "dirty": false,
+    "node": "v24.15.0",
+    "generatedAt": "2026-09-24T05:16:47.664Z",
+    "configHash": "ec9cb5cb67586f91b6c8c704e06af639757f278ac99920927b209cadb1071172",
+    "step": 0.05,
+    "count": 100,
+    "seedPattern": "SIM-{run}"
+  },
+  "summary": {
+    "duration": { "mean": 901.54, "median": 927, "p10": 460, "p90": 1200 },
+    "trollWins": 54,
+    "elfWins": 46,
+    "timeLimit": 32,
+    "unfinished": 0,
+    "under4Minutes": 4,
+    "under10Minutes": 16,
+    "meanTrollDamage": 25228.908065954285,
+    "meanStructuresDestroyed": 16.09,
+    "meanTowersDestroyed": 6.2,
+    "meanCombatSeconds": 407.73200000003925,
+    "meanRetreatSeconds": 278.97950000000105,
+    "meanRetreats": 8.16,
+    "meanEngagements": 10.85,
+    "meanFailedNavigation": 0.71,
+    "meanStuckNavigation": 0.01,
+    "meanFailedExploration": 14.23,
+    "meanPathRecalculations": 519.61,
+    "meanGoldPerMinute": 287.6033963349853,
+    "meanWoodPerMinute": 270.8019969679763
+  },
+  "referenceScenario": {
+    "elves": 5,
+    "difficulty": "normal",
+    "runs": 8,
+    "duration": { "mean": 991.25, "median": 971, "p10": 669, "p90": 1200 },
+    "trollWins": 4,
+    "elfWins": 4,
+    "timeLimit": 2,
+    "unfinished": 0,
+    "meanFailedNavigation": 0.5,
+    "meanFailedExploration": 1.75
+  },
+  "comparisonToPrevious100": {
+    "durationMeanDelta": 23.1,
+    "durationMedianDelta": 41,
+    "trollWinsDelta": 5,
+    "elfWinsDelta": -5,
+    "timeLimitDelta": 1,
+    "meanFailedNavigationDelta": 0.02,
+    "meanFailedExplorationDelta": 5.47
+  },
+  "notes": [
+    "O agregado mistura tamanhos de equipe e dificuldades; não representa o modo ranqueado isoladamente.",
+    "O cenário de referência 1v5 normal terminou 4–4, com mediana de 16:11.",
+    "Falhas médias de exploração cresceram; o maior foco está em 1v5 e 1v8 difícil.",
+    "O limite de 20 minutos ainda existia nesta baseline e será removido em GAME-107."
+  ]
+}

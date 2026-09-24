@@ -12,7 +12,7 @@ Os testes exercitam o código real, não telas simuladas. As conexões chamadas 
 - Regressão de 60 partidas após stun/reassentamento: 33 vitórias Troll, 27 Elfos, média 14:58, mediana 15:50 e nenhuma inconclusiva. Foram usados 102 stuns em 45 partidas.
 - `npm run verify` passa a ser o portão único local e de CI. A arena schema 2 registra versão, commit, dirty state e hash de configuração.
 
-O próximo baseline oficial deve conter 100 seeds pareadas após o commit de release; os números de 60 partidas são sinal de regressão, não baseline definitivo.
+O baseline oficial versionado está em [`baselines/v0.2.0-alpha.1.json`](../baselines/v0.2.0-alpha.1.json). Nas 100 seeds pareadas: 54 vitórias Troll, 46 Elfos, média 15:02, mediana 15:27 e zero inconclusivas. O cenário de referência 1v5 normal terminou 4–4, com mediana 16:11. O lote ainda usa o limite antigo de 20 minutos; 32 partidas chegaram a ele. Falhas médias de exploração cresceram de 8,76 para 14,23, concentradas especialmente nas dificuldades altas com cinco e oito Elfos.
 
 ## Estado atual — HUD e interação, 22/09/2026
 
