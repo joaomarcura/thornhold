@@ -2,6 +2,18 @@
 
 Os testes exercitam o código real, não telas simuladas. As conexões chamadas de “humanas” nos testes automáticos são clientes de rede sintéticos, sem controlador IA do servidor. Isso valida protocolo e ocupação dos slots; não substitui sessões de usabilidade com pessoas.
 
+## Candidata 0.2.0-alpha.1 — 24/09/2026
+
+- 65 testes de regras, física, IA e rede aprovados.
+- 50 arquivos JavaScript aprovados por `node --check`, incluindo a infraestrutura de release.
+- `browser-review.js`: upgrade do Núcleo, atualização no mesmo tick, foco de seleção e ícones unificados.
+- `browser-stun-scoreboard.js`: stun autoritativo, placar ao vivo, contador de reassentamento, MVP e tabela final, sem exceções JavaScript.
+- Baseline anterior de 100 partidas: 49 vitórias Troll, 51 Elfos, média 14:38, mediana 14:46, nenhuma inconclusiva.
+- Regressão de 60 partidas após stun/reassentamento: 33 vitórias Troll, 27 Elfos, média 14:58, mediana 15:50 e nenhuma inconclusiva. Foram usados 102 stuns em 45 partidas.
+- `npm run verify` passa a ser o portão único local e de CI. A arena schema 2 registra versão, commit, dirty state e hash de configuração.
+
+O próximo baseline oficial deve conter 100 seeds pareadas após o commit de release; os números de 60 partidas são sinal de regressão, não baseline definitivo.
+
 ## Estado atual — HUD e interação, 22/09/2026
 
 - **45 testes de regras/rede aprovados.** Os dois cenários novos verificam cancelamento de investimentos: reembolso parcial calculado no servidor, ausência de duplicação, dono, proximidade, bloqueio após dano e proteção de obras já concluídas.

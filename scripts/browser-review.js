@@ -5,7 +5,8 @@ import { createGameServer } from '../server/index.js';
 import { STATES } from '../shared/config.js';
 
 const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false});
-const browser=await chromium.launch({channel:'msedge',headless:true,args:['--enable-unsafe-swiftshader']});
+const channel=process.env.PLAYWRIGHT_CHANNEL||(process.platform==='win32'?'msedge':undefined);
+const browser=await chromium.launch({headless:true,args:['--enable-unsafe-swiftshader'],...(channel?{channel}:{})});
 const page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[],report={};
 page.on('pageerror',e=>errors.push(e.message));
 const until=async(fn,label)=>{for(let i=0;i<120;i++){if(await fn())return;await new Promise(r=>setTimeout(r,50));}throw Error(label);};

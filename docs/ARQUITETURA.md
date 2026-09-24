@@ -46,6 +46,8 @@ As áreas construíveis são planas. Elevações e faces de rocha são bloqueada
 
 ## Economia e encerramento
 
+Na candidata 0.2, o stun élfico é validado pelo servidor: exige a ruptura recente da própria Barricada, alcance, visão e uma recarga compartilhada. Ele interrompe intenção, dash e golpe preparado do Troll por três segundos. A destruição de um Núcleo abre atualmente uma janela de reassentamento de 60 segundos; o voucher único que garante o novo Núcleo está especificado no backlog da alpha.
+
 O núcleo é a principal fonte de ouro; a mina complementa renda, a oficina melhora coleta/reparo. A coleta manual consome estoque; árvores esgotadas rebrotam após 35 segundos quando não há estrutura no local. Wisps ligados às árvores geram madeira sem consumir estoque e dependem de dono vivo e núcleo concluído a até 25 metros. `shared/wisps.js` valida formação, exclusividade da árvore, evolução e transferência. Wisps são alvos econômicos, não participantes da condição de vitória.
 
 Obras começam com 15% do HP e progridem com um construtor perto. Estruturas, Wisps e atributos do Troll não têm nível máximo de compra; fórmulas evitam overflow e velocidades têm ganhos decrescentes. Os modelos visuais têm quatro estágios, independentes do nível real. `shared/equipment.js` centraliza nove itens, três espaços de equipamento e estatísticas usadas pelo servidor, HUD, loja e auditorias. Trocas exigem cinco segundos fora de combate e preservam a fração de vida.
@@ -67,3 +69,5 @@ Snapshots omitem unidades e estruturas inimigas fora da visão da equipe. Econom
 Mensagens têm limite de tamanho e frequência. Números não finitos, identificadores inválidos, propriedades herdadas, movimentos excessivos, ações fora de alcance e mutações sem permissão são rejeitados. HTTP só serve diretórios de assets; código do servidor e telemetria não são rotas públicas. Há heartbeat WebSocket e proteção básica de origem.
 
 O servidor atual mantém as salas em memória. Para persistência, distribuição regional e autenticação de produção, o ponto de extensão é `SessionService`; a simulação central não precisa ser duplicada.
+
+Versões de jogo, protocolo, balanceamento e IA ficam em `shared/version.js`. Relatórios novos da arena incluem essas versões, commit, estado sujo e hash da configuração para comparação reproduzível.

@@ -1,6 +1,6 @@
 # THORNHOLD — A última clareira
 
-Jogo 3D em terceira pessoa: um Troll caça de um a oito Elfos que precisam explorar, construir economia e defender suas clareiras. Código, modelos geométricos, interface, mapa e efeitos sonoros originais. Vertical slice **0.1**, com simulação autoritativa e multiplayer WebSocket real.
+Jogo 3D em terceira pessoa: um Troll caça de um a oito Elfos que precisam explorar, construir economia e defender suas clareiras. Código, modelos geométricos, interface, mapa e efeitos sonoros originais. Candidata **0.2.0-alpha.1**, com simulação autoritativa e multiplayer WebSocket real.
 
 ![Mapa de Thornhold com doze refúgios, floresta e trilhas](docs/images/mapa-thornhold.png)
 
@@ -45,7 +45,7 @@ O processo Node é o servidor da partida, não o navegador do host. O host tem p
 | Coletar / ajudar obra | E; segure para repetir |
 | Reparar estrutura selecionada | R; segure para repetir |
 | Ataque Troll / pesado | Clique ou segurar clique / Q |
-| Esquiva / rugido | Espaço / F |
+| Esquiva do Troll / habilidade de papel | Espaço / F |
 | Loja / atributos do Troll | B |
 | Formar e evoluir Wisps no núcleo | N ou clique no recurso madeira |
 | Evoluir seleção / formar Wisp no núcleo selecionado | U / T |
@@ -58,6 +58,8 @@ O processo Node é o servidor da partida, não o navegador do host. O host tem p
 | Guia / alternar observado | H / Tab |
 
 Obras precisam de um construtor vivo por perto. A barricada encaixa somente no portão da sua clareira. Elfos atravessam portões aliados; o Troll precisa destruí-los. Após uma ruptura, a entrada fica 12 segundos sem reconstrução e não aceita novas fundações com o Troll a menos de 5 metros.
+
+Depois que sua Barricada é rompida, um Elfo próximo pode usar **F** para atordoar o Troll por três segundos. A recarga de 60 segundos é compartilhada pela equipe. Se o Núcleo for destruído, o Elfo sobrevivente tem 60 segundos para alcançar outra clareira e reassentar; esta regra ainda receberá o voucher garantido descrito no [backlog da alpha](docs/BACKLOG-V0.2-ALPHA.md).
 
 O cursor livre permite selecionar estruturas e usar os painéis. Loja, ajuda e mapa liberam o cursor automaticamente; a bolinha do mouse retorna à câmera. Ao observar outra região, seu personagem permanece parado: **C** retorna ao personagem, **M** fecha o mapa. A partida continua nesses painéis.
 
@@ -87,6 +89,7 @@ O Troll aparece como um losango laranja quando a equipe o avista. Ao sair da vis
 - [Guia de referências de Troll & Elves](docs/REFERENCIAS-TROLL-E-ELFOS.md): fontes verificadas, diferenças entre versões e resultado da busca por uma wiki abrangente.
 
 ```powershell
+npm run verify
 npm test
 npm run balance
 npm run simulate -- 240
@@ -95,6 +98,7 @@ npm run audit:progression -- 6 artifacts/progression-current-20hz.json
 ```
 
 - `npm test`: regras, física, economia, fog, mapa, simulações completas e cenários de rede A–G com conexões WebSocket independentes.
+- `npm run verify`: sintaxe, testes de regras/rede e os fluxos críticos de navegador para upgrades, recursos, stun, reassentamento, placar e resultado.
 - `npm run balance`: HP, DPS, tempo para romper barricada, tempo para matar o Troll e retorno do investimento econômico por tier. Gera `artifacts/balance.json`.
 - `npm run simulate -- 240`: partidas determinísticas em 1v2/1v3/1v5/1v8 e três dificuldades. Gera `artifacts/simulations.json`, incluindo win rate, duração, dano, renda, primeira ruptura, melhorias e sobreviventes. O teste não concede bônus de vitória nem altera regras por resultado.
 - O servidor grava resultados reais em `telemetry/matches.jsonl`.
@@ -125,6 +129,8 @@ artifacts/    Relatórios e capturas gerados; ignorado pelo Git
 É um slice desktop com arte procedural e persistência de sessão em memória. Reiniciar o servidor encerra suas salas. Não inclui autenticação de conta, ranking, relay/NAT traversal, voz, matchmaking entre servidores, assets artísticos finais nem controles touch. O modo observador tem informação completa e deve ser usado para testes ou espectadores confiáveis; jogadores eliminados recebem somente a visão da equipe. A arquitetura não pretende oferecer proteção contra conluio entre espectadores e jogadores.
 
 O servidor está implementado para operação local/LAN e publicação em um host Node persistente; **nenhum serviço público foi contratado ou publicado automaticamente**.
+
+Escopo aprovado e sequência para a alpha: [Backlog v0.2 Alpha](docs/BACKLOG-V0.2-ALPHA.md).
 
 Referências de dependências: [Three.js — instalação](https://threejs.org/manual/en/installation.html) e [ws — servidor WebSocket](https://github.com/websockets/ws). Nenhum asset de Warcraft ou Dota é utilizado.
 

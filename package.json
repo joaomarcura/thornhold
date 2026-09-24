@@ -1,6 +1,6 @@
 {
   "name": "thornhold",
-  "version": "0.1.0",
+  "version": "0.2.0-alpha.1",
   "private": true,
   "type": "module",
   "description": "Thornhold — authoritative asymmetric 3D multiplayer vertical slice",
@@ -13,6 +13,7 @@
     "test:review:browser": "node scripts/browser-review.js",
     "test:stun:browser": "node scripts/browser-stun-scoreboard.js",
     "check": "node scripts/check.js",
+    "verify": "node scripts/verify.js",
     "balance": "node scripts/balance.js",
     "audit:combat": "node scripts/combat-audit.js",
     "audit:progression": "node scripts/progression-audit.js",

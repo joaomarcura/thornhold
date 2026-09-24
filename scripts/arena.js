@@ -1,7 +1,10 @@
 import { Worker,isMainThread,parentPort,workerData } from 'node:worker_threads';
 import { mkdir,writeFile,readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { Match } from '../shared/simulation.js';
-import { STATES } from '../shared/config.js';
+import { BALANCE, DEFAULT_SETTINGS, STATES } from '../shared/config.js';
+import { RELEASE } from '../shared/version.js';
 
 export function aggregate(rows){
   const mean=v=>v.length?v.reduce((a,b)=>a+b,0)/v.length:0;
@@ -47,7 +50,9 @@ if(!isMainThread){
   for(const elves of [2,3,5,8])for(const difficulty of ['easy','normal','hard']){const group=rows.filter(r=>r.elves===elves&&r.difficulty===difficulty);if(group.length)groups.push({elves,difficulty,...aggregate(group)});}
   let comparison=null;
   if(baselinePath){const baseline=JSON.parse(await readFile(baselinePath,'utf8')),paired=rows.map(r=>{const before=baseline.matches.find(b=>b.seed===r.seed&&b.elves===r.elves&&b.difficulty===r.difficulty);if(!before)return null;return {seed:r.seed,durationDelta:r.duration-before.duration,trollDamageDelta:r.trollDamage-before.trollDamage,winnerBefore:before.winner,winnerAfter:r.winner};}).filter(Boolean);if(!paired.length)throw Error('No matching seeds in baseline');comparison={matchedRuns:paired.length,baseline:aggregate(baseline.matches.filter(b=>paired.some(r=>r.seed===b.seed))),current:aggregate(rows.filter(b=>paired.some(r=>r.seed===b.seed))),paired};}
-  const result={schema:1,step,count,elapsedSeconds:(performance.now()-start)/1000,summary,groups,comparison,matches:rows};
+  let gitCommit='unavailable',dirty=null;try{gitCommit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();dirty=!!execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim();}catch{}
+  const metadata={release:RELEASE,gitCommit,dirty,node:process.version,generatedAt:new Date().toISOString(),configHash:createHash('sha256').update(JSON.stringify({BALANCE,DEFAULT_SETTINGS})).digest('hex'),defaultSettings:DEFAULT_SETTINGS,seedPattern:'SIM-{run}',matrix:{elves:[2,3,5,8],difficulty:['easy','normal','hard']}};
+  const result={schema:2,metadata,step,count,elapsedSeconds:(performance.now()-start)/1000,summary,groups,comparison,matches:rows};
   await mkdir('artifacts',{recursive:true});await writeFile(out,JSON.stringify(result,null,2));
   console.log(JSON.stringify({...result,matches:undefined,groups:undefined,comparison:comparison?{baseline:comparison.baseline,current:comparison.current,matchedRuns:comparison.matchedRuns}:null},null,2));
   if(summary.unfinished)process.exitCode=1;

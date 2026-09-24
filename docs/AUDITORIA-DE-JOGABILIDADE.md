@@ -1,5 +1,7 @@
 # Thornhold — auditoria de jogabilidade
 
+> **Registro histórico:** esta auditoria capturou o estado de 23/09/2026. O stun defensivo, reassentamento, placar ao vivo, MVP, correções de navegação e feedback de recursos já foram implementados depois dela. Decisões atuais e itens ainda abertos estão em [Backlog v0.2 Alpha](BACKLOG-V0.2-ALPHA.md).
+
 **23/09/2026 · Revisão após as melhorias de HUD e interação.**
 
 O jogo já entrega o ciclo de exploração, economia, cerco e vitória. O principal trabalho agora é dar ao Elfo respostas interessantes durante o confronto, transformar cooperação em uma estratégia praticável e ajustar o ritmo para que a partida aproveite seus sistemas. Acrescentar níveis ou itens, isoladamente, tem impacto menor.
