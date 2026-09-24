@@ -114,7 +114,7 @@ Critério: zero estados sem saída, zero partidas automatizadas inacabadas, 1v5 
 
 - [ ] `UX-201` Internacionalização PT-BR/EN sem strings de regra duplicadas.
 - [ ] `UX-202` Remapeamento, escala de UI, daltonismo e redução de movimento.
-- [ ] `MODE-203` Separar Normal, personalizado e Ranqueado no lobby.
+- [x] `MODE-203` Separar Normal, Personalizado e Ranqueado no lobby, com presets autoritativos e identificação pública.
 - [ ] `MODE-204` Filas por papel, grupos élficos, rendição e revanche ranqueada.
 - [ ] `MODE-205` MMR separado, colocações, divisões, temporada e decaimento.
 - [ ] `COS-206` Nível de conta e primeiros cosméticos sem alterar identificação competitiva.

@@ -4,7 +4,7 @@ Os testes exercitam o código real, não telas simuladas. As conexões chamadas 
 
 ## Candidata 0.2.0-alpha.2 — 24/09/2026
 
-- 78 testes de regras, física, IA e rede aprovados.
+- 79 testes de regras, física, IA e rede aprovados.
 - 50 arquivos JavaScript aprovados por `node --check`, incluindo a infraestrutura de release.
 - `browser-review.js`: upgrade do Núcleo, atualização no mesmo tick, foco de seleção e ícones unificados.
 - `browser-stun-scoreboard.js`: stun autoritativo, placar ao vivo, contador de reassentamento, MVP e tabela final, sem exceções JavaScript.
@@ -15,6 +15,10 @@ Os testes exercitam o código real, não telas simuladas. As conexões chamadas 
 O baseline oficial versionado está em [`baselines/v0.2.0-alpha.2.json`](../baselines/v0.2.0-alpha.2.json). O histórico pareado de 100 seeds terminou 39–61. Após `GAME-111`, a matriz cruzada definitiva de 240 partidas terminou 105–135 (43,75%–56,25%), mediana 10:20, sem timeout ou partida inacabada. O cenário principal 1v5 normal compacto terminou 4–6. Detalhes e o resíduo 1v1 estão em [`RELATORIO-ETAPA-1.md`](RELATORIO-ETAPA-1.md).
 
 A `alpha.2` remove o encerramento por relógio. O simulador usa um teto técnico configurável, atualmente 60 minutos, exclusivamente para detectar partidas sem resolução; esse teto e a matriz de cenários são gravados no artefato e não alteram a regra da partida.
+
+### Modos de partida
+
+`MODE-203` separa três contratos no servidor e na interface. **Normal** aplica o preset oficial sem MMR; **Personalizado** libera lobby, mapa, preparação e IA; **Ranqueado** força regras competitivas, sala pública e seed gerada pelo servidor. O MMR ainda não é gravado: filas, grupos e elegibilidade pertencem a `MODE-204`, enquanto colocações e divisões pertencem a `MODE-205`. Quick Play procura exclusivamente salas Normais. O navegador automatizado valida a presença dos três modos, o bloqueio do preset Normal, o desbloqueio do Personalizado e o início real da partida.
 
 ## Estado atual — HUD e interação, 22/09/2026
 

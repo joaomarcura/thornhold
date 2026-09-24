@@ -43,7 +43,12 @@ export const BALANCE = {
   },
   difficulty: { easy:{think:1.6,repair:0.55,retreat:0.42},normal:{think:0.7,repair:0.68,retreat:0.3},hard:{think:0.28,repair:0.75,retreat:0.18} }
 };
-export const DEFAULT_SETTINGS = { elfSlots:5, difficulty:'normal', seed:'THORNHOLD', mapSize:'compact', preparation:50, private:true, local:false, region:'SA', takeover:true, allowRoles:true };
+export const MATCH_MODES=Object.freeze({
+  custom:{name:'Personalizado',description:'O host controla mapa, lobby e regras.'},
+  normal:{name:'Normal',description:'Regras oficiais sem pontuação ranqueada.',preset:{elfSlots:5,difficulty:'normal',mapSize:'compact',preparation:50,takeover:true,allowRoles:true}},
+  ranked:{name:'Ranqueado',description:'Preset competitivo; MMR será ativado na etapa de filas.',preset:{elfSlots:5,difficulty:'normal',mapSize:'compact',preparation:50,takeover:true,allowRoles:false,private:false,local:false}}
+});
+export const DEFAULT_SETTINGS = { mode:'custom',elfSlots:5, difficulty:'normal', seed:'THORNHOLD', mapSize:'compact', preparation:50, private:true, local:false, region:'SA', takeover:true, allowRoles:true };
 export const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 export const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 export const mitigation=armor=>1/(1+0.055*Math.max(0,armor));

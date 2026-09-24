@@ -127,3 +127,12 @@ test('Lobby: autorização, slots, readiness, sessão privada e revanche',()=>{
   service.disconnect(guest);assert.equal(r.match.unit('e0').controller,'bot');service.resume(guest);assert.equal(r.match.unit('e0').controller,'human');
   r.match.unit('t0').alive=false;r.match.step(.05);r.state=r.match.state;service.returnToLobby(r,host);assert.equal(r.state,STATES.LOBBY);assert.equal(r.members.size,2);assert.ok([...r.members.values()].every(m=>!m.ready));for(const m of r.members.values())m.ready=true;service.start(r,host);assert.equal(r.match.time,0);
 });
+test('Modos Normal, Personalizado e Ranqueado são presets autoritativos',()=>{
+  const service=new SessionService(),host=service.addClient('modes','Host');
+  const room=service.create(host,{role:'troll',fillBots:true,settings:{mode:'normal',private:true,elfSlots:2,mapSize:'large',difficulty:'hard',preparation:20}});
+  assert.equal(room.settings.mode,'normal');assert.equal(room.settings.elfSlots,5);assert.equal(room.settings.mapSize,'compact');assert.equal(room.settings.difficulty,'normal');assert.equal(room.settings.preparation,50);assert.equal(room.settings.private,true);
+  service.configure(room,host,{mapSize:'large',elfSlots:2});assert.equal(room.settings.mapSize,'compact');assert.equal(room.settings.elfSlots,5);
+  assert.throws(()=>service.changeSlot(room,host,{slot:'e0',action:'difficulty',difficulty:'hard'}),/fixa/);
+  service.configure(room,host,{mode:'custom',mapSize:'large',elfSlots:2,difficulty:'hard',preparation:20});assert.equal(room.settings.mode,'custom');assert.equal(room.settings.mapSize,'large');assert.equal(room.settings.elfSlots,2);assert.equal(room.settings.difficulty,'hard');
+  const oldSeed=room.settings.seed;service.configure(room,host,{mode:'ranked',private:true,local:true,seed:'CHEAT'});assert.equal(room.settings.mode,'ranked');assert.equal(room.settings.private,false);assert.equal(room.settings.local,false);assert.equal(room.settings.allowRoles,false);assert.match(room.settings.seed,/^RANK-[A-F0-9]{16}$/);assert.notEqual(room.settings.seed,oldSeed);assert.equal(service.publicRoom(room).mode,'ranked');
+});

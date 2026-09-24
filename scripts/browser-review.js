@@ -15,8 +15,11 @@ try{
   await page.goto('http://127.0.0.1:'+app.port);
   await page.getByText('Servidor conectado',{exact:false}).waitFor();
   await page.getByRole('button',{name:'Criar sala privada',exact:false}).click();
-  await page.locator('[name=role]').selectOption('elf');await page.locator('[name=elves]').selectOption('2');
+  assert.deepEqual(await page.locator('[name=mode] option').allTextContents(),['Personalizado','Normal','Ranqueado']);
+  await page.locator('[name=mode]').selectOption('custom');await page.locator('[name=role]').selectOption('elf');await page.locator('[name=elves]').selectOption('2');
   await page.getByRole('button',{name:'Criar sala →',exact:true}).click();
+  const mode=page.locator('[data-setting=mode]');await mode.selectOption('normal');await until(()=>page.locator('[data-setting=elfSlots]').isDisabled(),'Normal preset did not lock settings');assert.equal([...app.sessions.rooms.values()][0].settings.elfSlots,5);
+  await mode.selectOption('custom');await until(()=>page.locator('[data-setting=elfSlots]').isEnabled(),'Custom mode did not unlock settings');await page.locator('[data-setting=elfSlots]').selectOption('2');await until(()=>[...app.sessions.rooms.values()][0].settings.elfSlots===2,'Custom lobby size did not apply');report.matchModes=true;
   await page.getByRole('button',{name:'Marcar como pronto'}).click();
   await page.getByRole('button',{name:'Iniciar expedição →'}).click();
   await page.locator('#role-name').waitFor();

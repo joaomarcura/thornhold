@@ -14,7 +14,7 @@ await mkdir('artifacts',{recursive:true});
 try{
   await page.goto('http://127.0.0.1:'+app.port);await page.getByText('Servidor conectado',{exact:false}).waitFor();
   await page.getByRole('button',{name:'Criar sala privada',exact:false}).click();
-  await page.locator('[name=role]').selectOption('elf');await page.locator('[name=elves]').selectOption('2');
+  await page.locator('[name=mode]').selectOption('custom');await page.locator('[name=role]').selectOption('elf');await page.locator('[name=elves]').selectOption('2');
   await page.getByRole('button',{name:'Criar sala →',exact:true}).click();
   await page.getByRole('button',{name:'Marcar como pronto'}).click();await page.getByRole('button',{name:'Iniciar expedição →'}).click();
   await page.locator('#role-name').waitFor();

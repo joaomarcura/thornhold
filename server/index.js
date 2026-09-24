@@ -50,8 +50,8 @@ export async function createGameServer({port=Number(process.env.PORT)||3000,host
         if(msg.type==='join'){room=sessions.join(client,msg);room.devSpeed??=1;lobby(room);return;}
         if(msg.type==='quick'){
           if(room)throw new Error('Saia da sala atual primeiro.');
-          const candidate=[...sessions.rooms.values()].filter(r=>!r.settings.private&&!r.settings.local&&!r.password&&r.state===STATES.LOBBY&&r.settings.region===(msg.region||'SA')&&r.members.size<r.settings.elfSlots+1).sort((a,b)=>b.members.size-a.members.size)[0];
-          room=candidate?sessions.join(client,{code:candidate.id}):sessions.create(client,{name:'Expedição pública',settings:{private:false,region:msg.region||'SA'},fillBots:true});lobby(room);return;
+          const candidate=[...sessions.rooms.values()].filter(r=>r.settings.mode==='normal'&&!r.settings.private&&!r.settings.local&&!r.password&&r.state===STATES.LOBBY&&r.settings.region===(msg.region||'SA')&&r.members.size<r.settings.elfSlots+1).sort((a,b)=>b.members.size-a.members.size)[0];
+          room=candidate?sessions.join(client,{code:candidate.id}):sessions.create(client,{name:'Expedição pública',settings:{mode:'normal',private:false,region:msg.region||'SA'},fillBots:true});lobby(room);return;
         }
         if(!room)throw new Error('Entre em uma sala primeiro.');
         switch(msg.type){
