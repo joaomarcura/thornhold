@@ -4,7 +4,7 @@ Os testes exercitam o código real, não telas simuladas. As conexões chamadas 
 
 ## Candidata 0.2.0-alpha.2 — 24/09/2026
 
-- 75 testes de regras, física, IA e rede aprovados.
+- 76 testes de regras, física, IA e rede aprovados.
 - 50 arquivos JavaScript aprovados por `node --check`, incluindo a infraestrutura de release.
 - `browser-review.js`: upgrade do Núcleo, atualização no mesmo tick, foco de seleção e ícones unificados.
 - `browser-stun-scoreboard.js`: stun autoritativo, placar ao vivo, contador de reassentamento, MVP e tabela final, sem exceções JavaScript.
@@ -12,7 +12,7 @@ Os testes exercitam o código real, não telas simuladas. As conexões chamadas 
 - Regressão de 60 partidas após stun/reassentamento: 33 vitórias Troll, 27 Elfos, média 14:58, mediana 15:50 e nenhuma inconclusiva. Foram usados 102 stuns em 45 partidas.
 - `npm run verify` passa a ser o portão único local e de CI. A arena schema 2 registra versão, commit, dirty state e hash de configuração.
 
-O baseline oficial versionado está em [`baselines/v0.2.0-alpha.1.json`](../baselines/v0.2.0-alpha.1.json). Nas 100 seeds pareadas: 54 vitórias Troll, 46 Elfos, média 15:02, mediana 15:27 e zero inconclusivas. O cenário de referência 1v5 normal terminou 4–4, com mediana 16:11. O lote ainda usa o limite antigo de 20 minutos; 32 partidas chegaram a ele. Falhas médias de exploração cresceram de 8,76 para 14,23, concentradas especialmente nas dificuldades altas com cinco e oito Elfos.
+O baseline oficial versionado está em [`baselines/v0.2.0-alpha.2.json`](../baselines/v0.2.0-alpha.2.json). Nas 100 seeds pareadas: 39 vitórias Troll, 61 Elfos, média 10:29, mediana 10:26 e zero inconclusivas. Nenhuma partida foi decidida pelo relógio. O cenário de referência 1v5 normal terminou 3–5, com mediana 10:56. A matriz complementar de 96 partidas também terminou integralmente e diagnosticou vantagem élfica no 1v5, nas dificuldades normal/difícil e no mapa grande; detalhes em [`RELATORIO-ETAPA-1.md`](RELATORIO-ETAPA-1.md).
 
 A `alpha.2` remove o encerramento por relógio. O simulador usa um teto técnico configurável, atualmente 60 minutos, exclusivamente para detectar partidas sem resolução; esse teto e a matriz de cenários são gravados no artefato e não alteram a regra da partida.
 

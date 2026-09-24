@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "sourceArtifact": "artifacts/v0.2.0-alpha.2-stage1-100.json",
+  "sourceSha256": "2f4b0c8cfd39c5e8168007c8c6888d3e378452a65bdcbb7a1bba64bbb848faa9",
+  "sourceBytes": 30503490,
+  "matrixArtifact": "artifacts/v0.2.0-alpha.2-matrix-96.json",
+  "matrixSha256": "8a97decfdab75f6c0a84cefe357e39ce6a999985875dbe64ee288ce9abdbb450",
+  "matrixBytes": 27400490,
+  "metadata": {
+    "release": { "game": "0.2.0-alpha.2", "protocol": 1, "balance": 3, "ai": 3 },
+    "gitCommit": "f3887611aa6b353664c21f67c617e39027111c68",
+    "dirty": false,
+    "node": "v24.15.0",
+    "generatedAt": "2026-09-24T06:12:29.607Z",
+    "configHash": "75817d418cb452d0961aa24e5591c21de169506abff4d97f069c14dc4ff3b6ae",
+    "step": 0.05,
+    "count": 100,
+    "simulationCeilingSeconds": 3600,
+    "seedPattern": "SIM-{run}"
+  },
+  "summary": {
+    "duration": { "mean": 629.47, "median": 626, "p10": 364, "p90": 841 },
+    "trollWins": 39,
+    "elfWins": 61,
+    "timeLimit": 0,
+    "unfinished": 0,
+    "under4Minutes": 4,
+    "under10Minutes": 41,
+    "meanTrollDamage": 15265.128712567017,
+    "meanStructuresDestroyed": 16.74,
+    "meanTowersDestroyed": 7.62,
+    "meanCombatSeconds": 259.4740000000252,
+    "meanRetreatSeconds": 121.99250000000127,
+    "meanRetreats": 4.32,
+    "meanEngagements": 7.01,
+    "meanFailedNavigation": 0.72,
+    "meanStuckNavigation": 0.06,
+    "meanFailedExploration": 11.95,
+    "meanPathRecalculations": 488.17,
+    "meanGoldPerMinute": 235.70054940034072,
+    "meanWoodPerMinute": 227.1608977638302
+  },
+  "referenceScenario": {
+    "mapSize": "compact",
+    "elves": 5,
+    "difficulty": "normal",
+    "runs": 8,
+    "duration": { "median": 656 },
+    "trollWins": 3,
+    "elfWins": 5,
+    "unfinished": 0,
+    "meanFailedNavigation": 1.125,
+    "meanFailedExploration": 10.375
+  },
+  "comparisonToAlpha1": {
+    "durationMeanDelta": -272.07,
+    "durationMedianDelta": -301,
+    "trollWinsDelta": -15,
+    "elfWinsDelta": 15,
+    "timeLimitDelta": -32,
+    "meanFailedNavigationDelta": 0.01,
+    "meanFailedExplorationDelta": -2.28
+  },
+  "matrix96": {
+    "dimensions": { "elves": [1, 2, 5, 8], "difficulty": ["easy", "normal", "hard"], "mapSize": ["compact", "large"], "repetitions": 4 },
+    "trollWins": 37,
+    "elfWins": 59,
+    "unfinished": 0,
+    "byElves": { "1": "8-16", "2": "11-13", "5": "5-19", "8": "13-11" },
+    "byDifficulty": { "easy": "20-12", "normal": "9-23", "hard": "8-24" },
+    "byMap": { "compact": "21-27", "large": "16-32" }
+  },
+  "notes": [
+    "O relógio de vitória foi removido; 3600 segundos é apenas o teto técnico do laboratório.",
+    "As 100 seeds históricas terminaram, contra 32 decisões artificiais por tempo na alpha.1.",
+    "A navegação ficou estável e a exploração melhorou, mas a média 39-61 ainda favorece Elfos.",
+    "A matriz complementar diagnostica desequilíbrio por dificuldade, 1v5 e mapa grande; GAME-111 permanece aberto."
+  ]
+}

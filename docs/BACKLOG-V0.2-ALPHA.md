@@ -9,7 +9,7 @@ Este documento é a fonte de verdade do produto para a primeira alpha por convit
 - Operar inicialmente no Brasil, em uma única instância econômica na AWS.
 - Aprender com partidas humanas antes de abrir acesso público ou distribuir o servidor.
 
-Versão candidata: `0.2.0-alpha.1`. Cenário principal de balanceamento: um Troll contra cinco Elfos humanos, mapa compacto. O Troll deve vencer aproximadamente 55–60% das partidas ranqueadas, sem invulnerabilidade ou vitória decidida por relógio.
+Versão candidata: `0.2.0-alpha.2`. Cenário principal de balanceamento: um Troll contra cinco Elfos humanos, mapa compacto. O Troll deve vencer aproximadamente 55–60% das partidas ranqueadas, sem invulnerabilidade ou vitória decidida por relógio.
 
 ## Regras de produto aprovadas
 
@@ -105,7 +105,8 @@ Versão candidata: `0.2.0-alpha.1`. Cenário principal de balanceamento: um Trol
 - [x] `GAME-107` Remover o limite temporal e instrumentar impasses.
 - [x] `GAME-108` Torre e Espada Lendárias, feedback audiovisual, IA e contrajogo.
 - [x] `GAME-109` Roda de comunicação sem transferência de recursos.
-- [ ] `GAME-110` Repetir 100 partidas pareadas e separar 1v1, 1v2, 1v5 e 1v8 por mapa/dificuldade.
+- [x] `GAME-110` Repetir 100 partidas pareadas e separar 1v1, 1v2, 1v5 e 1v8 por mapa/dificuldade.
+- [ ] `GAME-111` Corrigir a curva por dificuldade e lobby: 1v5 normal/difícil favorece Elfos; 1v8 fácil favorece Troll; mapa grande favorece Elfos.
 
 Critério: zero estados sem saída, zero partidas automatizadas inacabadas, 1v5 próximo da meta e nenhuma configuração principal acima de 65% para um lado sem diagnóstico explícito.
 
