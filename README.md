@@ -1,6 +1,6 @@
 # THORNHOLD — A última clareira
 
-Jogo 3D em terceira pessoa: um Troll caça de um a oito Elfos que precisam explorar, construir economia e defender suas clareiras. Código, modelos geométricos, interface, mapa e efeitos sonoros originais. Candidata **0.2.0-alpha.1**, com simulação autoritativa e multiplayer WebSocket real.
+Jogo 3D em terceira pessoa: um Troll caça de um a oito Elfos que precisam explorar, construir economia e defender suas clareiras. Código, modelos geométricos, interface, mapa e efeitos sonoros originais. Candidata **0.2.0-alpha.2**, com simulação autoritativa e multiplayer WebSocket real.
 
 ![Mapa de Thornhold com doze refúgios, floresta e trilhas](docs/images/mapa-thornhold.png)
 

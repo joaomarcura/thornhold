@@ -31,27 +31,30 @@ export function aggregate(rows){
 }
 if(!isMainThread){
   for(const i of workerData.indices){
-    const elves=[2,3,5,8][i%4],difficulty=['easy','normal','hard'][Math.floor(i/4)%3];
+    const elves=workerData.elfCounts[i%workerData.elfCounts.length],difficulty=['easy','normal','hard'][Math.floor(i/workerData.elfCounts.length)%3];
     const slots=[{id:'t',role:'troll',occupant:{type:'bot',name:'Troll',difficulty}},...Array.from({length:elves},(_,j)=>({id:'e'+j,role:'elf',occupant:{type:'bot',name:'Elfo '+j,difficulty}}))];
     const m=new Match({seed:'SIM-'+i,difficulty,diagnostics:true},slots);
-    for(let tick=0;tick<Math.ceil(1201/workerData.step)&&m.state!==STATES.END;tick++)m.step(workerData.step);
+    for(let tick=0;tick<Math.ceil(workerData.maxSeconds/workerData.step)&&m.state!==STATES.END;tick++)m.step(workerData.step);
     parentPort.postMessage({run:i,difficulty,completed:m.state===STATES.END,...m.result()});
   }
 }else if(process.argv[1]?.endsWith('arena.js')){
   const count=Math.min(1000,Math.max(1,Number(process.argv[2])||60)),out=process.argv[3]||'artifacts/arena.json',baselinePath=process.argv[4],step=Number(process.env.SIM_STEP)||.1;
+  const elfCounts=(process.env.SIM_ELF_COUNTS||'2,3,5,8').split(',').map(Number).filter(n=>Number.isInteger(n)&&n>=1&&n<=8);
+  const maxSeconds=Math.max(60,Number(process.env.SIM_MAX_SECONDS)||3600);
+  if(!elfCounts.length)throw Error('SIM_ELF_COUNTS must contain at least one integer from 1 to 8');
   const start=performance.now(),rows=[],concurrency=Math.min(4,count);
   await Promise.all(Array.from({length:concurrency},(_,worker)=>new Promise((resolve,reject)=>{
-    const w=new Worker(new URL(import.meta.url),{workerData:{indices:Array.from({length:count},(_,i)=>i).filter(i=>i%concurrency===worker),step}});
+    const w=new Worker(new URL(import.meta.url),{workerData:{indices:Array.from({length:count},(_,i)=>i).filter(i=>i%concurrency===worker),step,elfCounts,maxSeconds}});
     w.on('message',r=>{rows.push(r);if(rows.length%10===0)console.log(rows.length+'/'+count+' completed');});
     w.on('error',reject);w.on('exit',code=>code?reject(new Error('Worker exit '+code)):resolve());
   })));
   rows.sort((a,b)=>a.run-b.run);
   const summary=aggregate(rows),groups=[];
-  for(const elves of [2,3,5,8])for(const difficulty of ['easy','normal','hard']){const group=rows.filter(r=>r.elves===elves&&r.difficulty===difficulty);if(group.length)groups.push({elves,difficulty,...aggregate(group)});}
+  for(const elves of elfCounts)for(const difficulty of ['easy','normal','hard']){const group=rows.filter(r=>r.elves===elves&&r.difficulty===difficulty);if(group.length)groups.push({elves,difficulty,...aggregate(group)});}
   let comparison=null;
   if(baselinePath){const baseline=JSON.parse(await readFile(baselinePath,'utf8')),paired=rows.map(r=>{const before=baseline.matches.find(b=>b.seed===r.seed&&b.elves===r.elves&&b.difficulty===r.difficulty);if(!before)return null;return {seed:r.seed,durationDelta:r.duration-before.duration,trollDamageDelta:r.trollDamage-before.trollDamage,winnerBefore:before.winner,winnerAfter:r.winner};}).filter(Boolean);if(!paired.length)throw Error('No matching seeds in baseline');comparison={matchedRuns:paired.length,baseline:aggregate(baseline.matches.filter(b=>paired.some(r=>r.seed===b.seed))),current:aggregate(rows.filter(b=>paired.some(r=>r.seed===b.seed))),paired};}
   let gitCommit='unavailable',dirty=null;try{gitCommit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();dirty=!!execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim();}catch{}
-  const metadata={release:RELEASE,gitCommit,dirty,node:process.version,generatedAt:new Date().toISOString(),configHash:createHash('sha256').update(JSON.stringify({BALANCE,DEFAULT_SETTINGS})).digest('hex'),defaultSettings:DEFAULT_SETTINGS,seedPattern:'SIM-{run}',matrix:{elves:[2,3,5,8],difficulty:['easy','normal','hard']}};
+  const metadata={release:RELEASE,gitCommit,dirty,node:process.version,generatedAt:new Date().toISOString(),configHash:createHash('sha256').update(JSON.stringify({BALANCE,DEFAULT_SETTINGS})).digest('hex'),defaultSettings:DEFAULT_SETTINGS,seedPattern:'SIM-{run}',simulationCeilingSeconds:maxSeconds,matrix:{elves:elfCounts,difficulty:['easy','normal','hard']}};
   const result={schema:2,metadata,step,count,elapsedSeconds:(performance.now()-start)/1000,summary,groups,comparison,matches:rows};
   await mkdir('artifacts',{recursive:true});await writeFile(out,JSON.stringify(result,null,2));
   console.log(JSON.stringify({...result,matches:undefined,groups:undefined,comparison:comparison?{baseline:comparison.baseline,current:comparison.current,matchedRuns:comparison.matchedRuns}:null},null,2));

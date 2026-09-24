@@ -2,9 +2,9 @@
 
 Os testes exercitam o código real, não telas simuladas. As conexões chamadas de “humanas” nos testes automáticos são clientes de rede sintéticos, sem controlador IA do servidor. Isso valida protocolo e ocupação dos slots; não substitui sessões de usabilidade com pessoas.
 
-## Candidata 0.2.0-alpha.1 — 24/09/2026
+## Candidata 0.2.0-alpha.2 — 24/09/2026
 
-- 65 testes de regras, física, IA e rede aprovados.
+- 75 testes de regras, física, IA e rede aprovados.
 - 50 arquivos JavaScript aprovados por `node --check`, incluindo a infraestrutura de release.
 - `browser-review.js`: upgrade do Núcleo, atualização no mesmo tick, foco de seleção e ícones unificados.
 - `browser-stun-scoreboard.js`: stun autoritativo, placar ao vivo, contador de reassentamento, MVP e tabela final, sem exceções JavaScript.
@@ -13,6 +13,8 @@ Os testes exercitam o código real, não telas simuladas. As conexões chamadas 
 - `npm run verify` passa a ser o portão único local e de CI. A arena schema 2 registra versão, commit, dirty state e hash de configuração.
 
 O baseline oficial versionado está em [`baselines/v0.2.0-alpha.1.json`](../baselines/v0.2.0-alpha.1.json). Nas 100 seeds pareadas: 54 vitórias Troll, 46 Elfos, média 15:02, mediana 15:27 e zero inconclusivas. O cenário de referência 1v5 normal terminou 4–4, com mediana 16:11. O lote ainda usa o limite antigo de 20 minutos; 32 partidas chegaram a ele. Falhas médias de exploração cresceram de 8,76 para 14,23, concentradas especialmente nas dificuldades altas com cinco e oito Elfos.
+
+A `alpha.2` remove o encerramento por relógio. O simulador usa um teto técnico configurável, atualmente 60 minutos, exclusivamente para detectar partidas sem resolução; esse teto e a matriz de cenários são gravados no artefato e não alteram a regra da partida.
 
 ## Estado atual — HUD e interação, 22/09/2026
 
