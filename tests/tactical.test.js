@@ -59,6 +59,10 @@ test('Espada lendária encerra recuperação e dificuldades maiores sustentam o 
   c.troll(m,u);c.retreating=true;c.brain.recoveryUntil=m.time-1;c.troll(m,u);
   assert.equal(c.retreating,false);assert.ok(!['retreat','recover'].includes(c.brain.state));
 });
+test('Troll preserva ouro para completar a espada após o selo lendário',()=>{
+  const m=match(),u=m.unit('t'),c=new AIController('hard');m.state=STATES.ACTIVE;m.time=B.finalAge+1;u.levels.damage=4;u.levels.siege=3;u.gold=100;
+  c.troll(m,u);assert.equal(u.gold,100);assert.equal(u.levels.damage+u.levels.siege,7);
+});
 test('IA persegue Elfo exposto antes de desperdiçar tempo em estrutura resistente',()=>{
   const m=match(),u=m.unit('t'),elf=m.unit('e0'),c=new AIController('hard');m.state=STATES.ACTIVE;m.time=60;elf.x=u.x+6;elf.z=u.z;m.unit('e1').x=0;m.unit('e1').z=0;
   m.structures.push({id:'core',kind:'core',x:u.x-6,z:u.z,hp:3000,maxHp:3000,tier:4,progress:1});c.troll(m,u);assert.equal(c.brain.targetId,elf.id);assert.equal(c.brain.state,'pursue');

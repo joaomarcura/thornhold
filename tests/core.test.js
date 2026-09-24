@@ -30,6 +30,11 @@ test('Construção consome recursos, é progressiva e gera renda real',()=>{
   for(let i=0;i<100;i++)m.step(.05);assert.equal(s.progress,1);assert.equal(s.hp,s.maxHp);assert.ok(u.gold>85);
   assert.match(m.act(u.id,{type:'build',kind:'core',x:b.x,z:b.z+4.4}),/já possui/);
 });
+test('Orçamento de recompensa compensa lobbies sem vazar no snapshot',()=>{
+  const two=match(2),five=match(5),eight=match(8),a=completedBase(two).core,b=completedBase(five).core,c=completedBase(eight).core;
+  assert.equal(a.bountyFactor,B.economy.trollBountyFactor[2]);assert.equal(b.bountyFactor,B.economy.trollBountyFactor[5]);assert.equal(c.bountyFactor,B.economy.trollBountyFactor[8]);
+  assert.ok(a.bountyFactor>c.bountyFactor&&b.bountyFactor>c.bountyFactor);assert.equal(two.snapshot('e0').structures[0].bountyFactor,undefined);
+});
 test('Ferramentas dev concedem recursos com limites e não aceitam valores falsos',()=>{
   const m=match(),u=m.unit('e0'),before={gold:u.gold,wood:u.wood};
   assert.equal(m.devGrant('e0',{gold:1000,wood:250}),null);assert.equal(u.gold,before.gold+1000);assert.equal(u.wood,before.wood+250);

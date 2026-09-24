@@ -7,7 +7,7 @@ export const BALANCE = {
   vision: { troll: 30, elf: 24 }, interactRange: 6.5,
   movement:{sprint:1.25,trollRadius:.64,elfRadius:.37},
   construction:{initialHealth:.15,breachCooldown:45,enemyClearance:5,gateClearance:4,limits:{core:1,wall:1,tower:5,mine:5,workshop:1},upgradeSeconds:3},
-  economy:{richWood:1.65,finalRichWood:2.5,workshopGather:.3,workshopRepair:.2},
+  economy:{richWood:1.65,finalRichWood:2.5,workshopGather:.3,workshopRepair:.2,trollLobbyBonus:[0,0,.08,.12,.16,.2,.2,.2,.18],trollBountyFactor:[0,1.3,1.5,1.45,1.45,1.375,1.4,1.25,1.1]},
   progression:{structureGrowth:1.18,costGrowth:1.35,woodCostGrowth:1.25,trollDamageGrowth:1.12,healthGrowth:1.14},
   wisps:{gold:65,wood:15,hireGrowth:1.32,trainSeconds:6,income:1.4,incomeGrowth:1.25,upgradeGold:70,upgradeWood:20,costGrowth:1.5,seconds:4,hp:55,externalBonus:1.6,range:25,regrowSeconds:35},
   combat:{buffer:.18,lightWindup:.1,heavyWindup:.32,comboWindow:2.8,comboBonus:.25,openingSeconds:1.2,openingBonus:.2},
@@ -59,5 +59,6 @@ export const wispCost=count=>({gold:Math.round(scaled(BALANCE.wisps.gold,BALANCE
 export const wispUpgradeCost=level=>({gold:Math.round(scaled(BALANCE.wisps.upgradeGold,BALANCE.wisps.costGrowth,level-1)),wood:Math.round(scaled(BALANCE.wisps.upgradeWood,1.3,level-1))});
 export const wispIncome=w=>scaled(BALANCE.wisps.income,BALANCE.wisps.incomeGrowth,w.level-1)*(w.rich?BALANCE.wisps.externalBonus:1);
 export function scaling(alive,totalIncome,bases,time) {
-  return 1+Math.min(0.32,Math.max(0,alive-1)*0.04)+Math.min(0.12,totalIncome/600)+Math.min(0.08,bases*0.01)+Math.min(0.1,time/6000);
+  const lobby=BALANCE.economy.trollLobbyBonus[Math.max(0,Math.min(BALANCE.maxElves,alive))]||0;
+  return 1+lobby+Math.min(0.12,totalIncome/600)+Math.min(0.08,bases*0.01)+Math.min(0.1,time/6000);
 }

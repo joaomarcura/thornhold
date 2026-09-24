@@ -7,7 +7,7 @@ import { availableTrees } from './wisps.js';
 export class AIController {
   constructor(difficulty='normal'){this.profile=B.difficulty[difficulty]||B.difficulty.normal;this.difficulty=difficulty;this.nextThink=0;this.route=[];this.destination=null;this.routeAt=-100;this.explored=new Set();this.exploreTarget=null;this.exploreAt=0;this.discovered=new Map();this.retreating=false;this.navigationFailure=null;this.lastNavigationEntity=null;this.lastNavigationAt=-Infinity;this.metrics={idle:0,attacking:0,defending:0,retreating:0,failedNavigation:0,failedExploration:0,pathRecalculations:0,retreatAttempts:0,retreatSuccesses:0,targetChanges:0,stuckNavigation:0};}
   tick(match,u,dt){
-    if(match.time>=this.nextThink){this.nextThink=match.time+this.profile.think;if(u.ghost)this.ghost(match,u);else if(u.role==='elf')this.elf(match,u);else this.troll(match,u);}
+    if(match.time>=this.nextThink){const think=u.role==='elf'?Math.max(.7,this.profile.think):this.profile.think;this.nextThink=match.time+think;if(u.ghost)this.ghost(match,u);else if(u.role==='elf')this.elf(match,u);else this.troll(match,u);}
     // Brain decisions only update the intention. Apply movement once per tick;
     // calling follow both inside the brain and here caused route churn during retreat.
     if(this.destination)this.follow(match,u,dt);else u.input={x:0,z:0};
