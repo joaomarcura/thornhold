@@ -105,7 +105,7 @@ export class TrollBrain {
     c.explore(m,u);
   }
   purchase(m,u,threatened,towers){
-    const legendaryProgress=(u.levels.damage||0)+(u.levels.siege||0),legendaryPlanAt=u.difficulty==='hard'?B.finalAge*.5:B.finalAge,pursuingLegendary=m.time>legendaryPlanAt&&legendaryProgress<B.legendary.swordLevels;
+    const legendaryProgress=(u.levels.damage||0)+(u.levels.siege||0),pursuingLegendary=legendaryProgress<B.legendary.swordLevels&&legendaryProgress>=2;
     if(!pursuingLegendary&&!u.pendingStrike&&m.time-u.lastHit>=5&&m.time-u.lastAttack>=5&&Object.values(u.levels).reduce((a,b)=>a+b,0)>=2){
       this.build??=Object.values(BUILDS)[[...m.map.seed].reduce((n,c)=>n+c.charCodeAt(0),0)%3];
       const item=this.build.items.find(id=>!u.inventory.includes(id)&&u.gold>=ITEMS[id].cost);
@@ -114,8 +114,8 @@ export class TrollBrain {
     const injured=u.hp/u.maxHp<.6,armored=towers.some(t=>t.branch==='pierce');
     const weights={damage:5,speed:3.7,siege:4.5,health:injured?13:3,armor:threatened&&!armored?9:3,regen:u.hp<u.maxHp*.85?10:4,movement:this.state==='pursue'?6:1.5,utility:towers.length>1?4:1};
     if(u.slowUntil>m.time)weights.movement+=3;
-    if(pursuingLegendary){const legendaryOptions=['damage','siege'].filter(k=>(u.levels[k]<3||m.time>B.finalAge)&&u.gold>=trollCost(k,u.levels[k])).sort((a,b)=>u.levels[a]-u.levels[b]||trollCost(a,u.levels[a])-trollCost(b,u.levels[b]));if(legendaryOptions[0]){m.act(u.id,{type:'buy',key:legendaryOptions[0]});return;}if(m.time>B.finalAge)return;}
-    const options=Object.keys(weights).filter(k=>(u.levels[k]<3||m.time>B.finalAge)&&u.gold>=trollCost(k,u.levels[k]));
+    if(pursuingLegendary){const legendaryOptions=['damage','siege'].filter(k=>u.gold>=trollCost(k,u.levels[k])).sort((a,b)=>u.levels[a]-u.levels[b]||trollCost(a,u.levels[a])-trollCost(b,u.levels[b]));if(legendaryOptions[0])m.act(u.id,{type:'buy',key:legendaryOptions[0]});return;}
+    const options=Object.keys(weights).filter(k=>u.gold>=trollCost(k,u.levels[k]));
     options.sort((a,b)=>weights[b]/(1+u.levels[b]*1.2)-weights[a]/(1+u.levels[a]*1.2));
     if(options[0])m.act(u.id,{type:'buy',key:options[0]});
   }

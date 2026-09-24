@@ -2,6 +2,7 @@ import { BALANCE as B, distance, upgradeCost, wispCost, wispUpgradeCost } from '
 import { pathfind, toCell, index, lineOfSight, walkable, baseAt, randomFor } from './map.js';
 import { TrollBrain } from './troll-brain.js';
 import { availableTrees } from './wisps.js';
+import { upgradeStatus } from './upgrade-rules.js';
 
 // Controllers only choose intentions. Every cost, hit, cooldown and collision goes through Match.
 export class AIController {
@@ -135,7 +136,7 @@ export class AIController {
     const wisps=match.wisps.filter(w=>w.owner===u.id&&w.alive),training=wisps.some(w=>w.readyAt>match.time),hire=wispCost(wisps.length);
     if(!threat&&!training&&towers.length&&wisps.length<Math.min(4,core.tier+1)&&u.gold>=hire.gold+35&&u.wood>=hire.wood&&availableTrees(match,u,core).length){this.actNear(match,u,core,{type:'trainWisp',target:core.id});return;}
     const upgrade=s=>this.actNear(match,u,s,{type:'upgrade',target:s.id,branch:s.kind==='tower'?['power','frost','pierce'][Math.max(0,towers.indexOf(s))%3]:undefined});
-    const affordable=s=>s&&!s.upgrading&&(s.tier<3||match.time>B.finalAge)&&u.gold>=upgradeCost(s).gold&&u.wood>=upgradeCost(s).wood;
+    const affordable=s=>s&&!s.upgrading&&upgradeStatus(u,s,match.time,match.state,match.structures).allowed;
     if(core.tier<=wall.tier&&affordable(core)&&!threat){upgrade(core);return;}
     if(affordable(wall)&&(threat||wall.tier<core.tier)){upgrade(wall);return;}
     if(towers.length<Math.min(B.construction.limits.tower,core.tier+1)&&u.gold>=B.structures.tower.gold+35){if(buildTower()!=='no-position')return;}

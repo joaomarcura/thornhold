@@ -20,7 +20,7 @@ export function selectionMarkup(e,{u,snapshot,map}){
   }
   if(e.role==='wisp')return wispMarkup(e,{u,snapshot,map});
   if(!e.kind)return header(escape(e.name),e.role==='troll'?'TROLL':e.ghost?'ESPÍRITO':'ELFO',e.role==='troll'?'heavy':e.ghost?'wisp':'leaf')+`<p>${number(e.hp)} / ${number(e.maxHp)} vida</p>`;
-  const status=upgradeStatus(u,e,time,snapshot.state),cost=status.cost,ready=e.progress===1;
+  const status=upgradeStatus(u,e,time,snapshot.state,snapshot.structures),cost=status.cost,ready=e.progress===1;
   let html=header(e.legendary?'Torre Lendária':B.structures[e.kind].name,`${own?'SUA BASE':u?.role==='troll'?'INIMIGO':'ALIADO'} · NV. ${e.tier}`,e.kind);
   const producer=resourceProducer(e);
   html+=`<div class="selection-stats"><b>${number(e.hp)} <small>/ ${number(e.maxHp)} HP</small></b>${producer?`<span>${resource('gold',producer.amount,{rate:'s',signed:true})}</span>`:''}</div><div class="target-health"><i style="width:${e.hp/e.maxHp*100}%"></i></div>`;

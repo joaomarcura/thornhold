@@ -15,32 +15,35 @@ function fixture(){
   const m=create(),u=m.unit('e'),b=m.map.bases[0];Object.assign(u,{x:b.x+4.4,z:b.z});
   assert.equal(m.act(u.id,{type:'build',kind:'core',x:b.x,z:b.z}),undefined);
   for(let i=0;i<100;i++)m.step(.05);
-  const core=m.structures[0];u.gold=119;u.wood=67;
-  return {m,u,core};
+  const core=m.structures[0];Object.assign(u,{x:b.gate.x,z:b.gate.z,gold:1000,wood:1000});assert.equal(m.act(u.id,{type:'build',kind:'wall',x:b.gate.x,z:b.gate.z}),undefined);
+  for(let i=0;i<80;i++)m.step(.05);
+  const wall=m.structures.find(s=>s.kind==='wall');Object.assign(u,{x:core.x+3,z:core.z,gold:119,wood:67});
+  return {m,u,core,wall};
 }
 test('Core tier 2 accepts screenshot resources immediately, even during preparation',()=>{
   const {m,u,core}=fixture();assert.equal(m.state,STATES.PREP);
-  assert.equal(upgradeStatus(u,core,m.time,m.state).allowed,true);
+  assert.equal(upgradeStatus(u,core,m.time,m.state,m.structures).allowed,true);
   const html=selectionMarkup(core,{u,snapshot:m.snapshot('e'),map:m.map});
   assert.doesNotMatch(html.match(/<button[^>]*data-do="upgrade"[^>]*>/)[0],/disabled/);
   assert.equal(m.act('e',{type:'upgrade',target:core.id}),undefined);
   assert.equal(u.gold,19);assert.equal(u.wood,32);assert.ok(core.upgrading>0);
   for(let i=0;i<100;i++)m.step(.05);assert.equal(core.tier,2);
 });
-test('Exact affordability, all existing blockers, and server messages share one rule',()=>{
-  const {m,u,core}=fixture();
+test('Exact affordability, barricade progression, and server messages share one rule',()=>{
+  const {m,u,core,wall}=fixture();
   for(const [field,value,code] of [['gold',99.999,'gold'],['wood',34.999,'wood'],['alive',false,'player']]){
-    const before=u[field];u[field]=value;const result=upgradeStatus(u,core,m.time,m.state);
+    const before=u[field];u[field]=value;const result=upgradeStatus(u,core,m.time,m.state,m.structures);
     assert.ok(result.reasons.some(r=>r.code===code));u[field]=before;
   }
-  u.gold=100;u.wood=35;assert.equal(upgradeStatus(u,core,0,STATES.PREP).allowed,true);
+  u.gold=100;u.wood=35;assert.equal(upgradeStatus(u,core,0,STATES.PREP,m.structures).allowed,true);
   u.x+=20;assert.match(m.upgrade(u,core.id),/Aproxime-se/);u.x-=20;
   core.progress=.5;assert.match(m.upgrade(u,core.id),/construção/);core.progress=1;
   core.upgrading=2;assert.match(m.upgrade(u,core.id),/andamento/);core.upgrading=0;
-  core.tier=3;u.gold=u.wood=10000;assert.ok(upgradeStatus(u,core,B.finalAge-.1,STATES.ACTIVE).reasons.some(r=>r.code==='time'));
-  assert.equal(upgradeStatus(u,core,B.finalAge,STATES.ACTIVE).allowed,true);
-  assert.ok(upgradeStatus(u,core,B.finalAge,STATES.END).reasons.some(r=>r.code==='match'));
-  core.owner='someone-else';assert.ok(upgradeStatus(u,core,B.finalAge,STATES.ACTIVE).reasons.some(r=>r.code==='owner'));
+  core.tier=3;u.gold=u.wood=10000;let status=upgradeStatus(u,core,0,STATES.ACTIVE,m.structures);assert.ok(status.reasons.some(r=>r.code==='barricade'));assert.match(status.reasons.find(r=>r.code==='barricade').message,/nível 2 necessária — atual: nível 1/);
+  wall.tier=2;assert.equal(upgradeStatus(u,core,0,STATES.ACTIVE,m.structures).allowed,true);
+  wall.hp=0;status=upgradeStatus(u,core,0,STATES.ACTIVE,m.structures);assert.match(status.reasons.find(r=>r.code==='barricade').message,/não construída/);wall.hp=wall.maxHp;
+  assert.ok(upgradeStatus(u,core,0,STATES.END,m.structures).reasons.some(r=>r.code==='match'));
+  core.owner='someone-else';assert.ok(upgradeStatus(u,core,0,STATES.ACTIVE,m.structures).reasons.some(r=>r.code==='owner'));
 });
 test('Selection changes at resource threshold without a clock tick and explains distance',()=>{
   const {m,u,core}=fixture(),render=()=>selectionMarkup(core,{u,snapshot:m.snapshot('e'),map:m.map});

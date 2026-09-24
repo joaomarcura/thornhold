@@ -28,14 +28,21 @@ try{
   Object.assign(u,{x:base.x+4.4,z:base.z,gold:119,wood:67});
   assert.equal(m.act(u.id,{type:'build',kind:'core',x:base.x,z:base.z}),undefined);
   const core=m.structures.find(s=>s.owner===u.id);core.progress=core.healthProgress=1;core.hp=core.maxHp;delete core.job;
+  Object.assign(u,{x:base.gate.x,z:base.gate.z,gold:1000,wood:1000});assert.equal(m.act(u.id,{type:'build',kind:'wall',x:base.gate.x,z:base.gate.z}),undefined);
+  const wall=m.structures.find(s=>s.kind==='wall'&&s.owner===u.id);wall.progress=wall.healthProgress=1;wall.hp=wall.maxHp;delete wall.job;
+  Object.assign(u,{x:core.x+3,z:core.z});m.emit('resource',{unit:u.id,resource:'gold',amount:8,rate:490,x:core.x,z:core.z});await page.waitForTimeout(250);
+  assert.doesNotMatch(await page.locator('#toast').textContent(),/490\/min/);report.noIncomeToast=true;
   u.gold=119;u.wood=67;
-  await until(()=>page.locator('#objective').textContent().then(t=>t.includes('Proteja')),'Core snapshot did not arrive');
+  await until(()=>page.locator('#objective').textContent().then(t=>t.includes('Núcleo T')),'Core and Barricade snapshot did not arrive');
   await page.locator('#core-shortcut').click();
   const upgrade=page.locator('[data-do=upgrade]');await upgrade.waitFor();
   await until(()=>upgrade.isEnabled(),'Affordable core upgrade disabled');
   await page.screenshot({path:'artifacts/review-core-affordable.png'});
   await upgrade.click();await until(()=>core.upgrading>0,'UI command did not reach server');
   await until(()=>core.tier===2,'Core did not reach tier 2');report.coreUpgrade=true;
+  core.tier=3;core.upgrading=0;u.gold=u.wood=10000;wall.tier=1;
+  await until(()=>upgrade.isDisabled(),'Core 4 should require Barricade 2');await until(()=>page.locator('#upgrade-reasons').textContent().then(t=>t.includes('Barricada nível 2 necessária — atual: nível 1')),'Missing Barricade requirement');await page.screenshot({path:'artifacts/review-core-barricade-gate.png'});report.coreBarricadeGate=true;
+  wall.tier=2;await until(()=>upgrade.isEnabled(),'Barricade 2 did not unlock Core 4');core.tier=1;
   // Freeze simulation (not snapshots) to isolate threshold refresh from clock changes.
   const step=m.step.bind(m);m.step=()=>{};core.tier=1;core.upgrading=0;u.gold=99.99;u.wood=35;
   await until(()=>upgrade.isDisabled(),'Insufficient gold not disabled');

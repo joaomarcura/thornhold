@@ -76,7 +76,7 @@ const EN=new Map(Object.entries({
   'Abra a entrada durante o silêncio das torres.':'Breach the entrance while the towers are silenced.','Esquive, acerte e reposicione; sacrifique resistência.':'Dodge, strike, and reposition; sacrifice durability.',
   'Controle a distância e recupere-se entre investidas.':'Control distance and recover between assaults.','Equipar':'Equip','✓ Equipado':'✓ Equipped','Comprar':'Buy',
   'Em combate · aguarde 5s sem causar ou receber dano.':'In combat · wait 5s without dealing or taking damage.','3 espaços · misture as builds. Itens comprados ficam na coleção.':'3 slots · mix builds. Purchased items remain in your collection.',
-  'O marco de cerco libera nível 4. Depois, a evolução continua sem teto de nível.':'The siege milestone unlocks level 4. Progression then continues without a level cap.',
+  'A evolução está disponível desde o início e continua sem teto de nível.':'Progression is available from the start and continues without a level cap.',
   'Lentidão':'Slow','Movimento −35%':'Movement −35%','Atordoado':'Stunned','Movimento e habilidades bloqueados':'Movement and abilities disabled','Movimento acelerado':'Accelerated movement',
   'Selo de preparação':'Preparation Seal','Aguarde a libertação':'Await release','Fome':'Hunger','Cause dano para encerrar':'Deal damage to end it','Regeneração bloqueada':'Regeneration blocked',
   'Evite receber dano':'Avoid taking damage','Regenerando':'Regenerating','Abertura da esquiva':'Dodge opening','Exposição':'Exposure','Rugido · desativada':'Roar · disabled','Torre não pode disparar':'Tower cannot fire',
@@ -96,7 +96,7 @@ const EN=new Map(Object.entries({
   'Espaço ocupado por outra estrutura.':'Space occupied by another structure.','Um personagem está ocupando este espaço.':'A character is occupying this space.','Afaste-se um pouco da fundação.':'Move away from the foundation.',
   'Colete a árvore antes de construir aqui.':'Gather the tree before building here.','Apenas Elfos coletam madeira.':'Only Elves gather wood.','Aproxime-se de uma árvore.':'Move closer to a tree.',
   'Árvore vinculada a um Wisp. Colete outra árvore.':'Tree linked to a Wisp. Gather another tree.','Aproxime-se de uma estrutura aliada.':'Move closer to an allied structure.','Espíritos reparam apenas Barricadas.':'Spirits can only repair Barricades.',
-  'Reparo requer 3 ouro e 1 madeira.':'Repair requires 3 gold and 1 wood.','Especialização inválida.':'Invalid specialization.','Melhoria inválida.':'Invalid upgrade.','Melhoria final ainda selada.':'Final upgrade is still sealed.',
+  'Reparo requer 3 ouro e 1 madeira.':'Repair requires 3 gold and 1 wood.','Especialização inválida.':'Invalid specialization.','Melhoria inválida.':'Invalid upgrade.',
   'Ouro insuficiente.':'Not enough gold.','Equipamento inválido.':'Invalid equipment.','Compre o item primeiro.':'Buy the item first.','Elfos constroem defesas; não atacam.':'Elves build defenses; they do not attack.',
   'Disponível quando a caçada começar.':'Available when the hunt begins.','Disponível por 45s após sua Barricada ser rompida.':'Available for 45s after your Barricade is breached.','O Troll ainda não entrou na sua base.':'The Troll has not entered your base yet.',
   'Habilidade exclusiva de espíritos.':'Spirit-only ability.','Perigo aqui!':'Danger here!','Preciso de ajuda!':'I need help!','Atenção nesta posição.':'Watch this position!','Preciso de ouro!':'I need gold!','Preciso de madeira!':'I need wood!','Defendam esta clareira!':'Defend this clearing!','Ataquem este alvo!':'Attack this target!',
@@ -134,7 +134,7 @@ const PATTERNS=[
   [/^Construindo · (.+)$/, 'Building · $1'],[/^Evoluindo · (.+)$/, 'Upgrading · $1'],[/^Formando · (.+)$/, 'Training · $1'],[/^Vinculando · (.+)$/, 'Linking · $1'],
   [/^(\d+) árvores livres$/, '$1 free trees'],[/^(\d+) árvores livres · evolua os atuais$/, '$1 free trees · upgrade current Wisps'],[/^Rebrote (.+) · aguarda espaço livre\.$/, 'Regrowth $1 · waiting for free space.'],
   [/^Evoluir: (.+) ouro \+ (.+) madeira$/, 'Upgrade: $1 gold + $2 wood'],[/^Próximo: (.+)$/, 'Next: $1'],[/^Cancelar formação (.+)$/, 'Cancel training $1'],[/^Cancelar obra (.+)$/, 'Cancel construction $1'],[/^Cancelar melhoria (.+)$/, 'Cancel upgrade $1'],
-  [/^Aproxime-se: (.+) m \/ alcance (.+) m\.$/, 'Move closer: $1 m / range $2 m.'],[/^Melhoria em andamento: (.+)\.$/, 'Upgrade in progress: $1.'],[/^Nível 4 disponível após (.+) · faltam (.+)\.$/, 'Level 4 available after $1 · $2 remaining.'],
+  [/^Aproxime-se: (.+) m \/ alcance (.+) m\.$/, 'Move closer: $1 m / range $2 m.'],[/^Melhoria em andamento: (.+)\.$/, 'Upgrade in progress: $1.'],
   [/^Ouro insuficiente: (.+)\.$/, 'Not enough gold: $1.'],[/^Madeira insuficiente: (.+)\.$/, 'Not enough wood: $1.'],[/^Núcleo nível (\d+) necessário para outra Mina\.$/, 'Core level $1 required for another Mine.'],
   [/^Proteção da equipe recarregando: (.+)\.$/, 'Team protection recharging: $1.'],[/^Revelação recarregando por (.+)\.$/, 'Reveal recharging for $1.'],
   [/^\+(.*) vida\/s$/, '+$1 health/s'],[/^Próximo acerto \+(.*)% dano$/, 'Next hit +$1% damage'],[/^\+(.*)% dano · prazo sem novos acertos$/, '+$1% damage · time without new hits'],
@@ -145,7 +145,8 @@ const PATTERNS=[
   [/^Núcleo T(\d+) · Barricada T(\d+) · (\d+) torres\. Selecione o núcleo para formar Wisps e automatizar madeira\.$/, 'Core T$1 · Barricade T$2 · $3 towers. Select the Core to train Wisps and automate wood.'],
   [/^COMBO (.+) · terceiro acerto \+25%$/, 'COMBO $1 · third hit +25%'],[/^(.+): (\d+) ouro, (\d+) madeira$/, '$1: $2 gold, $3 wood'],
   [/^DESATIVADA (.+)$/, 'DISABLED $1'],[/^ATORDOADO (.+)$/, 'STUNNED $1'],[/^Vincular à árvore (.+)$/, 'Link to tree $1']
-  ,[/^Tier IV é liberado aos (.+) minutos\. Após (.+) minutos, o Troll perde vida se ficar sem causar dano\. A evolução continua sem nível máximo\. Custos crescem e ganhos de velocidade diminuem\.$/, 'Tier IV unlocks at $1 minutes. After $2 minutes, the Troll loses health while not dealing damage. Progression has no maximum level. Costs grow and speed gains diminish.']
+  ,[/^Melhorias não possuem bloqueio temporal\. O Núcleo exige uma Barricada ativa e acompanha metade de seu nível\. Após (.+) minutos, o Troll perde vida se ficar sem causar dano\. Custos crescem e ganhos de velocidade diminuem\.$/, 'Upgrades have no time gate. The Core requires an active Barricade at half its level. After $1 minutes, the Troll loses health while not dealing damage. Costs grow and speed gains diminish.']
+  ,[/^Barricada nível (\d+) necessária — atual: nível (\d+)\.$/, 'Barricade level $1 required — current: level $2.'],[/^Barricada nível (\d+) necessária — atual: não construída\.$/, 'Barricade level $1 required — current: not built.']
 ];
 
 export const getLocale=()=>locale;

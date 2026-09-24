@@ -14,7 +14,8 @@ function advance(m,seconds){for(let i=0;i<Math.ceil(seconds*20);i++)m.step(.05);
 function baseFixture(m){
   const e=m.unit('e'),b=m.map.bases[0];Object.assign(e,{x:b.x+4.4,z:b.z,gold:1000000,wood:1000000});
   assert.equal(m.act('e',{type:'build',kind:'core',x:b.x,z:b.z}),undefined);advance(m,5);
-  return {e,core:m.structures[0],b};
+  const core=m.structures[0];Object.assign(e,{x:b.gate.x,z:b.gate.z});assert.equal(m.act('e',{type:'build',kind:'wall',x:b.gate.x,z:b.gate.z}),undefined);advance(m,4);Object.assign(e,{x:core.x+3,z:core.z});
+  return {e,core,wall:m.structures.find(s=>s.kind==='wall'),b};
 }
 function arena(){
   const m=match(),t=m.unit('t'),e=m.unit('e');m.state=STATES.ACTIVE;m.time=80;
@@ -46,7 +47,7 @@ test('Cancelamento respeita proprietário, distância, combate e obra concluída
 });
 
 test('Estruturas e atributos continuam evoluindo após tier 4 sem custo grátis',()=>{
-  const m=match(),{e,core}=baseFixture(m),t=m.unit('t');m.time=300;m.state=STATES.ACTIVE;t.gold=1000000;
+  const m=match(),{e,core,wall}=baseFixture(m),t=m.unit('t');m.time=0;m.state=STATES.ACTIVE;t.gold=1000000;wall.tier=10;
   for(let i=0;i<9;i++){
     const before=e.gold,cost=upgradeCost(core),oldHP=core.maxHp;
     assert.equal(m.act('e',{type:'upgrade',target:core.id}),undefined);assert.equal(e.gold,before-cost.gold);advance(m,11);assert.ok(core.maxHp>oldHP);

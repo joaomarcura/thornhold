@@ -157,7 +157,7 @@ export class Match {
     const heal=Math.min(s.maxHp-s.hp,B.elf.repair*(1+(workshop?.tier||0)*B.economy.workshopRepair)*contribution);s.hp+=heal;if(!free){s.bounty+=B.elf.repairCost*.6;u.gold-=B.elf.repairCost;u.wood-=1;}u.stats.healing+=heal;u.cooldowns.repair=this.time+1;u.action='repair';u.actionUntil=this.time+.8;this.emit('repair',{unit:u.id,entity:id,x:s.x,z:s.z,amount:heal,free,contribution,contributors});
   }
   upgrade(u,id,branch){
-    const s=this.structures.find(s=>s.id===id),status=upgradeStatus(u,s,this.time,this.state);
+    const s=this.structures.find(s=>s.id===id),status=upgradeStatus(u,s,this.time,this.state,this.structures);
     if(!status.allowed)return status.reasons.map(r=>r.message).join(' ');
     const cost=status.cost;
     if(branch!==undefined&&!Object.hasOwn(B.branches,branch))return 'Especialização inválida.';
@@ -166,7 +166,6 @@ export class Match {
   buy(u,key){
     if(u.role!=='troll'||!Object.hasOwn(B.upgrades,key))return 'Melhoria inválida.';
     const level=u.levels[key];
-    if(level===3&&this.time<B.finalAge)return 'Melhoria final ainda selada.';
     const cost=trollCost(key,level);if(u.gold<cost)return 'Ouro insuficiente.';
     u.gold-=cost;u.stats.goldSpent+=cost;u.levels[key]++;if(key==='health'){const next=this.trollStats(u).maxHp;u.hp+=next-u.maxHp;u.maxHp=next;}u.stats.upgrades++;this.stats.upgrades++;this.emit('purchase',{unit:u.id,key,x:u.x,z:u.z});
   }

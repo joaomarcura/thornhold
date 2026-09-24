@@ -1,7 +1,9 @@
 import { BALANCE as B, STATES, distance, upgradeCost } from './config.js';
 
+export const requiredBarricadeTier=targetCoreTier=>Math.max(1,Math.floor(targetCoreTier/2));
+
 // Pure rules used by both the authoritative command and its UI preview.
-export function upgradeStatus(u,s,time,state){
+export function upgradeStatus(u,s,time,state,structures=[]){
   const cost=s?.kind&&Object.hasOwn(B.structures,s.kind)?upgradeCost(s):null;
   const reasons=[];
   const block=(code,message)=>reasons.push({code,message});
@@ -13,7 +15,10 @@ export function upgradeStatus(u,s,time,state){
     if(u&&distance(u,s)>B.interactRange)block('distance',`Aproxime-se: ${distance(u,s).toFixed(1)} m / alcance ${B.interactRange.toFixed(1)} m.`);
     if(s.progress<1)block('construction','Conclua a construção primeiro.');
     if(s.upgrading>0)block('upgrading',`Melhoria em andamento: ${Math.ceil(s.upgrading)}s.`);
-    if(s.tier===3&&time<B.finalAge)block('time',`Nível 4 disponível após ${Math.floor(B.finalAge/60)}:${String(B.finalAge%60).padStart(2,'0')} · faltam ${Math.ceil(B.finalAge-time)}s.`);
+    if(s.kind==='core'){
+      const required=requiredBarricadeTier(s.tier+1),wall=structures.find(a=>a.kind==='wall'&&a.owner===u?.id&&a.baseId===s.baseId&&a.progress>=1&&a.hp>0);
+      if(!wall||wall.tier<required)block('barricade',`Barricada nível ${required} necessária — atual: ${wall?`nível ${wall.tier}`:'não construída'}.`);
+    }
     if(!s.upgrading&&(u?.gold??0)<cost.gold)block('gold',`Ouro insuficiente: ${Math.floor(u?.gold||0)} / ${cost.gold}.`);
     if(!s.upgrading&&(u?.wood??0)<cost.wood)block('wood',`Madeira insuficiente: ${Math.floor(u?.wood||0)} / ${cost.wood}.`);
   }

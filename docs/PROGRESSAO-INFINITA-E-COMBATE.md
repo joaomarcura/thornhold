@@ -32,7 +32,7 @@ O vínculo que coleta sem destruir o tronco foi inspirado na [descrição oficia
 
 ## Crescimento sem nível máximo
 
-Estruturas, Wisps e os oito atributos do Troll continuam evoluindo. O tier IV e o nível IV mantêm o desbloqueio aos 3:30; níveis posteriores permanecem disponíveis. Após o quarto tier, vida/renda/dano de torres crescem 18% por tier, com preços crescendo 35% em ouro e 25% em madeira. No Troll, dano cresce 12% e vida 14% por nível após o quarto; armadura, movimento e velocidade têm ganhos decrescentes.
+Estruturas, Wisps e os oito atributos do Troll continuam evoluindo sem bloqueio temporal. O Núcleo depende de uma Barricada concluída e viva na mesma base: níveis 2–3 exigem Barricada 1, níveis 4–5 exigem Barricada 2 e a progressão segue com `floor(nível-alvo / 2)`. Após o quarto tier, vida/renda/dano de torres crescem 18% por tier, com preços crescendo 35% em ouro e 25% em madeira. No Troll, dano cresce 12% e vida 14% por nível após o quarto; armadura, movimento e velocidade têm ganhos decrescentes.
 
 Isso separa progressão contínua de velocidade sem controle: o intervalo de ataque não cai abaixo de 250 ms, e as janelas de preparação continuam existindo. Fórmulas saturam valores numéricos para evitar overflow; não há bloqueio comprável de nível. Modelos mantêm quatro estágios visuais, sem crescer indefinidamente e esconder o cenário.
 

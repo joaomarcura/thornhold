@@ -43,6 +43,7 @@ try{
   await elf.locator(`[data-do=upgrade-wisp][data-id=${w.id}]`).click();await until(()=>w.level===2,'Evolução do Wisp');await elf.locator('.wisp-row b').filter({hasText:'Nv. 2'}).waitFor();await elf.screenshot({path:'artifacts/wisp-economy.png'});report.wispUpgrade=true;
   await elf.locator(`[data-do=select-wisp][data-id=${w.id}]`).click();await elf.locator('.advanced-tree summary').click();await elf.locator('#wisp-tree').waitFor();const oldTree=w.treeId;
   await elf.locator('[data-do=assign-wisp]').click();await until(()=>w.treeId!==oldTree,'Redistribuição do Wisp');assert.ok(w.readyAt>m.time);report.wispReassignment=true;
+  const progressionWall={id:'progression-gate',kind:'wall',owner:'e0',baseId:base.id,x:base.gate.x,z:base.gate.z,tier:2,hp:2000,maxHp:2000,progress:1,healthProgress:1,bounty:3,lastHit:-100};m.structures.push(progressionWall);
   core.tier=4;core.hp=core.maxHp=structureHP('core',4);await elf.keyboard.press('KeyN');await elf.locator('[data-do=upgrade]').click();await until(()=>core.tier===5,'Núcleo evolui além do tier 4');report.structureBeyondCap=true;
 
   // Combat fixture: use a legal gate, place defender away, and face the Troll through real mouse-look input.

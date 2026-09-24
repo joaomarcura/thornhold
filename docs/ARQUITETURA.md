@@ -60,7 +60,7 @@ O combate agenda o impacto após a preparação de cada golpe e revalida alcance
 
 `client/selection.js` reúne os painéis contextuais e `client/icons.js` os símbolos vetoriais originais. `client/hud.css` define a apresentação da partida separada das telas de sala. Atualizações do painel preservam foco, seleção de opções e rolagem. Marcadores clicáveis mantêm seus elementos DOM e ficam estáveis sob o cursor. O cliente encerra repetições de teclado ao cancelar, sem interromper investimentos apenas por fechar o painel.
 
-O cerco usa desbloqueio do tier IV aos 3:30, bônus comprado, escalada de dano durante exposição às torres e fome por inatividade que bloqueia regeneração. As regras são iguais em partidas humanas e de bots e não consultam a taxa de vitória. Esses cronômetros ainda não realizam a meta de partidas de 12–18 minutos.
+Melhorias não possuem desbloqueio temporal. A progressão do Núcleo depende de uma Barricada ativa na mesma base, exigindo `floor(nível-alvo / 2)`. A Era do Cerco aos 3:30 conserva apenas seus modificadores econômicos e de dano; exposição às torres e fome por inatividade continuam independentes. As regras são iguais em partidas humanas e de bots e não consultam a taxa de vitória.
 
 ## Visão e superfície de rede
 
