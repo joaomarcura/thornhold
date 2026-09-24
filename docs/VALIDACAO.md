@@ -4,7 +4,7 @@ Os testes exercitam o código real, não telas simuladas. As conexões chamadas 
 
 ## Candidata 0.2.0-alpha.2 — 24/09/2026
 
-- 79 testes de regras, física, IA e rede aprovados.
+- 80 testes de regras, física, IA e rede aprovados.
 - 50 arquivos JavaScript aprovados por `node --check`, incluindo a infraestrutura de release.
 - `browser-review.js`: upgrade do Núcleo, atualização no mesmo tick, foco de seleção e ícones unificados.
 - `browser-stun-scoreboard.js`: stun autoritativo, placar ao vivo, contador de reassentamento, MVP e tabela final, sem exceções JavaScript.

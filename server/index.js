@@ -82,7 +82,10 @@ export async function createGameServer({port=Number(process.env.PORT)||3000,host
           }
           default:throw new Error('Mensagem desconhecida.');
         }
-      }catch(error){send(ws,'error',{message:error instanceof SyntaxError?'Mensagem inválida.':error.message});}
+      }catch(error){
+        const message=error instanceof SyntaxError?'Mensagem inválida.':error.message;send(ws,'error',{message});
+        if(message==='Saia da sala atual primeiro.'&&client){const active=sessions.room(client);if(active){lobby(active);if(active.match)sendMatch(ws,active,client);}}
+      }
     });
     ws.on('close',()=>{if(client&&connections.get(client.id)===ws){connections.delete(client.id);client.connected=false;const room=sessions.room(client);sessions.disconnect(client);if(room)lobby(room);}});
     ws.on('error',()=>{});

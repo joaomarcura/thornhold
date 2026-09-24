@@ -136,3 +136,11 @@ test('Modos Normal, Personalizado e Ranqueado são presets autoritativos',()=>{
   service.configure(room,host,{mode:'custom',mapSize:'large',elfSlots:2,difficulty:'hard',preparation:20});assert.equal(room.settings.mode,'custom');assert.equal(room.settings.mapSize,'large');assert.equal(room.settings.elfSlots,2);assert.equal(room.settings.difficulty,'hard');
   const oldSeed=room.settings.seed;service.configure(room,host,{mode:'ranked',private:true,local:true,seed:'CHEAT'});assert.equal(room.settings.mode,'ranked');assert.equal(room.settings.private,false);assert.equal(room.settings.local,false);assert.equal(room.settings.allowRoles,false);assert.match(room.settings.seed,/^RANK-[A-F0-9]{16}$/);assert.notEqual(room.settings.seed,oldSeed);assert.equal(service.publicRoom(room).mode,'ranked');
 });
+test('Referência de sala expirada não impede criar ou entrar em outra partida',()=>{
+  const service=new SessionService(),host=service.addClient('stale-host','Host'),guest=service.addClient('stale-guest','Guest');
+  host.roomId='EXPIRADA';
+  const room=service.create(host,{role:'troll',settings:{private:false}});
+  assert.equal(host.roomId,room.id);
+  guest.roomId='AUSENTE';service.join(guest,{code:room.id});assert.equal(guest.roomId,room.id);
+  service.rooms.delete(room.id);service.disconnect(host,true);assert.equal(host.roomId,null);
+});

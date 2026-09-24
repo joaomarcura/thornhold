@@ -22,7 +22,7 @@ export class SessionService {
     return out;
   }
   create(client,input={}){
-    if(client.roomId)reject('Saia da sala atual primeiro.');
+    if(this.room(client))reject('Saia da sala atual primeiro.');
     let code;do{code=randomBytes(4).toString('hex').slice(0,6).toUpperCase();}while(this.rooms.has(code));
     const settings=this.settings(input.settings),salt=randomBytes(16).toString('hex');if(settings.mode==='ranked')settings.seed='RANK-'+randomBytes(8).toString('hex').toUpperCase();
     const room={id:code,name:cleanText(input.name,`${client.name} · Clareira`),hostId:client.id,state:STATES.LOBBY,settings,members:new Map([[client.id,{...client,ready:false,connected:true}]]),slots:[{id:'t0',role:'troll',closed:false,occupant:null},...Array.from({length:BALANCE.maxElves},(_,i)=>({id:'e'+i,role:'elf',closed:i>=settings.elfSlots,occupant:null}))],match:null,created:Date.now(),updated:Date.now(),salt,password:input.password?scryptSync(String(input.password).slice(0,64),salt,32):null};
@@ -30,12 +30,16 @@ export class SessionService {
     if(input.fillBots)for(const s of room.slots)if(!s.closed&&!s.occupant)this.addBot(room,s.id);
     return room;
   }
-  room(client){return this.rooms.get(client.roomId);}
+  room(client){
+    const room=this.rooms.get(client.roomId);
+    if(client.roomId&&(!room||!room.members.has(client.id))){client.roomId=null;return undefined;}
+    return room;
+  }
   requireHost(room,client){if(room.hostId!==client.id)reject('Apenas o host pode fazer isso.');}
   editable(room){if(room.state!==STATES.LOBBY)reject('A sala está bloqueada durante a partida.');}
   invalidate(room){for(const m of room.members.values())m.ready=false;room.updated=Date.now();}
   join(client,input){
-    if(client.roomId)reject('Saia da sala atual primeiro.');
+    if(this.room(client))reject('Saia da sala atual primeiro.');
     const room=this.rooms.get(String(input.code||'').trim().toUpperCase());if(!room)reject('Código não encontrado neste servidor.');this.editable(room);
     if(room.settings.local)reject('Esta sala é local. Crie uma sala privada para jogar em rede.');
     if(room.members.size>=room.settings.elfSlots+1)reject('A sala está cheia.');
@@ -80,7 +84,7 @@ export class SessionService {
   start(room,client){this.requireHost(room,client);this.editable(room);const errors=this.startErrors(room);if(errors.length)reject(errors.join(' '));const match=new Match(room.settings,room.slots);room.state=STATES.LOADING;room.match=match;room.logged=false;room.updated=Date.now();return match;}
   returnToLobby(room,client){this.requireHost(room,client);if(room.state!==STATES.END)reject('A revanche fica disponível no resultado.');room.state=STATES.RETURN;room.match=null;for(const m of room.members.values())if(!m.connected){const slot=room.slots.find(s=>s.occupant?.clientId===m.id);if(slot)slot.occupant=room.settings.takeover?{type:'bot',name:m.name+' · IA',difficulty:room.settings.difficulty}:null;room.members.delete(m.id);const c=this.clients.get(m.id);if(c)c.roomId=null;}room.state=STATES.LOBBY;this.invalidate(room);}
   disconnect(client,explicit=false){
-    const room=this.room(client);if(!room)return;
+    const room=this.room(client);if(!room){if(explicit)client.roomId=null;return;}
     const member=room.members.get(client.id);if(member){member.connected=false;member.ready=false;}
     const slot=room.slots.find(s=>s.occupant?.clientId===client.id);
     if(room.match&&slot){const u=room.match.unit(slot.id);if(u){u.input={x:0,z:0};if(room.settings.takeover)room.match.setController(slot.id,'bot',room.settings.difficulty);}}
