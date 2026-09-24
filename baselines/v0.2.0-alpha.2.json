@@ -70,10 +70,29 @@
     "byDifficulty": { "easy": "20-12", "normal": "9-23", "hard": "8-24" },
     "byMap": { "compact": "21-27", "large": "16-32" }
   },
+  "game111": {
+    "artifact": "artifacts/v0.2.0-alpha.2-game111-final-240.json",
+    "sha256": "eed6bce6f6b4ab66adc9f926cc61b66f906a16901c7bece1f44eaf0c4752b56a",
+    "bytes": 69329903,
+    "gitCommit": "985d9293df79307f15f4c4d37310edf34514c881",
+    "configHash": "d1a21aa331cc70ecda7ef5c60c125e0902640a7b6fc3435d3f989e077b0e5568",
+    "release": { "game": "0.2.0-alpha.2", "protocol": 1, "balance": 4, "ai": 3 },
+    "dimensions": { "elves": [1, 2, 5, 8], "difficulty": ["easy", "normal", "hard"], "mapSize": ["compact", "large"], "repetitions": 10 },
+    "trollWins": 105,
+    "elfWins": 135,
+    "unfinished": 0,
+    "timeLimit": 0,
+    "duration": { "mean": 610.9458333333333, "median": 620, "p10": 185, "p90": 867 },
+    "byElves": { "1": "20-40", "2": "26-34", "5": "25-35", "8": "34-26" },
+    "byDifficulty": { "easy": "33-47", "normal": "33-47", "hard": "39-41" },
+    "byMap": { "compact": "51-69", "large": "54-66" },
+    "referenceScenario": { "mapSize": "compact", "elves": 5, "difficulty": "normal", "trollWins": 4, "elfWins": 6 },
+    "residual": "1v1 terminou 20-40 (66,7% Elfos), uma partida além do teto; concentração defensiva antes da primeira demolição, pendente de playtest humano."
+  },
   "notes": [
     "O relógio de vitória foi removido; 3600 segundos é apenas o teto técnico do laboratório.",
     "As 100 seeds históricas terminaram, contra 32 decisões artificiais por tempo na alpha.1.",
     "A navegação ficou estável e a exploração melhorou, mas a média 39-61 ainda favorece Elfos.",
-    "A matriz complementar diagnostica desequilíbrio por dificuldade, 1v5 e mapa grande; GAME-111 permanece aberto."
+    "GAME-111 fechou em 105-135, sem inacabadas; 1v1 mantém resíduo diagnosticado de 20-40 para validação humana."
   ]
 }
