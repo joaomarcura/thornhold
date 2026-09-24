@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateMap, heightAt, flatGround, pathfind, toCell, index, lineOfSight } from '../shared/map.js';
 import { Match } from '../shared/simulation.js';
-import { STATES, distance } from '../shared/config.js';
+import { BALANCE, STATES, distance } from '../shared/config.js';
 import { TacticalMap } from '../client/tactical-map.js';
 
 test('Refúgios variam em espaço, madeira e altura; núcleos e portões permanecem planos',()=>{
@@ -10,6 +10,7 @@ test('Refúgios variam em espaço, madeira e altura; núcleos e portões permane
     const map=generateMap('terrain-'+seed,size);
     assert.equal(map.bases.length,12);assert.equal(new Set(map.bases.map(b=>b.rx*b.rz)).size,3);
     assert.equal(new Set(map.bases.map(b=>b.wood)).size,3);
+    assert.ok(map.trees.every(t=>t.amount===BALANCE.economy.treeStock));
     assert.ok(map.bases.some(b=>b.height<0)&&map.bases.some(b=>b.height>0));
     for(const b of map.bases){assert.ok(flatGround(map,b.x,b.z,4.5),`core ${seed} ${b.id}`);assert.ok(flatGround(map,b.gate.x,b.gate.z,1.55),`gate ${seed} ${b.id}`);assert.ok(Math.abs(heightAt(map,b.x,b.z)-b.height)<.001);assert.equal(map.trees.filter(t=>t.baseId===b.id).length,b.capacity);}
     for(const d of map.decor){const c=toCell(map,d);assert.equal(map.grid[index(map,c.x,c.z)],1,'Cenário sólido não invade o corredor');}

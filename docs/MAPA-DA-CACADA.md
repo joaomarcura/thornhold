@@ -15,14 +15,14 @@ As páginas e os guias foram consultados. As imagens antigas foram localizadas, 
 | Aspecto | Antes | Agora |
 | --- | --- | --- |
 | Refúgios | Oito espaços praticamente iguais | Doze opções para até oito Elfos; sempre sobram esconderijos possíveis |
-| Capacidade | Mesmo desenho e estoque | Recanto: 5 árvores/750 madeira; bosque: 8/1.440; clareira ampla: 12/2.520 |
+| Capacidade | Mesmo desenho e estoque | Recanto: 5 árvores/5.000 madeira; bosque: 8/8.000; clareira ampla: 12/12.000 |
 | Terreno | Piso plano | Platôs e baixadas, entre −4,4 m e +5,4 m; interiores planos para construir |
 | Rotas | Vias radiais visuais, inclusive através de obstáculos | Trilhas navegáveis com voltas, bifurcações, circuitos e ramais sem saída |
 | Busca | Terreno inteiro exposto no minimapa | Revelação por visão real da equipe e memória do terreno explorado |
-| Recursos expostos | Distribuição aleatória | Bosques ricos nas aproximações; estoque de 300 por árvore e risco de exposição |
+| Recursos expostos | Distribuição aleatória | Bosques ricos nas aproximações; estoque de 1.000 por árvore e risco de exposição |
 | Câmera e interação | Seleção sobre plano y=0 | Personagens, construções, efeitos, cursor e câmera usam a mesma altura |
 
-Cada clareira conserva uma única entrada terrestre. A distribuição dos três tamanhos e dos recursos varia com a seed. O mapa compacto tem 109 × 109 células e o amplo 125 × 125, com 2,2 m por célula. A floresta ocupa células bloqueadas: o cenário não coloca troncos sólidos no meio de uma trilha navegável. As árvores coletáveis preservam a regra anterior de interação.
+Cada clareira conserva uma única entrada terrestre. A distribuição dos três tamanhos e dos recursos varia com a seed. Toda árvore coletável possui estoque de 1.000 madeiras; árvores ricas continuam diferenciadas pela velocidade de coleta, não pela reserva. O mapa compacto tem 109 × 109 células e o amplo 125 × 125, com 2,2 m por célula. A floresta ocupa células bloqueadas: o cenário não coloca troncos sólidos no meio de uma trilha navegável. As árvores coletáveis preservam a regra anterior de interação.
 
 O relevo usa uma superfície contínua de triângulos compartilhada entre servidor e renderização. A movimentação mantém subpassos de até 30 cm, rejeita inclinação excessiva e conserva as colisões de unidades e estruturas. Fundações exigem terreno plano. A linha de visão considera floresta e elevações intermediárias. O círculo das torres acompanha o chão e considera o alcance da especialização.
 

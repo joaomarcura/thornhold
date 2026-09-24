@@ -43,7 +43,7 @@ export function generateMap(seed='THORNHOLD',mapSize='compact'){
   const lo=12,hi=size-13,inner1=40+offset,inner2=68+offset;
   const slots=[[lo,lo,'x',1],[inner1,lo,'z',1],[inner2,lo,'z',1],[hi,lo,'x',-1],[hi,inner1,'x',-1],[hi,inner2,'x',-1],[hi,hi,'x',-1],[inner2,hi,'z',-1],[inner1,hi,'z',-1],[lo,hi,'x',1],[lo,inner2,'x',1],[lo,inner1,'x',1]];
   const names=['Vale Âmbar','Bosque do Orvalho','Refúgio Lunar','Pedra Serena','Jardim Cinzento','Clareira Rubra','Ninho de Musgo','Vigília Azul','Grota das Raízes','Terraço Antigo','Recanto Velado','Bacia das Névoas'];
-  const profiles=[{label:'Recanto',rx:6,rz:5,trees:5,wood:150},{label:'Bosque',rx:7,rz:7,trees:8,wood:180},{label:'Clareira ampla',rx:8,rz:8,trees:12,wood:210}];
+  const profiles=[{label:'Recanto',rx:6,rz:5,trees:5},{label:'Bosque',rx:7,rz:7,trees:8},{label:'Clareira ampla',rx:8,rz:8,trees:12}];
   const shift=Math.floor(rng()*3),levels=[0,3.6,-3.6,5.4,-2.4,0,-4.4,3.2,0,4.8,-3.2,2.4];
   for(let i=0;i<slots.length;i++){
     const [sx,sz,axis,sign]=slots[i],cx=sx+Math.floor(rng()*3)-1,cz=sz+Math.floor(rng()*3)-1,profile=profiles[(i+shift)%3];
@@ -53,7 +53,7 @@ export function generateMap(seed='THORNHOLD',mapSize='compact'){
     const nearest=lanes.reduce((best,n)=>Math.abs(n-junction.x)<Math.abs(best-junction.x)?n:best,lanes[0]);
     const nearestZ=lanes.reduce((best,n)=>Math.abs(n-junction.z)<Math.abs(best-junction.z)?n:best,lanes[0]);
     trail([[junction.x,junction.z],[nearest,junction.z],[nearest,nearestZ]]);
-    const b={id:'base'+i,name:names[i],cx,cz,rx,rz,...world(map,cx,cz),height:levels[i],profile:profile.label,capacity:profile.trees,wood:profile.wood*profile.trees,gate:{...world(map,gx,gz),cx:gx,cz:gz,axis,sign},outside:world(map,gx+dx*3,gz+dz*3),ramp:{from:world(map,gx+dx,gz+dz),to:world(map,junction.x,junction.z)}};
+    const b={id:'base'+i,name:names[i],cx,cz,rx,rz,...world(map,cx,cz),height:levels[i],profile:profile.label,capacity:profile.trees,wood:BALANCE.economy.treeStock*profile.trees,gate:{...world(map,gx,gz),cx:gx,cz:gz,axis,sign},outside:world(map,gx+dx*3,gz+dz*3),ramp:{from:world(map,gx+dx,gz+dz),to:world(map,junction.x,junction.z)}};
     map.bases.push(b);
     for(let z=cz-rz;z<=cz+rz;z++)for(let x=cx-rx;x<=cx+rx;x++)map.grid[index(map,x,z)]=(Math.abs(x-cx)===rx||Math.abs(z-cz)===rz||(Math.abs(x-cx)>rx-3&&Math.abs(z-cz)>rz-3))?1:0;
     carve(gx,gz,0);carve(gx+dx,gz+dz,0);
@@ -62,8 +62,8 @@ export function generateMap(seed='THORNHOLD',mapSize='compact'){
       const p=world(map,x,z);if(Math.hypot(x-cx,z-cz)<3.4||Math.hypot(x-gx,z-gz)<4.5||!walkable(map,x,z))continue;candidates.push(p);
     }
     for(let j=candidates.length-1;j>0;j--){const k=Math.floor(rng()*(j+1));[candidates[j],candidates[k]]=[candidates[k],candidates[j]];}
-    for(const p of candidates.slice(0,profile.trees))map.trees.push({id:'tree'+map.trees.length,...p,amount:profile.wood,rich:false,style:Math.floor(rng()*3),baseId:b.id});
-    b.capacity=map.trees.filter(t=>t.baseId===b.id).length;b.wood=b.capacity*profile.wood;
+    for(const p of candidates.slice(0,profile.trees))map.trees.push({id:'tree'+map.trees.length,...p,amount:BALANCE.economy.treeStock,rich:false,style:Math.floor(rng()*3),baseId:b.id});
+    b.capacity=map.trees.filter(t=>t.baseId===b.id).length;b.wood=b.capacity*BALANCE.economy.treeStock;
   }
   // Later approach trails may brush a neighbouring refuge; enforce every perimeter last.
   for(const b of map.bases){for(let z=b.cz-b.rz;z<=b.cz+b.rz;z++)for(let x=b.cx-b.rx;x<=b.cx+b.rx;x++)if(Math.abs(x-b.cx)===b.rx||Math.abs(z-b.cz)===b.rz)map.grid[index(map,x,z)]=1;carve(b.gate.cx,b.gate.cz,0);}
@@ -73,7 +73,7 @@ export function generateMap(seed='THORNHOLD',mapSize='compact'){
     map.heights[index(map,x,z)]=Math.round(y*10000)/10000;
   }
   for(const b of map.bases){const axis=b.gate.axis,sign=b.gate.sign;
-    for(const side of [-1,1]){const x=b.gate.cx+(axis==='x'?sign*4:side),z=b.gate.cz+(axis==='z'?sign*4:side);if(walkable(map,x,z))map.trees.push({id:'tree'+map.trees.length,...world(map,x,z),amount:300,rich:true,style:1});}
+    for(const side of [-1,1]){const x=b.gate.cx+(axis==='x'?sign*4:side),z=b.gate.cz+(axis==='z'?sign*4:side);if(walkable(map,x,z))map.trees.push({id:'tree'+map.trees.length,...world(map,x,z),amount:BALANCE.economy.treeStock,rich:true,style:1});}
   }
   // Scenery stays on blocked cells; the visible trail is also the collision corridor.
   for(let z=2;z<size-2;z++)for(let x=2;x<size-2;x++)if(!walkable(map,x,z)&&rng()<.35)map.decor.push({...world(map,x,z),scale:.8+rng()*.4,kind:rng()<.2?'rock':'tree',rotation:rng()*6.28});
@@ -107,5 +107,4 @@ export function lineOfSight(map,a,b){
   const n=Math.ceil(Math.hypot(a.x-b.x,a.z-b.z)/(map.cell*.45)),ay=heightAt(map,a.x,a.z)+1.8,by=heightAt(map,b.x,b.z)+1.8;
   for(let i=1;i<n;i++){const t=i/n,x=a.x+(b.x-a.x)*t,z=a.z+(b.z-a.z)*t,p=toCell(map,{x,z});if(!walkable(map,p.x,p.z)||heightAt(map,x,z)>ay+(by-ay)*t)return false;}return true;
 }
-
 

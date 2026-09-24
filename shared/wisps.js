@@ -46,7 +46,7 @@ export function stepWisps(m,dt){
   for(const tree of m.trees)if(tree.amount<=0){
     tree.regrowAt??=m.time+B.wisps.regrowSeconds;
     if(tree.regrowAt<=m.time&&!m.structures.some(s=>s.hp>0&&distance(s,tree)<B.structures[s.kind].radius+.55)){
-      tree.amount=tree.rich?280:180;delete tree.regrowAt;
+      tree.amount=B.economy.treeStock;delete tree.regrowAt;
     }
   }
   for(const w of m.wisps){
