@@ -50,6 +50,11 @@ test('Selection changes at resource threshold without a clock tick and explains 
   const amount=resource('gold',99.99);assert.match(amount,/>99</);assert.doesNotMatch(amount,/>100</);
   const costs=resourceCost({gold:100,wood:35});assert.match(costs,/resource-gold/);assert.match(costs,/resource-wood/);assert.doesNotMatch(costs,/[◇♧]/);
 });
+test('Selection identifies free barricade repair and diminishing assistance',()=>{
+  const {m,u,core}=fixture(),wall={...core,id:'wall-ui',kind:'wall',hp:core.maxHp-50};
+  const html=selectionMarkup(wall,{u,snapshot:m.snapshot('e'),map:m.map});
+  assert.match(html,/GRÁTIS/);assert.match(html,/Primeiro reparador: 100%/);assert.match(html,/ajudantes simultâneos: 25%/);assert.doesNotMatch(html,/resource-gold[^>]*>3</);
+});
 test('Navigation endpoint is in real action range, including last-cell approach',()=>{
   const m=create(),u=m.unit('t'),c=new AIController(),target={id:'target',kind:'tower',x:u.x+12,z:u.z,hp:260,tier:1,progress:1};
   m.structures.push(target);c.discovered.set(target.id,target);m.state=STATES.ACTIVE;

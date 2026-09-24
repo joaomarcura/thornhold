@@ -56,6 +56,17 @@ test('Coleta física esgota árvore; cooldown e reparo custam os mesmos recursos
   t.amount=3;m.time+=1;m.act(u.id,{type:'gather',target:t.id});assert.equal(t.amount,0);
   u.x=b.x+3;u.z=b.z;core.hp-=100;const before=u.gold;m.act(u.id,{type:'repair',target:core.id});assert.equal(u.gold,before-3);assert.equal(core.hp,core.maxHp-58);
 });
+test('Barricada é reparada sem recursos e ajudantes simultâneos contribuem 25%',()=>{
+  const m=match(2),a=m.unit('e0'),helper=m.unit('e1'),b=m.map.bases[0];
+  const wall={id:'wall-free-repair',kind:'wall',owner:a.id,baseId:b.id,x:b.gate.x,z:b.gate.z,tier:1,hp:300,maxHp:500,progress:1,lastHit:-100,bounty:0};m.structures.push(wall);
+  Object.assign(a,{x:wall.x,z:wall.z,gold:0,wood:0});Object.assign(helper,{x:wall.x,z:wall.z,gold:0,wood:0});
+  assert.equal(m.act(a.id,{type:'repair',target:wall.id}),undefined);assert.equal(wall.hp,342);
+  assert.equal(m.act(helper.id,{type:'repair',target:wall.id}),undefined);assert.equal(wall.hp,352.5);
+  assert.equal(a.gold,0);assert.equal(a.wood,0);assert.equal(helper.gold,0);assert.equal(helper.wood,0);
+  assert.equal(m.events.at(-1).contribution,.25);assert.equal(m.events.at(-1).contributors,2);
+  assert.equal(m.snapshot(a.id).structures[0].repairers,undefined);
+  m.time+=1.3;assert.equal(m.act(helper.id,{type:'repair',target:wall.id}),undefined);assert.equal(wall.hp,394.5);assert.equal(m.events.at(-1).contribution,1);
+});
 test('Dano econômico limitado ao HP aplicado, sem overkill ou alvo já morto',()=>{
   const m=match(),t=m.unit('t'),e=m.unit('e0');const before=t.gold;
   assert.equal(m.damage(e,9999,t,'melee'),B.elf.hp);assert.equal(m.damage(e,9999,t,'melee'),0);assert.ok(t.gold>before&&t.gold<100);

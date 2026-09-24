@@ -112,7 +112,7 @@ export class AIController {
     const towerPositions=[];for(const depth of [2,3,4])for(const side of [-1,1,-2,2])towerPositions.push({x:base.gate.x+ix*depth+side*iz,z:base.gate.z+iz*depth-side*ix});
     const towerPosition=towerPositions.find(p=>baseAt(match.map,p)?.id===base.id&&match.positionValid(u,p.x,p.z)&&!match.structures.some(s=>s.hp>0&&distance(s,p)<B.structures[s.kind].radius+B.structures.tower.radius+.3)&&!match.trees.some(t=>t.amount>0&&distance(t,p)<B.structures.tower.radius+.55));
     const buildTower=()=>{const p=towerPosition;if(p)return this.actNear(match,u,p,{type:'build',kind:'tower',...p});return 'no-position';};
-    if(wall&&wall.hp/wall.maxHp<this.profile.repair&&u.gold>=B.elf.repairCost&&u.wood>1){this.actNear(match,u,wall,{type:'repair',target:wall.id});return;}
+    if(wall&&wall.hp/wall.maxHp<this.profile.repair){this.actNear(match,u,wall,{type:'repair',target:wall.id});return;}
     if(u.wood<45){this.gather(match,u,base);return;}
     // The first defensive tower is the bot's opening combat insurance. Building
     // the wall first leaves no reaction window when the Troll arrives early.
@@ -125,7 +125,7 @@ export class AIController {
       }
       if(u.gold>=B.structures.wall.gold&&u.wood>=B.structures.wall.wood)this.actNear(match,u,base.gate,{type:'build',kind:'wall',x:base.gate.x,z:base.gate.z});else this.gather(match,u,base);return;
     }
-    if(threat&&wall.hp<wall.maxHp*.95&&u.gold>10){this.actNear(match,u,wall,{type:'repair',target:wall.id});return;}
+    if(threat&&wall.hp<wall.maxHp*.95){this.actNear(match,u,wall,{type:'repair',target:wall.id});return;}
     const wisps=match.wisps.filter(w=>w.owner===u.id&&w.alive),training=wisps.some(w=>w.readyAt>match.time),hire=wispCost(wisps.length);
     if(!threat&&!training&&towers.length&&wisps.length<Math.min(4,core.tier+1)&&u.gold>=hire.gold+35&&u.wood>=hire.wood&&availableTrees(match,u,core).length){this.actNear(match,u,core,{type:'trainWisp',target:core.id});return;}
     const upgrade=s=>this.actNear(match,u,s,{type:'upgrade',target:s.id,branch:s.kind==='tower'?(this.difficulty==='hard'?'pierce':towers.indexOf(s)%2?'frost':'power'):undefined});
