@@ -18,7 +18,7 @@ export function selectionMarkup(e,{u,snapshot,map}){
     return header('Árvore de seiva',e.rich?'BOSQUE EXTERNO':'CLAREIRA','leaf')+`<div class="selection-stats"><b>${resource('wood',e.amount)}</b>${e.rich?'<span>Wisp +60%</span>':''}</div>`+(w?`<button class="command-primary" data-do="select-wisp" data-id="${w.id}">${icon('wisp')} Wisp Nv. ${w.level}<span>${resource('wood',w.income,{rate:'s',signed:true})}</span></button>`:e.amount>0?`<button class="command-primary" data-do="gather" ${!near||u?.role!=='elf'?'disabled':''}>${icon('wood')} Coletar <kbd>E</kbd></button><small class="context-note">${near?'Segure E para continuar.':'Aproxime-se para coletar.'}</small>`:`<p>Rebrote ${Math.max(0,Math.ceil((e.regrowAt||time+35)-time))}s · aguarda espaço livre.</p>`);
   }
   if(e.role==='wisp')return wispMarkup(e,{u,snapshot,map});
-  if(!e.kind)return header(escape(e.name),e.role==='troll'?'TROLL':'ELFO',e.role==='troll'?'heavy':'leaf')+`<p>${number(e.hp)} / ${number(e.maxHp)} vida</p>`;
+  if(!e.kind)return header(escape(e.name),e.role==='troll'?'TROLL':e.ghost?'ESPÍRITO':'ELFO',e.role==='troll'?'heavy':e.ghost?'wisp':'leaf')+`<p>${number(e.hp)} / ${number(e.maxHp)} vida</p>`;
   const status=upgradeStatus(u,e,time,snapshot.state),cost=status.cost,ready=e.progress===1;
   let html=header(B.structures[e.kind].name,`${own?'SUA BASE':u?.role==='troll'?'INIMIGO':'ALIADO'} · NV. ${e.tier}`,e.kind);
   const producer=resourceProducer(e);
@@ -27,17 +27,17 @@ export function selectionMarkup(e,{u,snapshot,map}){
   html+=`<div class="structure-details"><span>Nível <b>${e.tier}</b></span><span>Construção <b>${price(e.constructionCost||def)}</b></span><span>Próxima melhoria <b>${price(cost)}</b></span>${producer?`<span>Produção <b>${resource('gold',producer.amount,{rate:'s',signed:true})}</b></span><span>Ritmo <b>${resource('gold',producer.perMinute,{rate:'min',signed:true})}</b></span>`:''}${e.kind==='mine'?`<span>Núcleo vinculado <b>Nv. ${e.coreTier||0}</b></span>`:''}${e.kind==='tower'?`<span>Dano <b>${towerDamage(e.tier).toFixed(1)}</b></span><span>Alcance <b>${(def.range+(B.branches[e.branch]?.range||0)).toFixed(1)} m</b></span><span>Intervalo <b>${(def.interval*(B.branches[e.branch]?.interval||1)).toFixed(2)} s</b></span>`:''}</div>`;
   if(!ready){html+=meter(e.progress,`Construindo · ${Math.floor(e.progress*100)}%`)+`<small class="context-note">${near?'Permaneça perto para concluir.':'Aproxime-se para continuar a obra.'}</small>${u?.role==='elf'?'<button class="command-secondary" data-do="assist">Ajudar <kbd>E</kbd></button>':''}`;}
   else if(u?.role==='elf'){
-    if(e.hp<e.maxHp)html+=`<button class="command-secondary" data-do="repair" ${near?'':'disabled'}>Reparar <span>${e.kind==='wall'?'GRÁTIS':price({gold:3,wood:1})} <kbd>R</kbd></span></button>${e.kind==='wall'?'<small class="context-note">Primeiro reparador: 100% · ajudantes simultâneos: 25%.</small>':''}`;
-    if(own){
+    if(e.hp<e.maxHp&&(!u.ghost||e.kind==='wall'))html+=`<button class="command-secondary" data-do="repair" ${near?'':'disabled'}>Reparar <span>${e.kind==='wall'?'GRÁTIS':price({gold:3,wood:1})} <kbd>R</kbd></span></button>${e.kind==='wall'?`<small class="context-note">${u.ghost?'Espírito: 50% da velocidade-base · ':''}Primeiro reparador: 100% · ajudantes simultâneos: 25%.</small>`:''}`;
+    if(own&&!u.ghost){
       if(e.upgrading)html+=meter(1-e.upgrading/e.upgradeDuration,`Evoluindo · ${Math.ceil(e.upgrading)}s`);
       html+=`<button class="command-primary" data-do="upgrade" ${status.allowed?'':'disabled'} aria-describedby="upgrade-reasons" title="${escape(status.allowed?'Melhoria disponível':status.reasons.map(r=>r.message).join(' '))}">${icon('upgrade')} Nível ${e.tier+1}<span>${price(cost)} <kbd>U</kbd></span></button>`;
       if(e.kind==='tower')html+=`<label class="branch-label">ESPECIALIZAÇÃO<select id="branch">${Object.entries(B.branches).map(([k,v])=>`<option value="${k}" ${k===e.branch?'selected':''}>${v.name} · ${v.description}</option>`).join('')}</select></label>`;
       if(!near)html+='<small class="context-note">Aproxime-se para gerenciar.</small>';
     }
   }
-  if(own)html+=`<small id="upgrade-reasons" class="context-note upgrade-reasons" role="status">${status.reasons.map(r=>escape(r.message)).join('<br>')}</small>`;
-  html+=cancel(e,u,time,near);
-  if(own&&e.kind==='core'&&ready)html+=coreWisps(e,{u,snapshot,map});
+  if(own&&!u?.ghost)html+=`<small id="upgrade-reasons" class="context-note upgrade-reasons" role="status">${status.reasons.map(r=>escape(r.message)).join('<br>')}</small>`;
+  if(!u?.ghost)html+=cancel(e,u,time,near);
+  if(own&&!u?.ghost&&e.kind==='core'&&ready)html+=coreWisps(e,{u,snapshot,map});
   if(e.kind==='workshop')html+=`<p class="context-note">Coleta +${e.tier*30}% · reparo +${e.tier*20}%.</p>`;
   return html;
 }

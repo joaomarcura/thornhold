@@ -124,10 +124,11 @@ export class WorldRenderer {
   update(snapshot){
     this.snapshot=snapshot;const all=[...snapshot.units,...snapshot.structures,...(snapshot.wisps||[])],ids=new Set(all.map(e=>e.id));
     for(const[id,g]of this.entities)if(!ids.has(id)){this.dynamic.remove(g);this.entities.delete(id);}
-    for(const e of all){let g=this.entities.get(e.id);const signature=e.kind?e.kind+Math.min(B.visualTier,e.tier)+e.branch:e.role+JSON.stringify(e.equipment||{});
+    for(const e of all){let g=this.entities.get(e.id);const signature=e.kind?e.kind+Math.min(B.visualTier,e.tier)+e.branch:e.role+JSON.stringify(e.equipment||{})+(e.ghost?'-ghost':'');
       if(!g||g.userData.signature!==signature){if(g)this.dynamic.remove(g);g=e.kind?building(e.kind,e.tier,e.branch,e.owner?playerColor(e.owner):null):e.role==='wisp'?wispModel():character(e.role,e.equipment,playerColor(e.id));g.userData.signature=signature;g.position.set(e.x,heightAt(this.map,e.x,e.z),e.z);if(e.kind){const scars=group(g);for(const sign of [-1,1]){part(scars,'sphere',0x333b35,sign*.65,.14,.85,.55,.23,.48);part(scars,'box',0x313e38,sign*.4,1,.55,.09,1.3,.12).rotation.z=sign*.35;}scars.visible=false;g.userData.scars=scars;}this.dynamic.add(g);this.entities.set(e.id,g);}
       g.userData.entity=e;g.userData.target=new T.Vector3(e.x,heightAt(this.map,e.x,e.z),e.z);if(e.kind==='wall'){const b=this.map.bases.find(b=>b.id===e.baseId);g.rotation.y=b.gate.axis==='x'?Math.PI/2:0;}else if(e.kind)g.rotation.y=e.rotation||0;
-      g.visible=e.alive!==false;if(e.kind){g.scale.y=(e.kind==='wall'?1+(Math.min(B.visualTier,e.tier)-1)*.12:1)*(.15+.85*e.progress);g.userData.scars.visible=e.progress>=1&&e.hp/e.maxHp<.55;g.rotation.z=e.progress>=1&&e.hp/e.maxHp<.25?.055:0;}
+      if(e.ghost&&!g.userData.ghostStyled){g.traverse(o=>{if(o.isMesh){o.material=o.material.clone();o.material.transparent=true;o.material.opacity=.52;o.material.depthWrite=false;}});g.userData.ghostStyled=true;}
+      g.visible=e.alive!==false||e.ghost;if(e.kind){g.scale.y=(e.kind==='wall'?1+(Math.min(B.visualTier,e.tier)-1)*.12:1)*(.15+.85*e.progress);g.userData.scars.visible=e.progress>=1&&e.hp/e.maxHp<.55;g.rotation.z=e.progress>=1&&e.hp/e.maxHp<.25?.055:0;}
     }
     const occupied=new Set((snapshot.wisps||[]).map(w=>w.treeId));
     for(const t of snapshot.trees){const g=this.treeMeshes.get(t.id);if(!g)continue;g.visible=t.amount>0;g.userData.entity={...t,kind:'tree'};
@@ -194,7 +195,7 @@ export class WorldRenderer {
         g.userData.arms.forEach((a,i)=>a.rotation.x=strike?(i===1?arc:.25):work?(i===1?-1.4+Math.sin(this.elapsed*16)*.9:.2):moving?Math.sin(this.elapsed*9+i*Math.PI+Math.PI)*.4:0);
         g.userData.body.rotation.z=strike?-arc*.08:0;g.userData.body.position.y=Math.sin(this.elapsed*(moving?18:2))*(moving?.06:.025);
       }
-      let me=this.entities.get(viewerId);if(!me||me.userData.entity.alive===false)me=this.entities.get(this.followId)||[...this.entities.values()].find(g=>!g.userData.entity.kind&&g.userData.entity.alive);
+      let me=this.entities.get(viewerId);if(!me||(!me.userData.entity.alive&&!me.userData.entity.ghost))me=this.entities.get(this.followId)||[...this.entities.values()].find(g=>!g.userData.entity.kind&&g.userData.entity.alive);
       if(this.focusPoint)this.target.lerp(new T.Vector3(this.focusPoint.x,heightAt(this.map,this.focusPoint.x,this.focusPoint.z)+1.25,this.focusPoint.z),Math.min(1,dt*9));
       else if(me)this.target.lerp(me.position.clone().add(new T.Vector3(0,me.userData.entity.role==='troll'?2:1.25,0)),Math.min(1,dt*9));
       const pitch=this.focusPoint?1.1:this.pitch,zoom=this.focusPoint?30:this.zoom;

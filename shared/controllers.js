@@ -7,7 +7,7 @@ import { availableTrees } from './wisps.js';
 export class AIController {
   constructor(difficulty='normal'){this.profile=B.difficulty[difficulty]||B.difficulty.normal;this.difficulty=difficulty;this.nextThink=0;this.route=[];this.destination=null;this.routeAt=-100;this.explored=new Set();this.exploreTarget=null;this.exploreAt=0;this.discovered=new Map();this.retreating=false;this.navigationFailure=null;this.lastNavigationEntity=null;this.lastNavigationAt=-Infinity;this.metrics={idle:0,attacking:0,defending:0,retreating:0,failedNavigation:0,failedExploration:0,pathRecalculations:0,retreatAttempts:0,retreatSuccesses:0,targetChanges:0,stuckNavigation:0};}
   tick(match,u,dt){
-    if(match.time>=this.nextThink){this.nextThink=match.time+this.profile.think;if(u.role==='elf')this.elf(match,u);else this.troll(match,u);}
+    if(match.time>=this.nextThink){this.nextThink=match.time+this.profile.think;if(u.ghost)this.ghost(match,u);else if(u.role==='elf')this.elf(match,u);else this.troll(match,u);}
     // Brain decisions only update the intention. Apply movement once per tick;
     // calling follow both inside the brain and here caused route churn during retreat.
     if(this.destination)this.follow(match,u,dt);else u.input={x:0,z:0};
@@ -78,6 +78,12 @@ export class AIController {
       if(choices[0])this.go(match,u,choices[0],.2);return 'moving';
     }
     if(this.go(match,u,target,reach)){u.yaw=Math.atan2(target.x-u.x,target.z-u.z);return match.act(u.id,cmd);}return 'moving';
+  }
+  ghost(match,u){
+    const wall=match.structures.filter(s=>s.kind==='wall'&&s.hp>0&&s.progress>=1&&s.hp<s.maxHp).sort((a,b)=>distance(u,a)-distance(u,b))[0];
+    if(wall){this.actNear(match,u,wall,{type:'repair',target:wall.id});return;}
+    if(!(u.cooldowns.ghostReveal>match.time)){match.act(u.id,{type:'ghostReveal'});this.stop(u);return;}
+    const ally=match.units.filter(a=>a.role==='elf'&&a.alive).sort((a,b)=>distance(u,a)-distance(u,b))[0];if(ally)this.go(match,u,ally,4);else this.stop(u);
   }
   elf(match,u){
     const own=match.structures.filter(s=>s.owner===u.id&&s.hp>0),core=own.find(s=>s.kind==='core');

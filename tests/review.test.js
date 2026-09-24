@@ -145,3 +145,13 @@ test('Morte do Elfo colapsa patrimônio, paga 25% e libera a clareira após 15s'
   Object.assign(ally,{x:base.x+4.4,z:base.z,gold:1000,wood:1000});assert.match(m.act(ally.id,{type:'build',kind:'core',x:base.x,z:base.z}),/colapso/);
   m.time=75.01;assert.equal(m.act(ally.id,{type:'build',kind:'core',x:base.x,z:base.z}),undefined);assert.equal(m.structures.at(-1).owner,ally.id);
 });
+test('Espírito move, revela, repara a 50% e uma segunda morte vira observação',()=>{
+  const m=new Match({seed:'GHOST'},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},{id:'e0',role:'elf',occupant:{type:'human',name:'Espírito'}},{id:'e1',role:'elf',occupant:{type:'human',name:'Vivo'}}]);
+  const troll=m.unit('t'),ghost=m.unit('e0'),ally=m.unit('e1'),base=m.map.bases[0];m.state=STATES.ACTIVE;m.time=60;m.damage(ghost,ghost.hp,troll,'melee');
+  assert.equal(ghost.alive,false);assert.equal(ghost.ghost,true);assert.equal(ghost.hp,B.ghost.hp);assert.equal(m.state,STATES.ACTIVE);assert.match(m.act(ghost.id,{type:'build',kind:'tower',x:base.x,z:base.z}),/espírito/);
+  Object.assign(ghost,{x:base.x,z:base.z});Object.assign(ally,m.map.bases.at(-1));Object.assign(troll,{x:base.x+14,z:base.z});assert.equal(m.teamSee(ally,troll),false);
+  assert.equal(m.act(ghost.id,{type:'ghostReveal'}),undefined);assert.equal(m.teamSee(ally,troll),true);assert.equal(m.reveals[0].until,m.time+B.ghost.revealDuration);assert.match(m.act(ghost.id,{type:'ghostReveal'}),/recarregando/);
+  const wall={id:'ghost-wall',kind:'wall',owner:ally.id,baseId:base.id,x:ghost.x+1,z:ghost.z,tier:1,hp:400,maxHp:500,progress:1,bounty:100,lastHit:-100};m.structures.push(wall);assert.equal(m.act(ghost.id,{type:'repair',target:wall.id}),undefined);assert.equal(wall.hp,421);
+  const x=ghost.x;m.input(ghost.id,{x:-1,z:0});m.movement(ghost,.1);assert.notEqual(ghost.x,x);
+  const gold=troll.gold,kills=m.stats.kills,eliminations=m.telemetry.eliminations.length;m.damage(ghost,ghost.hp,troll,'melee');assert.equal(ghost.ghost,false);assert.equal(ghost.observer,true);assert.equal(troll.gold,gold+B.ghost.goldReward);assert.equal(m.stats.kills,kills);assert.equal(m.telemetry.eliminations.length,eliminations);assert.equal(troll.stats.ghostsDestroyed,1);
+});

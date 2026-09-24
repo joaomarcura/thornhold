@@ -65,6 +65,8 @@ O Núcleo libera uma vaga de Mina por nível, até cinco. A cada nível, o custo
 
 Quando um Elfo morre, seus recursos são perdidos e todas as estruturas e Wisps que lhe pertencem colapsam. O Troll recebe 25% da recompensa normal restante; estruturas de outros proprietários sobrevivem. A clareira do Núcleo caído fica bloqueada por 15 segundos antes de poder ser reivindicada por um aliado vivo.
 
+O Elfo eliminado retorna como Espírito controlável com visão curta. Ele não causa dano nem impede a vitória do Troll, mas pode revelar uma área de 18 m por 10 segundos a cada 60 segundos e reparar Barricadas a 50% da velocidade-base. O Troll vê e pode matar o Espírito por 25 de ouro; essa segunda morte não conta como nova eliminação e encerra a participação ativa do jogador.
+
 Obras precisam de um construtor vivo por perto. A barricada encaixa somente no portão da sua clareira. Elfos atravessam portões aliados; o Troll precisa destruí-los. Após uma ruptura, a entrada fica 12 segundos sem reconstrução e não aceita novas fundações com o Troll a menos de 5 metros.
 
 Depois que sua Barricada é rompida, um Elfo próximo pode usar **F** para atordoar o Troll por três segundos. A recarga de 60 segundos é compartilhada pela equipe. Se o Núcleo for destruído, o Elfo sobrevivente tem 60 segundos para alcançar outra clareira e usar seu voucher único de reassentamento: o próximo Núcleo não consome ouro nem madeira.

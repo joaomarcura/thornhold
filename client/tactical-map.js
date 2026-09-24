@@ -10,13 +10,13 @@ export class TacticalMap {
     const troll=snapshot.units.find(u=>u.role==='troll'&&u.alive);
     if(troll)this.lastTroll={x:troll.x,z:troll.z,time:snapshot.time};
     if(snapshot.units.some(u=>u.role==='troll'&&!u.alive))this.lastTroll=null;
-    const sources=viewer?[...snapshot.units.filter(a=>a.role===viewer.role&&a.alive),...(viewer.role==='elf'?snapshot.structures.filter(s=>s.progress>=1&&s.hp>0):[])]:[];
+    const sources=viewer?[...snapshot.units.filter(a=>a.role===viewer.role&&(a.alive||a.ghost)),...(viewer.role==='elf'?snapshot.structures.filter(s=>s.progress>=1&&s.hp>0):[]),...(viewer.role==='elf'?(snapshot.reveals||[]):[])]:[];
     const key=viewer?sources.map(p=>{const c=toCell(this.map,p);return `${c.x},${c.z}`;}).join(';'):'spectator';
     if(key===this.visionKey)return;this.visionKey=key;this.visible.fill(viewer?0:1);this.revision++;
     if(!viewer)this.explored.fill(1);
-    const radius=B.vision[viewer?.role]||24,cells=Math.ceil(radius/this.map.cell);
-    for(const source of sources){const c=toCell(this.map,source);for(let z=Math.max(0,c.z-cells);z<=Math.min(this.map.size-1,c.z+cells);z++)for(let x=Math.max(0,c.x-cells);x<=Math.min(this.map.size-1,c.x+cells);x++){
-      const p={x:x*this.map.cell,z:z*this.map.cell},k=index(this.map,x,z);if(distance(source,p)<=radius&&lineOfSight(this.map,source,p)){this.explored[k]=1;this.visible[k]=1;}
+    const radius=B.vision[viewer?.role]||24;
+    for(const source of sources){const sourceRadius=source.radius||(source.ghost?B.ghost.vision:radius),cells=Math.ceil(sourceRadius/this.map.cell),c=toCell(this.map,source);for(let z=Math.max(0,c.z-cells);z<=Math.min(this.map.size-1,c.z+cells);z++)for(let x=Math.max(0,c.x-cells);x<=Math.min(this.map.size-1,c.x+cells);x++){
+      const p={x:x*this.map.cell,z:z*this.map.cell},k=index(this.map,x,z);if(distance(source,p)<=sourceRadius&&lineOfSight(this.map,source,p)){this.explored[k]=1;this.visible[k]=1;}
     }}
     for(const b of this.map.bases)if(!viewer||sources.some(a=>distance(a,b.gate)<radius&&lineOfSight(this.map,a,b.gate))||(viewer.role==='elf'&&snapshot.structures.some(s=>s.baseId===b.id)))this.seenBases.add(b.id);
   }
@@ -34,10 +34,11 @@ export class TacticalMap {
     for(const e of s.structures){ctx.fillStyle=playerColor(e.owner).css;const r=e.kind==='core'?3:2;ctx.fillRect(e.x*k-r,e.z*k-r,r*2,r*2);}
     if(large)for(const worker of s.wisps||[]){ctx.fillStyle=worker.income>0?'#bbf7d1':'#8a9782';ctx.beginPath();ctx.arc(worker.x*k,worker.z*k,2.5,0,Math.PI*2);ctx.fill();}
     for(const a of s.alerts||[])ring(a,7+Math.sin(s.time*7)*2,'#ff765f');
-    for(const a of s.units.filter(a=>a.alive)){
+    for(const a of s.units.filter(a=>a.alive||a.ghost)){
       if(a.role==='troll'){ring(a,large?12:8,'#ff795f');ctx.fillStyle='#ff795f';ctx.beginPath();ctx.moveTo(a.x*k,a.z*k-6);ctx.lineTo(a.x*k+6,a.z*k);ctx.lineTo(a.x*k,a.z*k+6);ctx.lineTo(a.x*k-6,a.z*k);ctx.closePath();ctx.fill();if(large){ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.fillText('TROLL',a.x*k,a.z*k-17);}}
-      else {ctx.fillStyle=playerColor(a.id).css;ctx.beginPath();ctx.arc(a.x*k,a.z*k,a.id===u?.id?4:3,0,Math.PI*2);ctx.fill();if(large){ctx.font='11px sans-serif';ctx.textAlign='center';ctx.fillText(a.name,a.x*k,a.z*k-9);}}
+      else {ctx.fillStyle=a.ghost?'#b9e8ff':playerColor(a.id).css;ctx.globalAlpha=a.ghost?.6:1;ctx.beginPath();ctx.arc(a.x*k,a.z*k,a.id===u?.id?4:3,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;if(large){ctx.font='11px sans-serif';ctx.textAlign='center';ctx.fillText((a.ghost?'✦ ':'')+a.name,a.x*k,a.z*k-9);}}
     }
+    for(const reveal of s.reveals||[])ring(reveal,reveal.radius*k,'#aee8ff88',true);
     if(!s.units.some(a=>a.role==='troll'&&a.alive)&&this.lastTroll&&s.time-this.lastTroll.time<12){ctx.globalAlpha=1-(s.time-this.lastTroll.time)/15;ring(this.lastTroll,large?12:8,'#ffb198',true);ctx.font=`bold ${large?14:10}px sans-serif`;ctx.textAlign='center';ctx.fillStyle='#ffb198';ctx.fillText('?',this.lastTroll.x*k,this.lastTroll.z*k+4);ctx.globalAlpha=1;}
     for(const p of s.pings||[]){const color=p.kind==='danger'?'#ff826a':p.kind==='help'?'#88dbff':'#ffdc8e';ring(p,8+(s.time-p.time)%1*8,color);ctx.font='bold 14px sans-serif';ctx.textAlign='center';ctx.fillStyle=color;ctx.fillText(p.kind==='danger'?'!':p.kind==='help'?'+':'•',p.x*k,p.z*k+4);if(large){ctx.font='11px sans-serif';ctx.fillText(`${p.text} ${Math.ceil(p.until-s.time)}s`,p.x*k,p.z*k+25);}}
     if(u)ring(u,B.vision[u.role]*k,'#d6ffe525');

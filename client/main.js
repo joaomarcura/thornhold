@@ -30,7 +30,7 @@ function syncControls(){
 }
 function releaseCursor(){stopInput();mouseLook.release();}
 function deselect(){selected=null;selectionKey='';if($('#selection-panel'))$('#selection-panel').hidden=true;}
-function stopInput(){for(const key of keys)suppressedKeys.add(key);keys.clear();if(snapshot&&me()?.alive)send('input',{x:0,z:0});}
+function stopInput(){for(const key of keys)suppressedKeys.add(key);keys.clear();if(snapshot&&(me()?.alive||me()?.ghost))send('input',{x:0,z:0});}
 function cancelContext(openMenu=false){
   awaitingBuild=false;stopInput();
   if(modal){modal=null;render();return true;}
@@ -107,7 +107,7 @@ function browserHTML(){
 function resultHTML(){
   if(!result)return '';const win=result.winner==='troll',mvp=result.mvp;
   const reason=result.endReason==='time-limit-objective'?'Resultado pelos objetivos ao atingir o limite de tempo.':result.endReason==='army-eliminated'?'O exército dos Elfos foi eliminado.':win?'Todos os núcleos reivindicados foram destruídos.':'O gigante caiu. A floresta terá outro amanhecer.';
-  const rows=[...(result.players||[])].sort((a,b)=>b.score-a.score).map((p,i)=>`<tr class="${p.id===mvp?.id?'mvp-row':''}"><td><span>${i+1}</span><b>${p.role==='troll'?'♜':'❧'} ${escape(p.name)}</b>${p.id===mvp?.id?'<em>MVP</em>':''}</td><td>${p.alive?'Sobreviveu':'Eliminado'}</td><td>${num(p.score)}</td><td>${p.kills}</td><td>${num(p.damage)}</td><td>${resource('gold',p.goldGenerated)} ${resource('wood',p.woodGenerated)}</td><td>${p.structuresBuilt}</td><td>${p.upgrades}</td><td>${p.stuns||0}</td></tr>`).join('');
+  const rows=[...(result.players||[])].sort((a,b)=>b.score-a.score).map((p,i)=>`<tr class="${p.id===mvp?.id?'mvp-row':''}"><td><span>${i+1}</span><b>${p.role==='troll'?'♜':'❧'} ${escape(p.name)}</b>${p.id===mvp?.id?'<em>MVP</em>':''}</td><td>${p.alive?'Sobreviveu':p.ghost?'Espírito':'Eliminado'}</td><td>${num(p.score)}</td><td>${p.kills}</td><td>${num(p.damage)}</td><td>${resource('gold',p.goldGenerated)} ${resource('wood',p.woodGenerated)}</td><td>${p.structuresBuilt}</td><td>${p.upgrades}</td><td>${p.stuns||0}</td></tr>`).join('');
   return `<main class="result-page"><div class="result-emblem">${win?'♜':'❧'}</div><div class="eyebrow">${win?'A FLORESTA SE CURVOU':'A CLAREIRA RESISTIU'}</div><h1>${win?'Vitória do Troll.':'Vitória dos Elfos.'}</h1><p>${reason}</p>${mvp?`<section class="mvp-card"><small>MVP DA PARTIDA</small><b>${mvp.role==='troll'?'♜':'❧'} ${escape(mvp.name)}</b><span>${num(mvp.score)} pontos · ${num(mvp.damage)} dano · ${mvp.kills} eliminações</span></section>`:''}<div class="result-summary"><div><small>DURAÇÃO</small><b>${clock(result.duration)}</b></div><div><small>ELIMINAÇÕES</small><b>${result.kills}</b></div><div><small>BASES ROMPIDAS</small><b>${result.basesDestroyed}</b></div><div><small>MELHORIAS</small><b>${result.upgrades}</b></div></div><div class="result-table-wrap"><table class="result-table"><thead><tr><th>Jogador</th><th>Status</th><th>Pontos</th><th>K</th><th>Dano</th><th>Recursos</th><th>Obras</th><th>Upgrades</th><th>Stuns</th></tr></thead><tbody>${rows}</tbody></table></div><div class="result-details"><span>Dano do Troll <b>${num(result.trollDamage)}</b></span><span>Dano das torres <b>${num(result.towerDamage)}</b></span><span>Ouro produzido <b>${resource('gold',result.produced)}</b></span><span>Maior renda <b>${resource('gold',result.highestIncome,{rate:'s'})}</b></span><span>Madeira produzida <b>${resource('wood',(result.players||[]).reduce((n,p)=>n+(p.woodGenerated||0),0))}</b></span><span>Estruturas destruídas <b>${result.destroyed}</b></span><span>Núcleos destruídos <b>${result.telemetry?.structuresDestroyed?.core||0}</b></span><span>Torres destruídas <b>${result.telemetry?.structuresDestroyed?.tower||0}</b></span><span>Elfos sobreviventes <b>${result.survivors}</b></span></div><p class="score-note">MVP é o maior placar do time vencedor. Pontos consideram dano, eliminações, recursos, construções, melhorias, reparos e stuns.</p><div class="result-actions">${host()?'<button class="primary" data-do="return">Revanche · voltar ao lobby →</button>':'<p>Aguardando o host retornar todos ao lobby.</p>'}<button class="secondary" data-do="leave">Sair</button></div><small class="muted">SEED ${escape(result.seed)} · A sessão permanece conectada para a próxima partida.</small></main>`;
 }
 function modalHTML(){
@@ -144,26 +144,27 @@ function updateTacticalHUD(u){
   const html=alerts.map(a=>`<button data-do="focus-alert" data-id="${escape(a.id)}"><b>⚠ ${escape(snapshot.units.find(u=>u.id===a.owner)?.name||'Aliado')} sob ataque</b><span>Clique para observar a região →</span></button>`).join('');
   if($('#team-alerts').innerHTML!==html)$('#team-alerts').innerHTML=html;
   if(u?.role==='elf'){const b=$('#hotbar [data-do="elf-stun"]'),status=snapshot.elfStun;if(b&&status){b.disabled=!status.available;b.title=status.reason;b.classList.toggle('ready',status.available);b.classList.toggle('cooling',status.readyAt>snapshot.time);let timer=b.querySelector('.skill-timer');if(!timer){timer=document.createElement('small');timer.className='skill-timer';b.append(timer);}timer.textContent=status.readyAt>snapshot.time?Math.ceil(status.readyAt-snapshot.time)+'s':'3s';}}
+  if(u?.ghost){const b=$('#hotbar [data-do="ghost-reveal"]'),readyAt=u.cooldowns.ghostReveal||0;if(b){b.classList.toggle('cooling',readyAt>snapshot.time);let timer=b.querySelector('.skill-timer');if(!timer){timer=document.createElement('small');timer.className='skill-timer';b.append(timer);}timer.textContent=readyAt>snapshot.time?Math.ceil(readyAt-snapshot.time)+'s':'pronto';}}
   if(u?.role==='troll')for(const[key,task]of [['heavy','heavy'],['dash','dash'],['roar','roar']]){const b=$(`#hotbar [data-do="${task}"]`);if(b){let timer=b.querySelector('.skill-timer');if(!timer){timer=document.createElement('small');timer.className='skill-timer';b.append(timer);}timer.textContent=remaining(u,key);b.classList.toggle('cooling',u.cooldowns[key]>snapshot.time);}}
 }
 function updateHUD(){
   if(!snapshot||view!=='game')return;
   world.setCombatDebug(devMode&&debugCombat,snapshot);const debug=$('#debug-overlay');if(debug){const rows=(snapshot.debugTowers||[]).map(t=>`<div><b>${escape(t.id)}</b> · ${escape(t.target||'sem alvo')} · ${t.distance?.toFixed(1)||'—'} / ${t.maxRange?.toFixed(1)||'—'}m · ${escape(t.reason)}</div>`).join('');debug.hidden=!devMode||!debugCombat;debug.innerHTML=`<strong>COMBATE · TORRES</strong>${rows||'<div>Sem torres na partida</div>'}`;}
-  const u=me(),elf=u?.role==='elf',observer=!u||!u.alive,prep=snapshot.state===STATES.PREP;
-  $('#role-name').textContent=!u?'OBSERVADOR':elf?'GUARDIÃO DA CLAREIRA':'TROLL DO BOSQUE';$('#player-title').textContent=u?.name||'Todos os bots · Tab para alternar';
+  const u=me(),ghost=!!u?.ghost,elf=u?.role==='elf',observer=!u||(!u.alive&&!ghost),prep=snapshot.state===STATES.PREP;
+  $('#role-name').textContent=!u?'OBSERVADOR':ghost?'ESPÍRITO DA CLAREIRA':elf?'GUARDIÃO DA CLAREIRA':'TROLL DO BOSQUE';$('#player-title').textContent=u?.name||'Todos os bots · Tab para alternar';
   $('#phase-name').textContent=prep?'O SELO CAI EM':snapshot.time>B.hungerAge?'A ÚLTIMA CAÇADA':snapshot.time>B.finalAge?'ERA DO CERCO':'A CAÇADA COMEÇOU';$('#match-clock').textContent=clock(prep?Math.max(0,snapshot.preparation-snapshot.time):snapshot.time);
   $('#resource-bar').innerHTML=u?`<span class="gold" title="Ouro · +${(u.income||0).toFixed(1)}/s"><b>${resource('gold',u.gold)}</b>${elf?`<small>+${(u.income||0).toFixed(1)}/s</small>`:''}</span>${elf?`<button class="wood" data-do="core" title="Madeira · N abre o núcleo"><b>${resource('wood',u.wood)}</b><small>+${(u.woodIncome||0).toFixed(1)}/s</small></button>`:''}`:'<span>Observando</span>';
-  $('#core-shortcut').hidden=!elf;
+  $('#core-shortcut').hidden=!elf||ghost;
   const own=snapshot.structures.filter(s=>s.owner===viewerId),core=own.find(s=>s.kind==='core'),wall=own.find(s=>s.kind==='wall'),nearBase=world.map.bases.find(b=>distance(b,u||world.target)<13);
   const relocating=elf&&!core&&(u.relocationUntil||0)>snapshot.time;
-  $('#objective').textContent=observer?(u?'Você é um espírito aliado. Acompanhe a equipe e use V para sinalizar.':'Observando a expedição. Pressione Tab para trocar de personagem.'):elf?!core?relocating?`REASSENTAMENTO GRÁTIS · ${Math.ceil(u.relocationUntil-snapshot.time)}s · Corra para outra clareira e construa um novo Núcleo.`:nearBase?`${nearBase.name} · ${nearBase.profile}, ${nearBase.capacity} árvores, ${nearBase.height>0?'+':''}${nearBase.height} m · Pressione 1 e coloque seu núcleo na clareira.`:'Explore uma clareira pelas trilhas. Depois, pressione 1 para construir o núcleo.':!wall?'Proteja a única entrada: pressione 2 e clique no portão iluminado.':`Núcleo T${core.tier} · Barricada T${wall.tier} · ${own.filter(s=>s.kind==='tower').length} torres. Selecione o núcleo para formar Wisps e automatizar madeira.`:prep?'O selo contém sua força. Os Elfos estão preparando seus refúgios.':'Procure atividade nas clareiras. Ataque para ganhar ouro; B abre suas melhorias.';
+  $('#objective').textContent=observer?'Observando a expedição. Pressione Tab para trocar de personagem.':ghost?'ESPÍRITO · F revela a área por 10s · R repara Barricadas a 50% · evite o Troll.':elf?!core?relocating?`REASSENTAMENTO GRÁTIS · ${Math.ceil(u.relocationUntil-snapshot.time)}s · Corra para outra clareira e construa um novo Núcleo.`:nearBase?`${nearBase.name} · ${nearBase.profile}, ${nearBase.capacity} árvores, ${nearBase.height>0?'+':''}${nearBase.height} m · Pressione 1 e coloque seu núcleo na clareira.`:'Explore uma clareira pelas trilhas. Depois, pressione 1 para construir o núcleo.':!wall?'Proteja a única entrada: pressione 2 e clique no portão iluminado.':`Núcleo T${core.tier} · Barricada T${wall.tier} · ${own.filter(s=>s.kind==='tower').length} torres. Selecione o núcleo para formar Wisps e automatizar madeira.`:prep?'O selo contém sua força. Os Elfos estão preparando seus refúgios.':'Procure atividade nas clareiras. Ataque para ganhar ouro; B abre suas melhorias.';
   const attacked=(snapshot.alerts||[]).filter(a=>a.owner===viewerId);$('#attack-alert').hidden=!elf||!attacked.length;$('#attack-alert').onclick=()=>{if(attacked[0])focusMap(attacked[0]);};
-  $('#hp-label').textContent=observer?'EXPEDIÇÃO':elf?'VITALIDADE':'FORÇA ANCESTRAL';$('#hp-value').textContent=u?`${num(u.hp)} / ${num(u.maxHp)}`:'';$('#health-fill').style.width=u?`${u.hp/u.maxHp*100}%`:'100%';
+  $('#hp-label').textContent=observer?'EXPEDIÇÃO':ghost?'ESSÊNCIA':elf?'VITALIDADE':'FORÇA ANCESTRAL';$('#hp-value').textContent=u?`${num(u.hp)} / ${num(u.maxHp)}`:'';$('#health-fill').style.width=u?`${u.hp/u.maxHp*100}%`:'100%';
   $('#cooldown-info').textContent=observer?'Tab · trocar personagem':u.name;
   $('#objective').hidden=!relocating&&(!!selected||!!buildKind||!!assigning||!showHints||(!observer&&elf&&!!core&&!!wall)||(!elf&&!prep&&snapshot.time>snapshot.preparation+20));
   $('#combo-meter').hidden=elf||observer||!u?.combo;$('#combo-meter').textContent=u?.combo?'COMBO '+u.combo+'/3 · terceiro acerto +25%':'';
-  const hotbarKey=(observer?'observer':elf?'elf':'troll')+buildKind+(relocating?'-relocating':'');
-  if($('#hotbar').dataset.key!==hotbarKey){$('#hotbar').dataset.key=hotbarKey;$('#hotbar').innerHTML=observer?'<button data-do="spectate"><kbd>TAB</kbd><span>Próximo</span></button>':elf?Object.entries(B.structures).map(([k,d],i)=>{const free=k==='core'&&relocating,mine=k==='mine';return `<button class="${buildKind===k?'active':''}" data-do="build" data-kind="${k}" title="${free?'Voucher de reassentamento: sem custo':mine?'Custo, vagas e produção escalam com o Núcleo':`${d.name}: ${d.gold} ouro, ${d.wood} madeira`}"><kbd>${i+1}</kbd><b>${icon(k)}</b><span>${d.name}</span><small>${free?'GRÁTIS':mine?'NÚCLEO':resourceCost(d)}</small></button>`;}).join('')+`<button data-do="elf-stun" title="Disponível após sua Barricada ser rompida"><kbd>F</kbd><b>${icon('stun')}</b><span>Atordoar</span><small>3s</small></button>`:`<button data-do="light"><kbd>CLIQUE</kbd><b>${icon('sword')}</b><span>Golpe</span></button><button data-do="heavy"><kbd>Q</kbd><b>${icon('heavy')}</b><span>Pesado</span></button><button data-do="dash"><kbd>ESPAÇO</kbd><b>${icon('dash')}</b><span>Esquiva</span></button><button data-do="roar"><kbd>F</kbd><b>${icon('roar')}</b><span>Rugido</span></button><button data-do="shop"><kbd>B</kbd><b>${icon('gold')}</b><span>Melhorias</span></button>`;}
+  const hotbarKey=(observer?'observer':ghost?'ghost':elf?'elf':'troll')+buildKind+(relocating?'-relocating':'');
+  if($('#hotbar').dataset.key!==hotbarKey){$('#hotbar').dataset.key=hotbarKey;$('#hotbar').innerHTML=observer?'<button data-do="spectate"><kbd>TAB</kbd><span>Próximo</span></button>':ghost?`<button data-do="ghost-reveal" title="Revela inimigos e terreno em ${B.ghost.revealRadius}m por ${B.ghost.revealDuration}s"><kbd>F</kbd><b>${icon('reveal')}</b><span>Revelar</span><small>60s</small></button><button data-do="repair"><kbd>R</kbd><b>${icon('wall')}</b><span>Reparar</span><small>50%</small></button>`:elf?Object.entries(B.structures).map(([k,d],i)=>{const free=k==='core'&&relocating,mine=k==='mine';return `<button class="${buildKind===k?'active':''}" data-do="build" data-kind="${k}" title="${free?'Voucher de reassentamento: sem custo':mine?'Custo, vagas e produção escalam com o Núcleo':`${d.name}: ${d.gold} ouro, ${d.wood} madeira`}"><kbd>${i+1}</kbd><b>${icon(k)}</b><span>${d.name}</span><small>${free?'GRÁTIS':mine?'NÚCLEO':resourceCost(d)}</small></button>`;}).join('')+`<button data-do="elf-stun" title="Disponível após sua Barricada ser rompida"><kbd>F</kbd><b>${icon('stun')}</b><span>Atordoar</span><small>3s</small></button>`:`<button data-do="light"><kbd>CLIQUE</kbd><b>${icon('sword')}</b><span>Golpe</span></button><button data-do="heavy"><kbd>Q</kbd><b>${icon('heavy')}</b><span>Pesado</span></button><button data-do="dash"><kbd>ESPAÇO</kbd><b>${icon('dash')}</b><span>Esquiva</span></button><button data-do="roar"><kbd>F</kbd><b>${icon('roar')}</b><span>Rugido</span></button><button data-do="shop"><kbd>B</kbd><b>${icon('gold')}</b><span>Melhorias</span></button>`;}
   $('#control-hints').innerHTML=!$('#shop').hidden?'<kbd>B / ESC</kbd> fechar arsenal · A partida continua':buildKind?'<kbd>CLIQUE</kbd> construir · <kbd>SHIFT</kbd> repetir · <kbd>ESC / DIREITO</kbd> cancelar':assigning?'<kbd>CLIQUE</kbd> escolher árvore · <kbd>ESC / RMB</kbd> cancelar':`<kbd>WASD</kbd> mover · <kbd>SHIFT</kbd> correr${elf?' · <kbd>E</kbd> coletar · <kbd>R</kbd> reparar':''} · <kbd>M</kbd> mapa`;
   const selectedEntity=[...snapshot.structures,...snapshot.trees,...snapshot.units,...(snapshot.wisps||[])].find(e=>e.id===selected);if(selected&&!selectedEntity)deselect();const key=selectedEntity?selectionMarkup(selectedEntity,{u,snapshot,map:world.map}):'';
   if(key!==selectionKey){selectionKey=key;renderSelection(selectedEntity,key);}
@@ -172,7 +173,7 @@ function updateHUD(){
   tactical.update(snapshot,u);tactical.draw($('#minimap'),world.target);if(mapOpen)tactical.draw($('#tactical-map'),world.target);
   updateTacticalHUD(u);syncControls();
   updateContextAction(u);
-  const labelEntities=[...snapshot.units.filter(a=>a.alive&&a.id!==viewerId),...snapshot.structures.filter(e=>e.id===selected||e.id===hoverTarget?.id||e.hp<e.maxHp||e.progress<1||e.upgrading),...(snapshot.wisps||[])];
+  const labelEntities=[...snapshot.units.filter(a=>(a.alive||a.ghost)&&a.id!==viewerId),...snapshot.structures.filter(e=>e.id===selected||e.id===hoverTarget?.id||e.hp<e.maxHp||e.progress<1||e.upgrading),...(snapshot.wisps||[])];
   const labels=labelEntities.map(e=>{
     const p=world.entityPoint(e);if(!p.visible||p.x<0||p.x>innerWidth||p.y<0||p.y>innerHeight||distance(e,world.target)>34)return '';
     if(e.role==='wisp')return `<button class="wisp-label ${e.id===selected?'selected':''}" data-do="select-wisp" data-id="${e.id}" style="left:${p.x}px;top:${p.y}px" aria-label="Wisp nível ${e.level}, ${e.income.toFixed(1)} madeira por segundo">${icon('wisp')}<span>${e.readyAt>snapshot.time?'◷ '+Math.ceil(e.readyAt-snapshot.time)+'s':e.upgradingUntil>snapshot.time?'↑ '+Math.ceil(e.upgradingUntil-snapshot.time)+'s':e.income>0?'+'+e.income.toFixed(1)+'/s':'Pausado'}</span></button>`;
@@ -246,7 +247,7 @@ function contextEntity(explicit=false){
 }
 function updateContextAction(u){
   const panel=$('#context-action');panel.hidden=true;hoverTarget=null;
-  if(!u?.alive||u.role!=='elf'||selected||buildKind||assigning||mapOpen||world.focusPoint||modal)return;
+  if((!u?.alive&&!u?.ghost)||u.role!=='elf'||selected||buildKind||assigning||mapOpen||world.focusPoint||modal)return;
   hoverTarget=world.pick(lastMouse.x,lastMouse.y,viewerId);const e=contextEntity();if(!e||distance(e,u)>B.interactRange||!lineOfSight(world.map,u,e))return;
   const linked=e.amount!==undefined&&snapshot.wisps.some(w=>w.treeId===e.id);
   const text=e.role==='wisp'||linked?'Gerenciar Wisp':e.amount>0?'Coletar madeira':e.progress<1?'Ajudar construção':e.kind==='core'?'Gerenciar núcleo':e.hp<e.maxHp?'Reparar':null;if(!text)return;
@@ -350,6 +351,7 @@ document.addEventListener('click',async event=>{
     case 'dash':action({type:'dash'});break;
     case 'roar':action({type:'roar'});break;
     case 'elf-stun':action({type:'elfStun'});break;
+    case 'ghost-reveal':action({type:'ghostReveal'});break;
     case 'spectate':spectate();break;
   }
 });
@@ -379,7 +381,7 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyB'&&!e.repeat&&me()?.role==='troll'){toggleShop();return;}
   if(e.code==='KeyN'&&!e.repeat&&me()?.role==='elf'){openCore();return;}
   if(e.code==='KeyV'&&!e.repeat){action({type:'ping',kind:'help',...(world.focusPoint||{})});return;}
-  if(e.code==='Tab'){if(!me()||!me().alive){e.preventDefault();spectate();}else if(mouseLook.locked){e.preventDefault();releaseCursor();$('#hotbar button')?.focus();}return;}
+  if(e.code==='Tab'){if(!me()||(!me().alive&&!me().ghost)){e.preventDefault();spectate();}else if(mouseLook.locked){e.preventDefault();releaseCursor();$('#hotbar button')?.focus();}return;}
   if(e.code==='Space'&&e.target.closest('button'))return;
   if(['Space','ArrowUp','ArrowDown'].includes(e.code))e.preventDefault();
   if(mapOpen||world.focusPoint||!$('#shop').hidden)return;
@@ -391,7 +393,7 @@ addEventListener('keydown',e=>{
   if(e.code==='Enter'&&buildKind&&buildValid){e.preventDefault();confirmBuild(e.shiftKey);}
   if(e.code==='KeyR'){if(buildKind)rotation+=Math.PI/2;else if(me()?.role==='elf')interact('repair');}
   if(e.code==='KeyG'&&buildKind)snap=!snap;
-  if(e.code==='KeyE')interact();if(e.code==='KeyQ')strike(true);if(e.code==='Space'&&me()?.role==='troll')action({type:'dash'});if(e.code==='KeyF')action({type:me()?.role==='elf'?'elfStun':'roar'});
+  if(e.code==='KeyE')interact();if(e.code==='KeyQ')strike(true);if(e.code==='Space'&&me()?.role==='troll')action({type:'dash'});if(e.code==='KeyF')action({type:me()?.ghost?'ghostReveal':me()?.role==='elf'?'elfStun':'roar'});
 });
 addEventListener('keyup',e=>{keys.delete(e.code);suppressedKeys.delete(e.code);});addEventListener('blur',()=>{keys.clear();suppressedKeys.clear();releaseCursor();});
 // Prevent native auto-scroll before the middle click toggles cursor control.
@@ -417,7 +419,7 @@ addEventListener('pointermove',e=>{
 });
 canvas.addEventListener('wheel',e=>{if(view==='game'){e.preventDefault();world.zoom=Math.max(5,Math.min(23,world.zoom+e.deltaY*.01));}},{passive:false});
 setInterval(()=>{
-  if(!snapshot||view!=='game')return;const u=me();if(!u?.alive)return;let x=0,z=0;
+  if(!snapshot||view!=='game')return;const u=me();if(!u?.alive&&!u?.ghost)return;let x=0,z=0;
   const playing=!modal&&!mapOpen&&!world.focusPoint&&!assigning&&$('#shop').hidden;
   if(playing){const forward=(keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0),side=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0);x=-Math.sin(world.yaw)*forward-Math.cos(world.yaw)*side;z=Math.cos(world.yaw)*forward-Math.sin(world.yaw)*side;}
   send('input',{x,z,sprint:keys.has('ShiftLeft')||keys.has('ShiftRight'),...(mouseLook.locked?{yaw:-world.yaw}:{})});

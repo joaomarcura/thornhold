@@ -8,7 +8,7 @@ export class CombatTelemetry {
   }
   hit(m,target,actual,source,kind,sourceId){
     if(target.kind&&target.hp<=0)this.destroyed[target.kind]=(this.destroyed[target.kind]||0)+1;
-    if(target.hp<=0&&target.role)this.eliminations.push({time:m.time,id:target.id,role:target.role,cause:kind,source:sourceId||source?.id||null});
+    if(target.hp<=0&&target.role&&!target.ghost)this.eliminations.push({time:m.time,id:target.id,role:target.role,cause:kind,source:sourceId||source?.id||null});
     if(target.role==='troll'){
       const category=kind==='tower'?'tower':kind==='hunger'?'hunger':source?.role==='elf'?'elf':'other';
       this.received[category]+=actual;

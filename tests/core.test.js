@@ -69,7 +69,8 @@ test('Barricada é reparada sem recursos e ajudantes simultâneos contribuem 25%
 });
 test('Dano econômico limitado ao HP aplicado, sem overkill ou alvo já morto',()=>{
   const m=match(),t=m.unit('t'),e=m.unit('e0');const before=t.gold;
-  assert.equal(m.damage(e,9999,t,'melee'),B.elf.hp);assert.equal(m.damage(e,9999,t,'melee'),0);assert.ok(t.gold>before&&t.gold<100);
+  assert.equal(m.damage(e,9999,t,'melee'),B.elf.hp);assert.equal(e.ghost,true);const afterElf=t.gold;
+  assert.equal(m.damage(e,9999,t,'melee'),B.ghost.hp);assert.equal(t.gold,afterElf+B.ghost.goldReward);assert.equal(m.damage(e,9999,t,'melee'),0);assert.ok(t.gold>before&&t.gold<100);
   assert.equal(m.damage(m.unit('e1'),Infinity,t,'melee'),0);
 });
 test('Cooldowns, preparação e bloqueio físico não dependem do cliente',()=>{

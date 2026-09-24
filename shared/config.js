@@ -12,6 +12,7 @@ export const BALANCE = {
   wisps:{gold:65,wood:15,hireGrowth:1.32,trainSeconds:6,income:1.4,incomeGrowth:1.25,upgradeGold:70,upgradeWood:20,costGrowth:1.5,seconds:4,hp:55,externalBonus:1.6,range:25,regrowSeconds:35},
   combat:{buffer:.18,lightWindup:.1,heavyWindup:.32,comboWindow:2.8,comboBonus:.25,openingSeconds:1.2,openingBonus:.2},
   elf: { hp: 85, speed: 6.4, gold: 150, wood: 110, gather: 10, gatherInterval: 0.65, repair: 42, repairCost: 3, stunDuration:3, stunCooldown:60, stunRange:10, relocationSeconds:60 },
+  ghost:{hp:55,vision:8,revealRadius:18,revealDuration:10,revealCooldown:60,goldReward:25},
   troll: { hp: 2200, speed: 5.8, damage: 24, interval: 1.05, range: 3.6, armor: 1, gold: 0, goldPerDamage: 0.36, regen: 1.8, regenPerLevel:4, damageGrowth:1.18,speedFactor:.88,healthPerLevel:320,armorPerLevel:3,movementPerLevel:.08,siegePerLevel:.18,finalSiege:1.35,regenDelay:6,exposureGrace:9,exposureRate:.035,heavy: 2.25,heavyRecovery:1.3, heavyCooldown: 4, dashCooldown: 7,dashDuration:.4,dashSpeed:2.5, roarCooldown: 18,roarRange:9,roarDuration:2 },
   structures: {
     core: { name:'Núcleo', gold:65, wood:25, hp:360, radius:1.55, seconds:4, income:3, growth:1.65, upgradeGold:100, upgradeWood:35, color:0xe4c37a },
