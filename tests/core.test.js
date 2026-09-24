@@ -109,7 +109,7 @@ test('Partidas autônomas 1v1, 1v2, 1v5 e 1v8 completam todo o ciclo',()=>{
   const cases=[...[1,2,5,8].map(n=>({n,seed:'TEST-'+n,difficulty:'normal'})),{n:5,seed:'SIM-2',difficulty:'easy'}];
   // Infinite progression can exceed the former 20-minute cap. Pacing is measured separately
   // by the 20 Hz audit, which preserves unfinished games instead of treating them as wins.
-  for(const {n,seed,difficulty} of cases){const m=new Match({seed,difficulty},slots(n,'bot'));for(let i=0;i<18000&&m.state!==STATES.END;i++)m.step(.1);assert.equal(m.state,STATES.END,seed);assert.ok(['troll','elves'].includes(m.winner));assert.ok(m.stats.trollDamage>0);assert.ok(m.stats.produced>0);assert.ok(m.stats.upgrades>0);assert.ok(m.winner==='elves'||m.stats.basesDestroyed>0);assert.ok(m.stats.basesDestroyed<=n);}
+  for(const {n,seed,difficulty} of cases){const m=new Match({seed,difficulty},slots(n,'bot'));for(let i=0;i<36000&&m.state!==STATES.END;i++)m.step(.1);assert.equal(m.state,STATES.END,seed);assert.ok(['troll','elves'].includes(m.winner));assert.ok(m.stats.trollDamage>0);assert.ok(m.stats.produced>0);assert.ok(m.stats.upgrades>0);assert.ok(m.winner==='elves'||m.stats.basesDestroyed>0);assert.ok(m.stats.basesDestroyed<=n);}
 });
 test('Lobby: autorização, slots, readiness, sessão privada e revanche',()=>{
   const service=new SessionService(),host=service.addClient('host','Host'),guest=service.addClient('guest','Guest'),r=service.create(host,{role:'troll',settings:{elfSlots:2,private:true},password:'secret',fillBots:true});

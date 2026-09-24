@@ -20,7 +20,7 @@ export function selectionMarkup(e,{u,snapshot,map}){
   if(e.role==='wisp')return wispMarkup(e,{u,snapshot,map});
   if(!e.kind)return header(escape(e.name),e.role==='troll'?'TROLL':e.ghost?'ESPÍRITO':'ELFO',e.role==='troll'?'heavy':e.ghost?'wisp':'leaf')+`<p>${number(e.hp)} / ${number(e.maxHp)} vida</p>`;
   const status=upgradeStatus(u,e,time,snapshot.state),cost=status.cost,ready=e.progress===1;
-  let html=header(B.structures[e.kind].name,`${own?'SUA BASE':u?.role==='troll'?'INIMIGO':'ALIADO'} · NV. ${e.tier}`,e.kind);
+  let html=header(e.legendary?'Torre Lendária':B.structures[e.kind].name,`${own?'SUA BASE':u?.role==='troll'?'INIMIGO':'ALIADO'} · NV. ${e.tier}`,e.kind);
   const producer=resourceProducer(e);
   html+=`<div class="selection-stats"><b>${number(e.hp)} <small>/ ${number(e.maxHp)} HP</small></b>${producer?`<span>${resource('gold',producer.amount,{rate:'s',signed:true})}</span>`:''}</div><div class="target-health"><i style="width:${e.hp/e.maxHp*100}%"></i></div>`;
   const def=B.structures[e.kind];
@@ -38,6 +38,7 @@ export function selectionMarkup(e,{u,snapshot,map}){
   if(own&&!u?.ghost)html+=`<small id="upgrade-reasons" class="context-note upgrade-reasons" role="status">${status.reasons.map(r=>escape(r.message)).join('<br>')}</small>`;
   if(!u?.ghost)html+=cancel(e,u,time,near);
   if(own&&!u?.ghost&&e.kind==='core'&&ready)html+=coreWisps(e,{u,snapshot,map});
+  if(e.legendary)html+=`<p class="context-note">Raio contínuo · dano cresce até ${B.legendary.maxRamp}× enquanto mantém linha de visão.</p>`;
   if(e.kind==='workshop')html+=`<p class="context-note">Coleta +${e.tier*30}% · reparo +${e.tier*20}%.</p>`;
   return html;
 }

@@ -102,8 +102,8 @@ Versão candidata: `0.2.0-alpha.1`. Cenário principal de balanceamento: um Trol
 - [x] `GAME-104` Reparo gratuito de Barricada e contribuição decrescente.
 - [x] `GAME-105` Colapso do patrimônio, recompensa parcial e bloqueio de 15 segundos.
 - [x] `GAME-106` Espírito controlável, revelação, reparo, segunda morte e observação.
-- [ ] `GAME-107` Remover o limite temporal e instrumentar impasses.
-- [ ] `GAME-108` Torre e Espada Lendárias, feedback audiovisual, IA e contrajogo.
+- [x] `GAME-107` Remover o limite temporal e instrumentar impasses.
+- [x] `GAME-108` Torre e Espada Lendárias, feedback audiovisual, IA e contrajogo.
 - [ ] `GAME-109` Roda de comunicação sem transferência de recursos.
 - [ ] `GAME-110` Repetir 100 partidas pareadas e separar 1v1, 1v2, 1v5 e 1v8 por mapa/dificuldade.
 

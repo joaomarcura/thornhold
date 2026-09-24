@@ -146,3 +146,16 @@ test('Defesa de torres mata Troll exposto e encerra partida com vitória dos Elf
   advance(m,30);assert.equal(t.alive,false);assert.equal(m.winner,'elves');assert.equal(m.state,STATES.END);assert.ok(m.stats.towerDamage>0);
   const end=m.time;advance(m,2);assert.equal(m.time,end);
 });
+test('Progressão lendária resolve estruturas e aumenta o raio enquanto mantém contato',()=>{
+  const sword=arena(),{m,t,e}=sword,structure={id:'execute-me',kind:'core',owner:'e',baseId:'base-x',x:t.x,z:t.z+2,tier:1,hp:140,maxHp:1000,progress:1,bounty:100,lastHit:-100};Object.assign(e,{x:t.x+20,z:t.z+20});m.structures.push(structure);t.yaw=0;t.levels.damage=5;t.levels.siege=5;
+  assert.equal(m.legendarySword(t),true);m.act(t.id,{type:'attack'});m.time=t.pendingStrike.at;m.resolveStrike(t);assert.equal(structure.hp,0);assert.ok(m.events.some(e=>e.type==='legendary-execute'));
+
+  const beam=match(),troll=beam.unit('t'),elf=beam.unit('e');beam.state=STATES.ACTIVE;beam.time=80;troll.hp=troll.maxHp=10000;Object.assign(elf,{x:troll.x+8,z:troll.z+8});
+  const tower={id:'legend',kind:'tower',owner:elf.id,baseId:'b',x:troll.x,z:troll.z+5,tier:10,hp:1000,maxHp:1000,progress:1,branch:'pierce',lastShot:-100,lastHit:-100,bounty:100};beam.structures.push(tower);
+  advance(beam,.1);assert.equal(tower.legendary,true);const hp0=troll.hp;advance(beam,1);const first=hp0-troll.hp,hp1=troll.hp;advance(beam,1);const second=hp1-troll.hp;assert.ok(second>first);assert.ok(beam.events.some(e=>e.type==='beam'));
+  tower.disabledUntil=beam.time+1;advance(beam,.5);assert.equal(tower.beamStartedAt,0);const paused=troll.hp;advance(beam,.4);assert.equal(troll.hp,paused);
+});
+test('Partida não termina por relógio e resultado registra diagnóstico de impasse',()=>{
+  const m=match(),{core}=baseFixture(m);m.state=STATES.ACTIVE;m.time=B.matchSeconds+30;m.elfBasesClaimed.add(core.baseId);m.checkEndState();assert.equal(m.state,STATES.ACTIVE);
+  const diagnostics=m.result().stallDiagnostics;assert.equal(diagnostics.liveCores,1);assert.ok(diagnostics.secondsWithoutCombat>=B.matchSeconds);assert.ok(Number.isFinite(diagnostics.economyPerSecond));
+});

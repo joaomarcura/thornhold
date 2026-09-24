@@ -145,6 +145,7 @@ export class WorldRenderer {
       if(e.unit===this.viewerId&&!matchMedia('(prefers-reduced-motion: reduce)').matches){this.shakeUntil=this.elapsed+.12;this.shakeStrength=e.broken?.12:e.heavy?.06:.025;}
     }
     if(e.type==='shot'){const mesh=new T.Mesh(geo.sphere,material(e.branch==='frost'?0x87d7ee:0xf2d09a));mesh.scale.setScalar(.13);mesh.position.set(e.x,heightAt(this.map,e.x,e.z)+4.5,e.z);this.effects.add(mesh);this.projectiles.push({mesh,start:mesh.position.clone(),end:new T.Vector3(e.tx,heightAt(this.map,e.tx,e.tz)+2,e.tz),age:0});}
+    if(e.type==='beam'){const mesh=new T.Mesh(geo.sphere,material(0xe8fff0));mesh.scale.setScalar(.18*Math.min(2,e.ramp||1));mesh.position.set(e.x,heightAt(this.map,e.x,e.z)+4.8,e.z);this.effects.add(mesh);this.projectiles.push({mesh,start:mesh.position.clone(),end:new T.Vector3(e.tx,heightAt(this.map,e.tx,e.tz)+2,e.tz),age:.12});}
     if(['damage','destroy','wisp-death','gather','repair','complete','roar','build','impact'].includes(e.type)){
       const color=e.type==='damage'?0xe8b37b:e.type==='repair'?0x91e4c9:e.type==='gather'?0xb3c892:0xe8d697;
       const rubble=e.type==='destroy'&&e.kind==='wall';
