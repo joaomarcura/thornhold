@@ -81,6 +81,8 @@ O cursor livre permite selecionar estruturas e usar os painéis. Loja, ajuda e m
 
 Uma construção confirmada encerra o projeto; segure **Shift** para continuar colocando. **E** mostra e executa a interação próxima. Wisps orbitam as árvores com brilho, rastro e marcador clicável de produção; o botão **Localizar** permite inspecioná-los. **Esc** fecha o contexto atual sem desfazer investimentos. Para cancelar uma obra, formação ou evolução ainda em andamento, use seu botão **Cancelar**, que mostra a devolução de 75% da parte ainda não executada. Exige proximidade e cinco segundos sem dano no alvo. Dicas permanentes podem ser desligadas no menu.
 
+O menu **Acessibilidade e controles** permite remapear movimento, combate e interface, ajustar a UI entre 90% e 125% e reduzir animações, partículas e movimento de câmera. As preferências ficam salvas no navegador; modo daltônico não faz parte deste ciclo.
+
 Detalhes do desenho e dos fluxos: [HUD e interação](docs/HUD-E-INTERACAO.md).
 
 O Troll aparece como um losango laranja quando a equipe o avista. Ao sair da visão, um círculo tracejado marca **a última posição conhecida por até 12 segundos**, sem acompanhar seus movimentos ocultos. Pings duram 10 segundos e têm intervalo de 3 segundos. Lentidão, bloqueio de regeneração, exposição, selo e torres desativadas mostram seus prazos; efeitos condicionais, como fome, explicam como encerrá-los.
@@ -114,7 +116,7 @@ npm run audit:progression -- 6 artifacts/progression-current-20hz.json
 ```
 
 - `npm test`: regras, física, economia, fog, mapa, simulações completas e cenários de rede A–G com conexões WebSocket independentes.
-- `npm run verify`: sintaxe, testes de regras/rede e os fluxos críticos de navegador para upgrades, recursos, stun, reassentamento, placar, resultado e alternância PT-BR/EN.
+- `npm run verify`: sintaxe, testes de regras/rede e os fluxos críticos de navegador para upgrades, recursos, stun, reassentamento, placar, resultado, alternância PT-BR/EN e preferências de acessibilidade.
 - `npm run balance`: HP, DPS, tempo para romper barricada, tempo para matar o Troll e retorno do investimento econômico por tier. Gera `artifacts/balance.json`.
 - `npm run simulate -- 240`: partidas determinísticas em 1v2/1v3/1v5/1v8 e três dificuldades. Gera `artifacts/simulations.json`, incluindo win rate, duração, dano, renda, primeira ruptura, melhorias e sobreviventes. O teste não concede bônus de vitória nem altera regras por resultado.
 - O servidor grava resultados reais em `telemetry/matches.jsonl`.

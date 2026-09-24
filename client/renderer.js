@@ -142,14 +142,14 @@ export class WorldRenderer {
     if(e.type==='dash'){const g=this.entities.get(e.unit);if(g)g.userData.swing=null;}
     if(e.type==='impact'){
       const target=this.entities.get(e.entity);if(target)target.userData.hitUntil=this.elapsed+.14;
-      if(e.unit===this.viewerId&&!matchMedia('(prefers-reduced-motion: reduce)').matches){this.shakeUntil=this.elapsed+.12;this.shakeStrength=e.broken?.12:e.heavy?.06:.025;}
+      if(e.unit===this.viewerId&&!this.reducedMotion()){this.shakeUntil=this.elapsed+.12;this.shakeStrength=e.broken?.12:e.heavy?.06:.025;}
     }
     if(e.type==='shot'){const mesh=new T.Mesh(geo.sphere,material(e.branch==='frost'?0x87d7ee:0xf2d09a));mesh.scale.setScalar(.13);mesh.position.set(e.x,heightAt(this.map,e.x,e.z)+4.5,e.z);this.effects.add(mesh);this.projectiles.push({mesh,start:mesh.position.clone(),end:new T.Vector3(e.tx,heightAt(this.map,e.tx,e.tz)+2,e.tz),age:0});}
     if(e.type==='beam'){const mesh=new T.Mesh(geo.sphere,material(0xe8fff0));mesh.scale.setScalar(.18*Math.min(2,e.ramp||1));mesh.position.set(e.x,heightAt(this.map,e.x,e.z)+4.8,e.z);this.effects.add(mesh);this.projectiles.push({mesh,start:mesh.position.clone(),end:new T.Vector3(e.tx,heightAt(this.map,e.tx,e.tz)+2,e.tz),age:.12});}
     if(['damage','destroy','wisp-death','gather','repair','complete','roar','build','impact'].includes(e.type)){
       const color=e.type==='damage'?0xe8b37b:e.type==='repair'?0x91e4c9:e.type==='gather'?0xb3c892:0xe8d697;
       const rubble=e.type==='destroy'&&e.kind==='wall';
-      for(let i=0;i<(rubble?24:e.type==='destroy'?15:5);i++){const m=new T.Mesh(rubble?geo.box:geo.sphere,material(rubble?0x9a8667:color));m.scale.setScalar((rubble?.16:.05)+Math.random()*(rubble?.25:.08));m.position.set(e.x,heightAt(this.map,e.x,e.z)+1.4,e.z);this.effects.add(m);this.particles.push({mesh:m,velocity:new T.Vector3((Math.random()-.5)*(rubble?8:4),2+Math.random()*3,(Math.random()-.5)*(rubble?8:4)),age:0});}
+      for(let i=0;i<(this.reducedMotion()?0:rubble?24:e.type==='destroy'?15:5);i++){const m=new T.Mesh(rubble?geo.box:geo.sphere,material(rubble?0x9a8667:color));m.scale.setScalar((rubble?.16:.05)+Math.random()*(rubble?.25:.08));m.position.set(e.x,heightAt(this.map,e.x,e.z)+1.4,e.z);this.effects.add(m);this.particles.push({mesh:m,velocity:new T.Vector3((Math.random()-.5)*(rubble?8:4),2+Math.random()*3,(Math.random()-.5)*(rubble?8:4)),age:0});}
     }
   }
   previewSwing(id,heavy){
@@ -174,15 +174,16 @@ export class WorldRenderer {
     for(const[id,ring]of this.towerDebugRings)if(!keep.has(id)){this.scene.remove(ring);this.towerDebugRings.delete(id);}
     for(const tower of towers){let ring=this.towerDebugRings.get(tower.id);if(!ring){ring=new T.Mesh(new T.RingGeometry(16.92,17,64),new T.MeshBasicMaterial({color:0x75e0b0,side:T.DoubleSide,transparent:true,opacity:.2,depthWrite:false}));ring.rotation.x=-Math.PI/2;this.towerDebugRings.set(tower.id,ring);this.scene.add(ring);}const radius=B.structures.tower.range+(B.branches[tower.branch]?.range||0);groundRing(ring,this.map,tower.x,tower.z,radius);const status=snapshot.debugTowers?.find(s=>s.id===tower.id);ring.material.color.setHex(status?.valid?0x79e2a8:0xe98775);ring.material.opacity=status?.valid?.34:.2;}
   }
+  reducedMotion(){return matchMedia('(prefers-reduced-motion: reduce)').matches||document.body.classList.contains('reduce-motion');}
   render(time,viewerId,selected){
     this.viewerId=viewerId;
     const dt=Math.min(.05,(time-this.lastTime)/1000||.016);this.lastTime=time;this.elapsed+=dt;
-    if(this.isMenu){const f=this.menuFocus,t=this.elapsed*.04;this.camera.position.set(f.x-23+Math.sin(t)*2,f.y+24,f.z-29+Math.cos(t)*2);this.camera.lookAt(f);this.menuTroll.userData.body.position.y=Math.sin(this.elapsed*1.6)*.06;}
+    if(this.isMenu){const f=this.menuFocus,t=this.reducedMotion()?0:this.elapsed*.04;this.camera.position.set(f.x-23+Math.sin(t)*2,f.y+24,f.z-29+Math.cos(t)*2);this.camera.lookAt(f);this.menuTroll.userData.body.position.y=this.reducedMotion()?0:Math.sin(this.elapsed*1.6)*.06;}
     else if(this.snapshot){
       for(const g of this.entities.values()){
         const e=g.userData.entity;g.position.lerp(g.userData.target,1-Math.exp(-dt*16));g.position.y=heightAt(this.map,g.position.x,g.position.z);
         if(e.role==='wisp'){
-          const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches,phase=(reduced?0:this.elapsed*.95)+e.x*.3,active=e.income>0,forming=e.readyAt>this.snapshot.time;
+          const reduced=this.reducedMotion(),phase=(reduced?0:this.elapsed*.95)+e.x*.3,active=e.income>0,forming=e.readyAt>this.snapshot.time;
           const orbit=(a)=>new T.Vector3(Math.cos(a)*1.7,2.05+(reduced?0:Math.sin(a*2)*.22),Math.sin(a)*1.7);
           g.userData.spirit.position.copy(orbit(phase));g.userData.orb.rotation.y=this.elapsed;
           g.userData.spirit.scale.setScalar(forming?.65:1);g.userData.glow.material.opacity=active?.8:.35;g.userData.ring.material.opacity=e.id===selected?.85:.25;
@@ -210,7 +211,7 @@ export class WorldRenderer {
       this.camera.position.y=Math.max(this.camera.position.y,heightAt(this.map,this.camera.position.x,this.camera.position.z)+.6);
       const aim=this.target.clone();if(this.aiming&&!this.focusPoint)aim.add(new T.Vector3(-Math.sin(this.yaw)*5,0,Math.cos(this.yaw)*5));
       this.camera.lookAt(aim);
-      if(this.shakeUntil>this.elapsed&&!this.focusPoint)this.camera.position.x+=Math.sin(this.elapsed*110)*this.shakeStrength;
+      if(!this.reducedMotion()&&this.shakeUntil>this.elapsed&&!this.focusPoint)this.camera.position.x+=Math.sin(this.elapsed*110)*this.shakeStrength;
       const s=this.entities.get(selected)||this.treeMeshes.get(selected);if(!this.ghost?.visible){this.selection.visible=!!s;if(s)this.selection.position.set(s.position.x,s.position.y+.08,s.position.z);}this.range.visible=!!s&&s.userData.entity?.kind==='tower';if(this.range.visible){const radius=B.structures.tower.range+(B.branches[s.userData.entity.branch]?.range||0),key=s.userData.entity.id+':'+radius;if(this.rangeKey!==key){groundRing(this.range,this.map,s.position.x,s.position.z,radius);this.rangeKey=key;}}
     }
     this.sun.position.set(this.target.x+25,55,this.target.z-20);this.sun.target.position.copy(this.target);

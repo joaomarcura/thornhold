@@ -11,6 +11,20 @@
 .lobby-bottom{position:sticky;bottom:12px;background:#162c2df5;padding:18px 20px;border:1px solid #d6dec338;border-radius:3px;box-shadow:0 6px 30px #0003;z-index:10}.playing .connection{right:30px;bottom:13px}.connection{bottom:6px;font-size:8px}.lobby-page~footer{padding-bottom:12px}.world-label small{font-size:7px}.objective{font-size:12px}.hotbar span{font-size:10px}
 @media(max-height:1000px) and (min-width:801px){.lobby-page{padding-top:22px}.lobby-page .page-heading h1{font-size:30px}.lobby-page .back{margin-bottom:16px}.lobby-layout{margin-top:23px}.lobby-page .slot{min-height:57px;margin-bottom:5px}.lobby-page .settings-panel{padding:18px}.lobby-page .settings-panel label{margin-bottom:12px}.lobby-page .settings-panel .section-label{margin-bottom:15px}.lobby-page .settings-panel input,.lobby-page .settings-panel select{padding:10px 12px}.lobby-page .versus{margin:13px 0}.lobby-page .rule-note{margin-top:14px}.lobby-bottom{margin-top:16px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* Local accessibility preferences. Zoom keeps the WebGL canvas and projected world labels at native coordinates. */
+#app,#hud{zoom:var(--ui-scale,1)}
+#app{width:var(--ui-extent,100%);min-height:var(--ui-vh,100vh)}
+#hud{right:auto;bottom:auto;width:var(--ui-extent,100%);height:var(--ui-extent,100%)}
+body.reduce-motion *,body.reduce-motion *::before,body.reduce-motion *::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
+.settings-modal{width:min(760px,calc(100vw - 40px));max-height:calc(100vh - 40px);overflow:auto}
+.settings-modal>p{color:#aebeb5;line-height:1.6}
+.accessibility-options{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px 0;padding:16px;border:1px solid #ffffff18;background:#ffffff06}
+.accessibility-options label{margin:0}.accessibility-options .check{align-self:end;padding-bottom:12px}
+.binding-groups{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.binding-groups section{border:1px solid #ffffff18;padding:12px}.binding-groups h3{margin:0 0 8px;color:#d8c18b;font:700 9px/1.4 system-ui;letter-spacing:1.5px}
+.binding-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;min-height:38px;border-top:1px solid #ffffff0e;font-size:11px;color:#c6d2ca}.binding-row button{min-width:88px;padding:7px 9px;border:1px solid #b9c9b745;background:#ffffff08}.binding-row button.capturing{color:#172724;background:#e3ca8d;border-color:#e3ca8d}.binding-row kbd{font-size:10px}
+.settings-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}.settings-actions button{width:auto}
+@media(max-width:760px){.binding-groups{grid-template-columns:1fr}.accessibility-options{grid-template-columns:1fr}.settings-modal{max-height:calc(100vh - 20px)}}
 .result-page{max-width:1100px}
 .mvp-card{margin:22px auto 0;max-width:520px;padding:15px 20px;border:1px solid #d3b86a88;background:linear-gradient(120deg,#b6923920,#25352caa);display:grid;gap:5px}
 .mvp-card small{font-size:8px;letter-spacing:1.7px;color:var(--gold)}.mvp-card b{font:23px Georgia,serif;color:#f2e2b8}.mvp-card span{font-size:11px;color:var(--muted)}

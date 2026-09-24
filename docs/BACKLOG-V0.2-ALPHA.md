@@ -113,7 +113,7 @@ Critério: zero estados sem saída, zero partidas automatizadas inacabadas, 1v5 
 ### Etapa 2 — modos, identidade e acessibilidade
 
 - [x] `UX-201` Internacionalização PT-BR/EN sem strings de regra duplicadas; troca ao vivo persistente e cobertura de menu, ajuda, lobby, HUD, seleção, loja e resultado.
-- [ ] `UX-202` Remapeamento, escala de UI, daltonismo e redução de movimento.
+- [x] `UX-202` Remapeamento, escala de UI e redução de movimento. Modo daltônico foi retirado deste ciclo por decisão de produto.
 - [x] `MODE-203` Separar Normal, Personalizado e Ranqueado no lobby, com presets autoritativos e identificação pública.
 - [ ] `MODE-204` Filas por papel, grupos élficos, rendição e revanche ranqueada.
 - [ ] `MODE-205` MMR separado, colocações, divisões, temporada e decaimento.

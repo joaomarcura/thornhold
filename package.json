@@ -12,6 +12,7 @@
     "simulate:arena": "node scripts/arena.js",
     "test:review:browser": "node scripts/browser-review.js",
     "test:stun:browser": "node scripts/browser-stun-scoreboard.js",
+    "test:accessibility:browser": "node scripts/browser-accessibility.js",
     "check": "node scripts/check.js",
     "verify": "node scripts/verify.js",
     "balance": "node scripts/balance.js",
