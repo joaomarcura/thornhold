@@ -30,6 +30,20 @@ test('Construção consome recursos, é progressiva e gera renda real',()=>{
   for(let i=0;i<100;i++)m.step(.05);assert.equal(s.progress,1);assert.equal(s.hp,s.maxHp);assert.ok(u.gold>85);
   assert.match(m.act(u.id,{type:'build',kind:'core',x:b.x,z:b.z+4.4}),/já possui/);
 });
+test('Ferramentas dev concedem recursos com limites e não aceitam valores falsos',()=>{
+  const m=match(),u=m.unit('e0'),before={gold:u.gold,wood:u.wood};
+  assert.equal(m.devGrant('e0',{gold:1000,wood:250}),null);assert.equal(u.gold,before.gold+1000);assert.equal(u.wood,before.wood+250);
+  assert.match(m.devGrant('e0',{gold:-1}),/Quantidade/);assert.match(m.devGrant('e0',{gold:1.5}),/Quantidade/);assert.match(m.devGrant('e0',{gold:1_000_001}),/Quantidade/);assert.match(m.devGrant('missing',{gold:1}),/Jogador/);
+});
+test('Targeting de torres é determinístico e explica borda, cooldown e estado',()=>{
+  const m=match(1),t=m.unit('t'),s={id:'tower-debug',kind:'tower',owner:'e0',x:t.x+B.structures.tower.range,z:t.z,tier:1,branch:'power',hp:260,maxHp:260,progress:1,lastShot:-100,disabledUntil:0};m.structures.push(s);m.state=STATES.ACTIVE;
+  assert.equal(m.towerTargeting(s).valid,true);s.lastShot=m.time;assert.equal(m.towerTargeting(s).reason,'cooldown');s.disabledUntil=m.time+2;assert.equal(m.towerTargeting(s).reason,'disabled');s.disabledUntil=0;t.alive=false;assert.equal(m.towerTargeting(s).reason,'no-troll');
+});
+test('IA do Elfo prioriza a primeira torre antes da barricada',()=>{
+  const m=new Match({seed:'EARLY-DEFENSE',difficulty:'easy',preparation:20},[{id:'t',role:'troll',occupant:{type:'bot',name:'Troll',difficulty:'easy'}},{id:'e0',role:'elf',occupant:{type:'bot',name:'Elfo',difficulty:'easy'}}]);
+  for(let i=0;i<500&&!m.structures.some(s=>s.kind==='tower');i++)m.step(.1);
+  assert.equal(m.structures[0]?.kind,'core');assert.equal(m.structures[1]?.kind,'tower');assert.ok(m.time<50);
+});
 test('Servidor rejeita construção remota, terreno, sobreposição, protótipos e recursos falsos',()=>{
   const m=match(),u=m.unit('e0'),b=m.map.bases[0],gold=u.gold;
   for(const command of [{type:'build',kind:'core',x:b.x,z:b.z},{type:'build',kind:'constructor',x:u.x,z:u.z},{type:'build',kind:'__proto__',x:u.x,z:u.z},{type:'build',kind:'core',x:NaN,z:0}])assert.equal(typeof m.act(u.id,command),'string');

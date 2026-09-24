@@ -10,13 +10,14 @@ const paths={
   heavy:'m3 7 5-4 10 9-5 5ZM12 13 5 21M16 5l3-3M19 9l3-1',
   dash:'m3 6 8 6-8 6M11 6l8 6-8 6M3 12h18',
   roar:'M8 8h5l7-5v18l-7-5H8ZM4 8v8M1 10v4',
+  stun:'M13 2 4 14h7l-1 8 10-13h-7Z',
   armor:'M12 2 21 6l-2 10-7 6-7-6L3 6ZM12 2v20',
   leaf:'M20 3C7 2 1 8 5 15s17 3 15-12ZM4 21 16 8M8 16l-1-5M12 12h5',
   relic:'m12 2 4 7 6 3-6 3-4 7-4-7-6-3 6-3ZM12 7v10M7 12h10',
-  gold:'M12 2 21 7v10l-9 5-9-5V7ZM3 7l9 5 9-5M12 12v10',
-  wood:'m5 5 12-3 5 12-12 7-8-8Zm5 16 3-13 9 6M5 5l8 3',
+  gold:'M4 8h16l2 11H2ZM4 8l4-4h8l4 4M2 19l6-4h8l6 4M8 4v11M16 4v11',
+  wood:'M8 21a5 5 0 1 1 0-10 5 5 0 0 1 0 10Zm0-3a2 2 0 1 1 0-4 2 2 0 0 1 0 4ZM5 12 14 3c3-2 9 3 6 7l-9 10M11 10l7-7M14 13l7-7',
   target:'M12 2v4M12 18v4M2 12h4M18 12h4M19 12a7 7 0 1 1-14 0 7 7 0 0 1 14 0',
   upgrade:'m5 14 7-8 7 8M12 6v15M5 3h14',
   close:'m6 6 12 12M6 18 18 6',
 };
-export function icon(name,extra=''){return `<svg class="game-icon ${extra}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[name]||paths.relic}"/></svg>`;}
+export function icon(name,extra=''){extra+=['gold','wood'].includes(name)?` resource-icon resource-${name}`:'';return `<svg class="game-icon ${extra}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[name]||paths.relic}"/></svg>`;}

@@ -56,7 +56,8 @@ export function stepWisps(m,dt){
     if(w.job&&w.job.until<=m.time)delete w.job;
     if(w.upgradingUntil&&w.upgradingUntil<=m.time){w.upgradingUntil=0;w.level++;w.maxHp+=5;w.hp=Math.min(w.maxHp,w.hp+5);m.emit('complete',{entity:w.id,x:w.x,z:w.z});}
     if(wispActive(m,w)){
-      const amount=wispIncome(w)*dt;owner.wood+=amount;owner.stats.woodProduced=(owner.stats.woodProduced||0)+amount;
+      const amount=wispIncome(w)*dt;owner.wood+=amount;owner.stats.woodGenerated=(owner.stats.woodGenerated||0)+amount;w.productionPulse=(w.productionPulse||0)+amount;
+      if((w.productionPulseAt??m.time)<=m.time){m.emit('resource',{unit:owner.id,entity:w.id,x:w.x,z:w.z,resource:'wood',amount:w.productionPulse,rate:wispIncome(w)*60});w.productionPulse=0;w.productionPulseAt=m.time+1;}
     }
   }
 }
