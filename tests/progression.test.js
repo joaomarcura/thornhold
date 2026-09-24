@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Match } from '../shared/simulation.js';
-import { BALANCE as B, STATES, wispCost, wispIncome, structureHP, trollCost, upgradeCost } from '../shared/config.js';
+import { BALANCE as B, STATES, wispCost, wispIncome, structureHP, trollCost, upgradeCost, mineEconomy, resourceProducer } from '../shared/config.js';
 import { combatStats, ITEMS } from '../shared/equipment.js';
 import { jobRefund } from '../shared/jobs.js';
 
@@ -53,6 +53,18 @@ test('Estruturas e atributos continuam evoluindo após tier 4 sem custo grátis'
     const gold=t.gold,price=trollCost('damage',t.levels.damage);assert.equal(m.act('t',{type:'buy',key:'damage'}),undefined);assert.equal(t.gold,gold-price);
   }
   assert.equal(core.tier,10);assert.equal(t.levels.damage,9);assert.ok(trollCost('damage',9)>trollCost('damage',8));assert.ok(structureHP('wall',10)>structureHP('wall',9));
+});
+
+test('Minas ganham uma vaga por tier do Núcleo e escalam custo e produção',()=>{
+  const m=match(),{e,core,b}=baseFixture(m);e.x=b.x;e.z=b.z;
+  const points=[];for(const dx of [-4.4,-2.2,0,2.2,4.4])for(const dz of [-4.4,-2.2,0,2.2,4.4])if(dx||dz)points.push({x:b.x+dx,z:b.z+dz});
+  const firstPoint=points.find(p=>m.placement(e,'mine',p.x,p.z)===null);assert.ok(firstPoint);const firstCost=mineEconomy(1).cost,before=e.gold;
+  assert.equal(m.act(e.id,{type:'build',kind:'mine',...firstPoint}),undefined);const first=m.structures.at(-1);assert.equal(e.gold,before-firstCost.gold);assert.deepEqual(first.constructionCost,firstCost);advance(m,6);
+  const blockedPoint=points.find(p=>/Núcleo nível 2/.test(m.placement(e,'mine',p.x,p.z)||''));assert.ok(blockedPoint);
+  e.x=core.x+3;e.z=core.z;e.gold=e.wood=1000000;assert.equal(m.act(e.id,{type:'upgrade',target:core.id}),undefined);advance(m,5);assert.equal(core.tier,2);
+  e.x=b.x;e.z=b.z;const secondPoint=points.find(p=>m.placement(e,'mine',p.x,p.z)===null);assert.ok(secondPoint);const secondCost=mineEconomy(2).cost,gold=e.gold;
+  assert.equal(m.act(e.id,{type:'build',kind:'mine',...secondPoint}),undefined);assert.equal(e.gold,gold-secondCost.gold);advance(m,6);assert.equal(first.coreTier,2);const tier2Income=resourceProducer(first).amount;
+  e.x=core.x+3;e.z=core.z;assert.equal(m.act(e.id,{type:'upgrade',target:core.id}),undefined);advance(m,6);assert.equal(first.coreTier,3);assert.ok(resourceProducer(first).amount>tier2Income);assert.equal(mineEconomy(5).capacity,5);
 });
 
 test('Níveis extremos mantêm números finitos e ações com tempo de resposta legível',()=>{

@@ -6,7 +6,7 @@ import { icon } from './icons.js';
 import { resource, resourceCost } from './resources.js';
 import { updatePanel } from './panel.js';
 import { selectionMarkup, freeTrees } from './selection.js';
-import { BALANCE as B, STATES, distance } from '../shared/config.js';
+import { BALANCE as B, STATES, distance, mineEconomy } from '../shared/config.js';
 import { baseAt, toCell, walkable, lineOfSight, heightAt, flatGround } from '../shared/map.js';
 
 const $=s=>document.querySelector(s),app=$('#app'),hud=$('#hud'),canvas=$('#world');
@@ -163,7 +163,7 @@ function updateHUD(){
   $('#objective').hidden=!relocating&&(!!selected||!!buildKind||!!assigning||!showHints||(!observer&&elf&&!!core&&!!wall)||(!elf&&!prep&&snapshot.time>snapshot.preparation+20));
   $('#combo-meter').hidden=elf||observer||!u?.combo;$('#combo-meter').textContent=u?.combo?'COMBO '+u.combo+'/3 · terceiro acerto +25%':'';
   const hotbarKey=(observer?'observer':elf?'elf':'troll')+buildKind+(relocating?'-relocating':'');
-  if($('#hotbar').dataset.key!==hotbarKey){$('#hotbar').dataset.key=hotbarKey;$('#hotbar').innerHTML=observer?'<button data-do="spectate"><kbd>TAB</kbd><span>Próximo</span></button>':elf?Object.entries(B.structures).map(([k,d],i)=>{const free=k==='core'&&relocating;return `<button class="${buildKind===k?'active':''}" data-do="build" data-kind="${k}" title="${free?'Voucher de reassentamento: sem custo':`${d.name}: ${d.gold} ouro, ${d.wood} madeira`}"><kbd>${i+1}</kbd><b>${icon(k)}</b><span>${d.name}</span><small>${free?'GRÁTIS':resourceCost(d)}</small></button>`;}).join('')+`<button data-do="elf-stun" title="Disponível após sua Barricada ser rompida"><kbd>F</kbd><b>${icon('stun')}</b><span>Atordoar</span><small>3s</small></button>`:`<button data-do="light"><kbd>CLIQUE</kbd><b>${icon('sword')}</b><span>Golpe</span></button><button data-do="heavy"><kbd>Q</kbd><b>${icon('heavy')}</b><span>Pesado</span></button><button data-do="dash"><kbd>ESPAÇO</kbd><b>${icon('dash')}</b><span>Esquiva</span></button><button data-do="roar"><kbd>F</kbd><b>${icon('roar')}</b><span>Rugido</span></button><button data-do="shop"><kbd>B</kbd><b>${icon('gold')}</b><span>Melhorias</span></button>`;}
+  if($('#hotbar').dataset.key!==hotbarKey){$('#hotbar').dataset.key=hotbarKey;$('#hotbar').innerHTML=observer?'<button data-do="spectate"><kbd>TAB</kbd><span>Próximo</span></button>':elf?Object.entries(B.structures).map(([k,d],i)=>{const free=k==='core'&&relocating,mine=k==='mine';return `<button class="${buildKind===k?'active':''}" data-do="build" data-kind="${k}" title="${free?'Voucher de reassentamento: sem custo':mine?'Custo, vagas e produção escalam com o Núcleo':`${d.name}: ${d.gold} ouro, ${d.wood} madeira`}"><kbd>${i+1}</kbd><b>${icon(k)}</b><span>${d.name}</span><small>${free?'GRÁTIS':mine?'NÚCLEO':resourceCost(d)}</small></button>`;}).join('')+`<button data-do="elf-stun" title="Disponível após sua Barricada ser rompida"><kbd>F</kbd><b>${icon('stun')}</b><span>Atordoar</span><small>3s</small></button>`:`<button data-do="light"><kbd>CLIQUE</kbd><b>${icon('sword')}</b><span>Golpe</span></button><button data-do="heavy"><kbd>Q</kbd><b>${icon('heavy')}</b><span>Pesado</span></button><button data-do="dash"><kbd>ESPAÇO</kbd><b>${icon('dash')}</b><span>Esquiva</span></button><button data-do="roar"><kbd>F</kbd><b>${icon('roar')}</b><span>Rugido</span></button><button data-do="shop"><kbd>B</kbd><b>${icon('gold')}</b><span>Melhorias</span></button>`;}
   $('#control-hints').innerHTML=!$('#shop').hidden?'<kbd>B / ESC</kbd> fechar arsenal · A partida continua':buildKind?'<kbd>CLIQUE</kbd> construir · <kbd>SHIFT</kbd> repetir · <kbd>ESC / DIREITO</kbd> cancelar':assigning?'<kbd>CLIQUE</kbd> escolher árvore · <kbd>ESC / RMB</kbd> cancelar':`<kbd>WASD</kbd> mover · <kbd>SHIFT</kbd> correr${elf?' · <kbd>E</kbd> coletar · <kbd>R</kbd> reparar':''} · <kbd>M</kbd> mapa`;
   const selectedEntity=[...snapshot.structures,...snapshot.trees,...snapshot.units,...(snapshot.wisps||[])].find(e=>e.id===selected);if(selected&&!selectedEntity)deselect();const key=selectedEntity?selectionMarkup(selectedEntity,{u,snapshot,map:world.map}):'';
   if(key!==selectionKey){selectionKey=key;renderSelection(selectedEntity,key);}
@@ -260,7 +260,7 @@ function updateBuildPreview(){
   buildPoint={x:p.x,z:p.z};if(snap){buildPoint.x=Math.round(p.x/world.map.cell)*world.map.cell;buildPoint.z=Math.round(p.z/world.map.cell)*world.map.cell;}
   let b=baseAt(world.map,buildPoint);
   if(buildKind==='wall'){b=[...world.map.bases].sort((a,b)=>distance(a.gate,p)-distance(b.gate,p))[0];if(distance(b.gate,p)<7){buildPoint={x:b.gate.x,z:b.gate.z};rotation=b.gate.axis==='x'?Math.PI/2:0;}}
-  const def=B.structures[buildKind],cell=toCell(world.map,buildPoint),core=snapshot.structures.find(s=>s.kind==='core'&&s.baseId===b?.id);
+  const def=B.structures[buildKind],cell=toCell(world.map,buildPoint),core=snapshot.structures.find(s=>s.kind==='core'&&s.baseId===b?.id),cost=buildKind==='mine'?mineEconomy(core?.tier).cost:def;
   let reason='Clique para construir';buildValid=true;const invalid=text=>{buildValid=false;reason=text;};const buildDistance=distance(u,buildPoint);
   if(buildDistance>B.interactRange)invalid(`Fora do alcance do Elfo · ${buildDistance.toFixed(1)} m / ${B.interactRange.toFixed(1)} m`);
   else if(!b||!walkable(world.map,cell.x,cell.z)||!lineOfSight(world.map,u,buildPoint))invalid('Terreno bloqueado ou sem linha de visão');
@@ -271,14 +271,15 @@ function updateBuildPreview(){
   else if(buildKind==='core'&&(core||snapshot.structures.some(s=>s.kind==='core'&&s.owner===u.id)))invalid('A clareira ou seu núcleo já está ocupado');
   else if(buildKind!=='core'&&!core)invalid('Esta clareira precisa de um núcleo ativo');
   else if(buildKind!=='core'&&!snapshot.units.some(a=>a.id===core.owner&&a.alive))invalid('O proprietário desta clareira foi eliminado');
-  else if(!(buildKind==='core'&&(u.relocationVouchers||0)>0&&(u.relocationUntil||0)>snapshot.time)&&(u.gold<def.gold||u.wood<def.wood))invalid('Recursos insuficientes');
+  else if(buildKind==='mine'&&snapshot.structures.filter(s=>s.baseId===b.id&&s.kind==='mine').length>=mineEconomy(core?.tier).capacity)invalid(`Núcleo nível ${(core?.tier||1)+1} necessário para outra Mina`);
+  else if(!(buildKind==='core'&&(u.relocationVouchers||0)>0&&(u.relocationUntil||0)>snapshot.time)&&(u.gold<cost.gold||u.wood<cost.wood))invalid('Recursos insuficientes');
   else if(buildKind!=='wall'&&distance(buildPoint,b.gate)<B.construction.gateClearance)invalid('Mantenha a entrada livre');
   else if(distance(u,buildPoint)<def.radius+.45&&buildKind!=='wall')invalid('Afaste-se da fundação');
   else if(snapshot.units.some(a=>a.alive&&a.role==='troll'&&distance(a,buildPoint)<B.construction.enemyClearance))invalid('O Troll está perto demais');
   else if(snapshot.units.some(a=>a.alive&&a.id!==u.id&&distance(a,buildPoint)<def.radius+.7))invalid('Um personagem ocupa o local');
   else if(snapshot.structures.filter(s=>s.baseId===b.id&&s.kind===buildKind).length>=B.construction.limits[buildKind])invalid('Limite desta estrutura nesta clareira atingido');
   else if(snapshot.structures.some(s=>distance(s,buildPoint)<B.structures[s.kind].radius+def.radius+.3)||snapshot.trees.some(t=>t.amount>0&&distance(t,buildPoint)<def.radius+.55))invalid('Espaço ocupado');
-  world.ghostAt(buildKind,buildPoint,buildValid,rotation);const hint=$('#build-hint');hint.hidden=false;hint.classList.toggle('invalid',!buildValid);hint.innerHTML=`<b>${buildValid?'✓ VÁLIDO':'✕ NÃO PODE CONSTRUIR'}</b> <span>${reason}</span><small>${def.name} · ${buildDistance.toFixed(1)} m / ${B.interactRange.toFixed(1)} m · Enter confirmar · Shift girar · Esc cancelar</small>`;
+  world.ghostAt(buildKind,buildPoint,buildValid,rotation);const hint=$('#build-hint');hint.hidden=false;hint.classList.toggle('invalid',!buildValid);hint.innerHTML=`<b>${buildValid?'✓ VÁLIDO':'✕ NÃO PODE CONSTRUIR'}</b> <span>${reason}</span><small>${def.name} · ${resourceCost(cost)} · ${buildDistance.toFixed(1)} m / ${B.interactRange.toFixed(1)} m · Enter confirmar · Shift girar · Esc cancelar</small>`;
 }
 function cancelBuild(){buildKind=null;world.ghostAt(null,null);world.setConstructionRange(me(),false);if($('#build-hint'))$('#build-hint').hidden=true;}
 function interact(type){

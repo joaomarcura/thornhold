@@ -47,7 +47,8 @@ export const scaled=(base,growth,level)=>Math.min(Number.MAX_SAFE_INTEGER,base*M
 export const tierScale=(growth,tier)=>scaled(Math.pow(growth,Math.min(3,tier-1)),BALANCE.progression.structureGrowth,Math.max(0,tier-4));
 export const structureHP=(kind,tier)=>BALANCE.structures[kind].hp*tierScale(kind==='wall'?1.85:1.5,tier);
 export const towerDamage=tier=>BALANCE.structures.tower.damage*tierScale(BALANCE.structures.tower.growth,tier);
-export const income=s=>(BALANCE.structures[s.kind].income||0)*tierScale(BALANCE.structures[s.kind].growth,s.tier);
+export const mineEconomy=coreTier=>{const tier=Math.max(1,Math.min(BALANCE.construction.limits.mine,Math.floor(coreTier||1))),costFactor=1+.25*(tier-1);return {tier,capacity:tier,cost:{gold:Math.round(BALANCE.structures.mine.gold*costFactor),wood:Math.round(BALANCE.structures.mine.wood*costFactor)},productionFactor:1+.3*(tier-1)};};
+export const income=s=>(BALANCE.structures[s.kind].income||0)*tierScale(BALANCE.structures[s.kind].growth,s.tier)*(s.kind==='mine'?(s.coreTier>0?mineEconomy(s.coreTier).productionFactor:0):1);
 export const resourceProducer=s=>{const amount=income(s);return amount?{resource:'gold',amount,perMinute:amount*60,interval:1,active:true}:null;};
 export const upgradeCost=s=>({gold:Math.round(scaled(BALANCE.structures[s.kind].upgradeGold*Math.pow(1.9,Math.min(3,s.tier-1)),BALANCE.progression.costGrowth,s.tier-4)),wood:Math.round(scaled(BALANCE.structures[s.kind].upgradeWood*Math.pow(1.5,Math.min(3,s.tier-1)),BALANCE.progression.woodCostGrowth,s.tier-4))});
 export const trollCost=(key,level)=>Math.round(scaled(BALANCE.upgrades[key].cost*Math.pow(BALANCE.upgrades[key].growth,Math.min(4,level)),BALANCE.progression.costGrowth,level-4));

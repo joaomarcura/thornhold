@@ -1,4 +1,4 @@
-import { BALANCE as B, STATES, DEFAULT_SETTINGS, clamp, distance, mitigation, structureHP, income, resourceProducer, upgradeCost, trollCost, scaling, towerDamage, wispIncome } from './config.js';
+import { BALANCE as B, STATES, DEFAULT_SETTINGS, clamp, distance, mitigation, structureHP, income, resourceProducer, upgradeCost, trollCost, scaling, towerDamage, wispIncome, mineEconomy } from './config.js';
 import { generateMap, baseAt, toCell, walkable, index, lineOfSight, heightAt, flatGround } from './map.js';
 import { AIController } from './controllers.js';
 import { CombatTelemetry } from './telemetry.js';
@@ -90,7 +90,7 @@ export class Match {
     this.emit('ping',ping);this.pings=this.pings.filter(p=>p.until>this.time);this.pings.push({...ping,id:this.eventId});
   }
   freeRelocation(u,kind='core'){return kind==='core'&&u.role==='elf'&&u.alive&&(u.relocationVouchers||0)>0&&(u.relocationUntil||0)>this.time;}
-  buildCost(u,kind){const def=B.structures[kind];return this.freeRelocation(u,kind)?{gold:0,wood:0,relocation:true}:{gold:def.gold,wood:def.wood,relocation:false};}
+  buildCost(u,kind,baseId=null){const def=B.structures[kind];if(this.freeRelocation(u,kind))return {gold:0,wood:0,relocation:true};if(kind==='mine'){const core=this.structures.find(s=>s.kind==='core'&&s.baseId===baseId&&s.hp>0);return {...mineEconomy(core?.tier).cost,relocation:false};}return {gold:def.gold,wood:def.wood,relocation:false};}
   placement(u,kind,x,z){
     if(u.role!=='elf'||!Object.hasOwn(B.structures,kind))return 'Construção inválida.';const def=B.structures[kind];
     if(!Number.isFinite(x)||!Number.isFinite(z))return 'Posição inválida.';
@@ -114,15 +114,17 @@ export class Match {
     if(this.units.some(a=>a.alive&&a.id!==u.id&&distance(a,{x,z})<def.radius+.7))return 'Um personagem está ocupando este espaço.';
     if(distance(u,{x,z})<def.radius+.45&&kind!=='wall')return 'Afaste-se um pouco da fundação.';
     if(this.trees.some(t=>t.amount>0&&distance(t,{x,z})<def.radius+.55))return 'Colete a árvore antes de construir aqui.';
-    if(this.structures.filter(s=>s.baseId===b.id&&s.kind===kind&&s.hp>0).length>=B.construction.limits[kind])return 'Limite desta estrutura nesta clareira atingido.';
-    const cost=this.buildCost(u,kind);if(u.gold<cost.gold||u.wood<cost.wood)return 'Recursos insuficientes.';
+    const kindCount=this.structures.filter(s=>s.baseId===b.id&&s.kind===kind&&s.hp>0).length;
+    if(kind==='mine'&&kindCount>=mineEconomy(claim?.tier).capacity)return `Núcleo nível ${claim.tier+1} necessário para outra Mina.`;
+    if(kindCount>=B.construction.limits[kind])return 'Limite desta estrutura nesta clareira atingido.';
+    const cost=this.buildCost(u,kind,b.id);if(u.gold<cost.gold||u.wood<cost.wood)return 'Recursos insuficientes.';
     return null;
   }
   build(u,cmd){
     const x=Number(cmd.x),z=Number(cmd.z),kind=cmd.kind,error=this.placement(u,kind,x,z);if(error)return error;
-    const def=B.structures[kind],cost=this.buildCost(u,kind),b=kind==='wall'?this.map.bases.find(b=>distance(b.gate,{x,z})<.45):baseAt(this.map,{x,z});
+    const def=B.structures[kind],b=kind==='wall'?this.map.bases.find(b=>distance(b.gate,{x,z})<.45):baseAt(this.map,{x,z}),cost=this.buildCost(u,kind,b.id);
     u.gold-=cost.gold;u.wood-=cost.wood;u.stats.goldSpent+=cost.gold;u.stats.woodSpent+=cost.wood;u.stats.structuresBuilt++;this.stats.buildingsCreated++;const hp=structureHP(kind,1);
-    const s={id:'s'+this.nextId++,kind,owner:u.id,baseId:b.id,x,z,rotation:Number.isFinite(cmd.rotation)?cmd.rotation:0,tier:1,hp:hp*B.construction.initialHealth,maxHp:hp,progress:0,healthProgress:0,builder:u.id,branch:'power',lastHit:-100,lastShot:-100,upgrading:0,bounty:hp*B.troll.goldPerDamage*1.3};
+    const s={id:'s'+this.nextId++,kind,owner:u.id,baseId:b.id,x,z,rotation:Number.isFinite(cmd.rotation)?cmd.rotation:0,tier:1,hp:hp*B.construction.initialHealth,maxHp:hp,progress:0,healthProgress:0,builder:u.id,branch:'power',lastHit:-100,lastShot:-100,upgrading:0,bounty:hp*B.troll.goldPerDamage*1.3,constructionCost:{gold:cost.gold,wood:cost.wood},...(kind==='mine'?{coreTier:this.structures.find(a=>a.kind==='core'&&a.baseId===b.id&&a.hp>0)?.tier||0}:{})};
     s.job={type:'build',gold:cost.gold,wood:cost.wood};this.structures.push(s);if(kind==='core'){this.elfBasesClaimed.add(b.id);if(cost.relocation){u.relocationVouchers--;u.stats.relocations++;}u.relocationUntil=0;u.baseId=b.id;}u.action='build';u.actionUntil=this.time+def.seconds;this.emit('build',{unit:u.id,entity:s.id,x,z,kind,relocation:cost.relocation});
   }
   gather(u,id){
@@ -309,6 +311,7 @@ export class Match {
       if(s.progress<1)continue;
       if(s.job?.type==='build')delete s.job;
       if(s.upgrading>0){s.upgrading=Math.max(0,s.upgrading-dt);if(!s.upgrading){const old=s.maxHp;s.tier++;s.maxHp=structureHP(s.kind,s.tier);s.hp+=s.maxHp-old;s.bounty+=(s.maxHp-old)*B.troll.goldPerDamage;s.branch=s.nextBranch;this.emit('complete',{entity:s.id,x:s.x,z:s.z});}}
+      if(s.kind==='mine')s.coreTier=this.structures.find(a=>a.kind==='core'&&a.baseId===s.baseId&&a.hp>0&&a.progress>=1)?.tier||0;
       const owner=this.unit(s.owner),producer=resourceProducer(s);if(owner?.alive&&producer){const production=producer.amount*dt;owner.gold+=production;owner.stats.produced+=production;owner.stats.goldGenerated+=production;this.stats.produced+=production;s.productionPulse=(s.productionPulse||0)+production;if((s.productionPulseAt??this.time)<=this.time){this.emit('resource',{unit:owner.id,entity:s.id,x:s.x,z:s.z,resource:producer.resource,amount:s.productionPulse,rate:producer.perMinute});s.productionPulse=0;s.productionPulseAt=this.time+producer.interval;}}
       if(s.kind==='tower'&&this.state===STATES.ACTIVE&&!(s.disabledUntil>this.time)){
         const troll=this.units.find(u=>u.role==='troll'&&u.alive),status=this.towerTargeting(s,troll),branch=B.branches[s.branch]||B.branches.power;
