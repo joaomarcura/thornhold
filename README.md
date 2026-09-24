@@ -59,6 +59,8 @@ O processo Node é o servidor da partida, não o navegador do host. O host tem p
 
 A Barricada é reparada gratuitamente. O primeiro Elfo canalizando aplica 100% do reparo; cada ajudante simultâneo aplica 25%. O reparo das demais estruturas continua consumindo 3 de ouro e 1 de madeira.
 
+Elfos podem construir apoio em uma clareira aliada ativa. A estrutura pertence a quem pagou — somente esse jogador pode evoluir ou cancelar — e os limites de 1 Núcleo, 1 Barricada, 5 Torres, 5 Minas e 1 Oficina valem para a clareira inteira. Recursos permanecem pessoais e não podem ser transferidos diretamente.
+
 Obras precisam de um construtor vivo por perto. A barricada encaixa somente no portão da sua clareira. Elfos atravessam portões aliados; o Troll precisa destruí-los. Após uma ruptura, a entrada fica 12 segundos sem reconstrução e não aceita novas fundações com o Troll a menos de 5 metros.
 
 Depois que sua Barricada é rompida, um Elfo próximo pode usar **F** para atordoar o Troll por três segundos. A recarga de 60 segundos é compartilhada pela equipe. Se o Núcleo for destruído, o Elfo sobrevivente tem 60 segundos para alcançar outra clareira e usar seu voucher único de reassentamento: o próximo Núcleo não consome ouro nem madeira.

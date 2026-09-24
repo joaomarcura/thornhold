@@ -75,7 +75,6 @@ export class Match {
       case 'trainWisp':case 'upgradeWisp':case 'assignWisp':return commandWisp(this,u,cmd);
       case 'roar':return this.roar(u);
       case 'elfStun':return this.elfStun(u);
-      case 'transfer':return this.transfer(u,cmd);
       case 'assist':{const s=this.structures.find(s=>s.id===cmd.target);if(u.role!=='elf'||!s||distance(u,s)>B.interactRange||s.progress>=1)return 'Aproxime-se de uma obra aliada.';if((u.cooldowns.work||0)>this.time)return;u.cooldowns.work=this.time+.5;s.progress=Math.min(1,s.progress+.5/B.structures[s.kind].seconds);u.action='build';u.actionUntil=this.time+.5;return;}
       default:return 'Comando desconhecido.';
     }
@@ -108,13 +107,14 @@ export class Match {
     if(kind==='core'){
       if(this.structures.some(s=>s.kind==='core'&&s.owner===u.id&&s.hp>0))return 'Você já possui um núcleo.';
       if(claim)return 'Esta clareira já pertence a outro Elfo.';
-    }else if(!claim||claim.owner!==u.id)return 'Construa seu núcleo nesta clareira primeiro.';
+    }else if(!claim)return 'Esta clareira precisa de um núcleo ativo.';
+    else if(!this.unit(claim.owner)?.alive)return 'O proprietário desta clareira foi eliminado.';
     if(kind!=='wall'&&distance({x,z},b.gate)<B.construction.gateClearance)return 'Mantenha a entrada livre para a barricada.';
     if(this.structures.some(s=>s.hp>0&&distance(s,{x,z})<B.structures[s.kind].radius+def.radius+.3))return 'Espaço ocupado por outra estrutura.';
     if(this.units.some(a=>a.alive&&a.id!==u.id&&distance(a,{x,z})<def.radius+.7))return 'Um personagem está ocupando este espaço.';
     if(distance(u,{x,z})<def.radius+.45&&kind!=='wall')return 'Afaste-se um pouco da fundação.';
     if(this.trees.some(t=>t.amount>0&&distance(t,{x,z})<def.radius+.55))return 'Colete a árvore antes de construir aqui.';
-    if(this.structures.filter(s=>s.owner===u.id&&s.kind===kind&&s.hp>0).length>=B.construction.limits[kind])return 'Limite desta estrutura atingido.';
+    if(this.structures.filter(s=>s.baseId===b.id&&s.kind===kind&&s.hp>0).length>=B.construction.limits[kind])return 'Limite desta estrutura nesta clareira atingido.';
     const cost=this.buildCost(u,kind);if(u.gold<cost.gold||u.wood<cost.wood)return 'Recursos insuficientes.';
     return null;
   }
@@ -123,7 +123,7 @@ export class Match {
     const def=B.structures[kind],cost=this.buildCost(u,kind),b=kind==='wall'?this.map.bases.find(b=>distance(b.gate,{x,z})<.45):baseAt(this.map,{x,z});
     u.gold-=cost.gold;u.wood-=cost.wood;u.stats.goldSpent+=cost.gold;u.stats.woodSpent+=cost.wood;u.stats.structuresBuilt++;this.stats.buildingsCreated++;const hp=structureHP(kind,1);
     const s={id:'s'+this.nextId++,kind,owner:u.id,baseId:b.id,x,z,rotation:Number.isFinite(cmd.rotation)?cmd.rotation:0,tier:1,hp:hp*B.construction.initialHealth,maxHp:hp,progress:0,healthProgress:0,builder:u.id,branch:'power',lastHit:-100,lastShot:-100,upgrading:0,bounty:hp*B.troll.goldPerDamage*1.3};
-    s.job={type:'build',gold:cost.gold,wood:cost.wood};this.structures.push(s);if(kind==='core'){this.elfBasesClaimed.add(b.id);if(cost.relocation){u.relocationVouchers--;u.stats.relocations++;}u.relocationUntil=0;}u.baseId=b.id;u.action='build';u.actionUntil=this.time+def.seconds;this.emit('build',{unit:u.id,entity:s.id,x,z,kind,relocation:cost.relocation});
+    s.job={type:'build',gold:cost.gold,wood:cost.wood};this.structures.push(s);if(kind==='core'){this.elfBasesClaimed.add(b.id);if(cost.relocation){u.relocationVouchers--;u.stats.relocations++;}u.relocationUntil=0;u.baseId=b.id;}u.action='build';u.actionUntil=this.time+def.seconds;this.emit('build',{unit:u.id,entity:s.id,x,z,kind,relocation:cost.relocation});
   }
   gather(u,id){
     if(u.role!=='elf')return 'Apenas Elfos coletam madeira.';
@@ -236,11 +236,6 @@ export class Match {
     for(const elf of this.units.filter(a=>a.role==='elf'))elf.cooldowns.elfStun=this.elfStunReadyAt;
     troll.stunnedUntil=this.time+B.elf.stunDuration;troll.input={x:0,z:0};troll.pendingStrike=null;troll.queuedStrike=null;troll.dashUntil=this.time;troll.action='stunned';troll.actionUntil=troll.stunnedUntil;
     u.stats.stuns++;this.emit('stun',{unit:u.id,target:troll.id,x:troll.x,z:troll.z,duration:B.elf.stunDuration,baseId:u.baseId});
-  }
-  transfer(u,cmd){
-    const ally=this.unit(cmd.target);if(u.role!=='elf'||!ally||ally.id===u.id||ally.role!=='elf'||!ally.alive)return 'Selecione um aliado vivo.';
-    const gold=Number(cmd.gold),wood=Number(cmd.wood);if(!Number.isSafeInteger(gold)||!Number.isSafeInteger(wood)||gold<0||wood<0||gold+wood===0||gold>u.gold||wood>u.wood)return 'Quantidade inválida.';
-    u.gold-=gold;u.wood-=wood;ally.gold+=gold;ally.wood+=wood;this.emit('transfer',{unit:u.id,target:ally.id,gold,wood});
   }
   damage(target,amount,source,kind,sourceId){
     if(target.hp<=0||amount<=0||!Number.isFinite(amount))return 0;

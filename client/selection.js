@@ -18,7 +18,7 @@ export function selectionMarkup(e,{u,snapshot,map}){
     return header('Árvore de seiva',e.rich?'BOSQUE EXTERNO':'CLAREIRA','leaf')+`<div class="selection-stats"><b>${resource('wood',e.amount)}</b>${e.rich?'<span>Wisp +60%</span>':''}</div>`+(w?`<button class="command-primary" data-do="select-wisp" data-id="${w.id}">${icon('wisp')} Wisp Nv. ${w.level}<span>${resource('wood',w.income,{rate:'s',signed:true})}</span></button>`:e.amount>0?`<button class="command-primary" data-do="gather" ${!near||u?.role!=='elf'?'disabled':''}>${icon('wood')} Coletar <kbd>E</kbd></button><small class="context-note">${near?'Segure E para continuar.':'Aproxime-se para coletar.'}</small>`:`<p>Rebrote ${Math.max(0,Math.ceil((e.regrowAt||time+35)-time))}s · aguarda espaço livre.</p>`);
   }
   if(e.role==='wisp')return wispMarkup(e,{u,snapshot,map});
-  if(!e.kind)return header(escape(e.name),e.role==='troll'?'TROLL':'ELFO',e.role==='troll'?'heavy':'leaf')+`<p>${number(e.hp)} / ${number(e.maxHp)} vida</p>${u?.role==='elf'&&e.role==='elf'&&e.id!==u.id?`<button class="command-secondary" data-do="transfer">Enviar ${price({gold:25,wood:10})}</button>`:''}`;
+  if(!e.kind)return header(escape(e.name),e.role==='troll'?'TROLL':'ELFO',e.role==='troll'?'heavy':'leaf')+`<p>${number(e.hp)} / ${number(e.maxHp)} vida</p>`;
   const status=upgradeStatus(u,e,time,snapshot.state),cost=status.cost,ready=e.progress===1;
   let html=header(B.structures[e.kind].name,`${own?'SUA BASE':u?.role==='troll'?'INIMIGO':'ALIADO'} · NV. ${e.tier}`,e.kind);
   const producer=resourceProducer(e);

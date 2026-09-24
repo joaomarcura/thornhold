@@ -82,9 +82,19 @@ test('Fog de guerra omite unidades, economia, construções e eventos inimigos',
   const s=m.snapshot(t.id);assert.ok(!s.units.some(e=>e.id===u.id));assert.ok(!s.structures.some(e=>e.id===core.id));assert.ok(!s.events.some(e=>e.entity===core.id));assert.ok(!JSON.stringify(s).includes('bounty'));
   t.x=u.x;t.z=u.z+2;const visible=m.snapshot(t.id).units.find(e=>e.id===u.id);assert.ok(visible);assert.equal(visible.gold,undefined);assert.equal(visible.levels,undefined);
 });
-test('Transferência aliada impede valores negativos e griefing',()=>{
-  const m=match(),a=m.unit('e0'),b=m.unit('e1');assert.equal(m.act(a.id,{type:'transfer',target:b.id,gold:25,wood:10}),undefined);assert.equal(a.gold,125);assert.equal(b.gold,175);
-  assert.ok(m.act(a.id,{type:'transfer',target:b.id,gold:-20,wood:0}));assert.ok(m.act(a.id,{type:'transfer',target:'t',gold:10,wood:0}));assert.ok(m.act(a.id,{type:'attack'}));
+test('Apoio aliado preserva propriedade individual e limites por clareira',()=>{
+  const m=match(),{u:owner,b}=completedBase(m),ally=m.unit('e1');owner.x=m.map.elfSpawn.x;owner.z=m.map.elfSpawn.z;ally.x=b.x;ally.z=b.z;
+  const candidates=[];for(const dx of [-4.4,-2.2,0,2.2,4.4])for(const dz of [-4.4,-2.2,0,2.2,4.4])if(dx||dz)candidates.push({x:b.x+dx,z:b.z+dz});
+  const first=candidates.find(p=>m.placement(ally,'tower',p.x,p.z)===null);assert.ok(first);const ownBase=ally.baseId;
+  assert.equal(m.act(ally.id,{type:'build',kind:'tower',...first}),undefined);const tower=m.structures.at(-1);assert.equal(tower.owner,ally.id);assert.equal(tower.baseId,b.id);assert.equal(ally.baseId,ownBase);
+  for(let i=0;i<100;i++)m.step(.05);owner.x=tower.x;owner.z=tower.z;owner.gold=owner.wood=10000;assert.match(m.act(owner.id,{type:'upgrade',target:tower.id}),/estrutura sua/);
+  ally.x=b.x;ally.z=b.z;const next=candidates.find(p=>m.placement(ally,'tower',p.x,p.z)===null);assert.ok(next);
+  for(let i=0;i<4;i++)m.structures.push({...tower,id:'shared-limit-'+i,x:-100-i*3,z:-100,baseId:b.id});
+  assert.match(m.placement(ally,'tower',next.x,next.z),/nesta clareira/);
+});
+test('Transferência direta de recursos foi removida',()=>{
+  const m=match(),a=m.unit('e0'),b=m.unit('e1'),before=[a.gold,a.wood,b.gold,b.wood];
+  assert.match(m.act(a.id,{type:'transfer',target:b.id,gold:25,wood:10}),/desconhecido/);assert.deepEqual([a.gold,a.wood,b.gold,b.wood],before);
 });
 test('Vitórias simétricas, resultado imutável e punição por inatividade',()=>{
   const m=match(1);m.unit('t').hp=0;m.unit('t').alive=false;m.step(.05);assert.equal(m.state,STATES.END);assert.equal(m.winner,'elves');const time=m.time;m.step(1);assert.equal(m.time,time);

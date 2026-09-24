@@ -55,6 +55,10 @@ test('Selection identifies free barricade repair and diminishing assistance',()=
   const html=selectionMarkup(wall,{u,snapshot:m.snapshot('e'),map:m.map});
   assert.match(html,/GRÁTIS/);assert.match(html,/Primeiro reparador: 100%/);assert.match(html,/ajudantes simultâneos: 25%/);assert.doesNotMatch(html,/resource-gold[^>]*>3</);
 });
+test('Selection no longer offers direct resource transfer to an ally',()=>{
+  const {m,u}=fixture(),ally=m.unit('t');Object.assign(ally,{role:'elf',name:'Aliado'});
+  const html=selectionMarkup(ally,{u,snapshot:m.snapshot('e'),map:m.map});assert.doesNotMatch(html,/data-do="transfer"|Enviar/);
+});
 test('Navigation endpoint is in real action range, including last-cell approach',()=>{
   const m=create(),u=m.unit('t'),c=new AIController(),target={id:'target',kind:'tower',x:u.x+12,z:u.z,hp:260,tier:1,progress:1};
   m.structures.push(target);c.discovered.set(target.id,target);m.state=STATES.ACTIVE;

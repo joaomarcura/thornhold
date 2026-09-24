@@ -269,13 +269,14 @@ function updateBuildPreview(){
   else if(buildKind==='wall'&&distance(b.gate,buildPoint)>.45)invalid('Use a passagem iluminada');
   else if(buildKind==='wall'&&(snapshot.breaches?.[b.id]||0)>snapshot.time)invalid('Entrada rompida: reconstrução em '+Math.ceil(snapshot.breaches[b.id]-snapshot.time)+'s');
   else if(buildKind==='core'&&(core||snapshot.structures.some(s=>s.kind==='core'&&s.owner===u.id)))invalid('A clareira ou seu núcleo já está ocupado');
-  else if(buildKind!=='core'&&core?.owner!==u.id)invalid('Construa seu núcleo nesta clareira');
+  else if(buildKind!=='core'&&!core)invalid('Esta clareira precisa de um núcleo ativo');
+  else if(buildKind!=='core'&&!snapshot.units.some(a=>a.id===core.owner&&a.alive))invalid('O proprietário desta clareira foi eliminado');
   else if(!(buildKind==='core'&&(u.relocationVouchers||0)>0&&(u.relocationUntil||0)>snapshot.time)&&(u.gold<def.gold||u.wood<def.wood))invalid('Recursos insuficientes');
   else if(buildKind!=='wall'&&distance(buildPoint,b.gate)<B.construction.gateClearance)invalid('Mantenha a entrada livre');
   else if(distance(u,buildPoint)<def.radius+.45&&buildKind!=='wall')invalid('Afaste-se da fundação');
   else if(snapshot.units.some(a=>a.alive&&a.role==='troll'&&distance(a,buildPoint)<B.construction.enemyClearance))invalid('O Troll está perto demais');
   else if(snapshot.units.some(a=>a.alive&&a.id!==u.id&&distance(a,buildPoint)<def.radius+.7))invalid('Um personagem ocupa o local');
-  else if(snapshot.structures.filter(s=>s.owner===u.id&&s.kind===buildKind).length>=B.construction.limits[buildKind])invalid('Limite desta estrutura atingido');
+  else if(snapshot.structures.filter(s=>s.baseId===b.id&&s.kind===buildKind).length>=B.construction.limits[buildKind])invalid('Limite desta estrutura nesta clareira atingido');
   else if(snapshot.structures.some(s=>distance(s,buildPoint)<B.structures[s.kind].radius+def.radius+.3)||snapshot.trees.some(t=>t.amount>0&&distance(t,buildPoint)<def.radius+.55))invalid('Espaço ocupado');
   world.ghostAt(buildKind,buildPoint,buildValid,rotation);const hint=$('#build-hint');hint.hidden=false;hint.classList.toggle('invalid',!buildValid);hint.innerHTML=`<b>${buildValid?'✓ VÁLIDO':'✕ NÃO PODE CONSTRUIR'}</b> <span>${reason}</span><small>${def.name} · ${buildDistance.toFixed(1)} m / ${B.interactRange.toFixed(1)} m · Enter confirmar · Shift girar · Esc cancelar</small>`;
 }
@@ -322,7 +323,6 @@ document.addEventListener('click',async event=>{
     case 'repair':interact('repair');break;
     case 'assist':interact('assist');break;
     case 'upgrade':action({type:'upgrade',target:selected,branch:$('#branch')?.value});break;
-    case 'transfer':action({type:'transfer',target:selected,gold:25,wood:10});break;
     case 'shop':toggleShop();break;
     case 'shop-tab':shopTab=button.dataset.tab;updateShop(me());break;
     case 'shop-build':shopBuild=button.dataset.build;updateShop(me());break;
