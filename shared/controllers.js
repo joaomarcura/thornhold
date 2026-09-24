@@ -134,7 +134,7 @@ export class AIController {
     if(threat&&wall.hp<wall.maxHp*.95){this.actNear(match,u,wall,{type:'repair',target:wall.id});return;}
     const wisps=match.wisps.filter(w=>w.owner===u.id&&w.alive),training=wisps.some(w=>w.readyAt>match.time),hire=wispCost(wisps.length);
     if(!threat&&!training&&towers.length&&wisps.length<Math.min(4,core.tier+1)&&u.gold>=hire.gold+35&&u.wood>=hire.wood&&availableTrees(match,u,core).length){this.actNear(match,u,core,{type:'trainWisp',target:core.id});return;}
-    const upgrade=s=>this.actNear(match,u,s,{type:'upgrade',target:s.id,branch:s.kind==='tower'?(this.difficulty==='hard'?'pierce':towers.indexOf(s)%2?'frost':'power'):undefined});
+    const upgrade=s=>this.actNear(match,u,s,{type:'upgrade',target:s.id,branch:s.kind==='tower'?['power','frost','pierce'][Math.max(0,towers.indexOf(s))%3]:undefined});
     const affordable=s=>s&&!s.upgrading&&(s.tier<3||match.time>B.finalAge)&&u.gold>=upgradeCost(s).gold&&u.wood>=upgradeCost(s).wood;
     if(core.tier<=wall.tier&&affordable(core)&&!threat){upgrade(core);return;}
     if(affordable(wall)&&(threat||wall.tier<core.tier)){upgrade(wall);return;}
