@@ -172,7 +172,8 @@ export class Match {
   }
   trollStats(u){
     // Bots survive through the same purchased stats and abilities as players.
-    return combatStats(u);
+    const stats=combatStats(u),lobby=Math.min(B.maxElves,this.units.filter(a=>a.role==='elf').length),siege=B.economy.trollLobbySiege[lobby]||1;
+    return {...stats,siege:stats.siege*siege};
   }
   legendarySword(u){return u?.role==='troll'&&(u.levels.damage||0)+(u.levels.siege||0)>=B.legendary.swordLevels;}
   equipItem(u,id,buy){

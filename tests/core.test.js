@@ -34,6 +34,7 @@ test('Orçamento de recompensa compensa lobbies sem vazar no snapshot',()=>{
   const two=match(2),five=match(5),eight=match(8),a=completedBase(two).core,b=completedBase(five).core,c=completedBase(eight).core;
   const mapFactor=B.economy.trollMapBounty.compact,scenario=B.economy.trollScenarioBounty.compact.normal;assert.equal(a.bountyFactor,B.economy.trollBountyFactor[2]*mapFactor*(scenario[2]||1));assert.equal(b.bountyFactor,B.economy.trollBountyFactor[5]*mapFactor*scenario[5]);assert.equal(c.bountyFactor,B.economy.trollBountyFactor[8]*mapFactor*(scenario[8]||1));
   assert.ok(a.bountyFactor>c.bountyFactor&&b.bountyFactor>c.bountyFactor);assert.equal(two.snapshot('e0').structures[0].bountyFactor,undefined);
+  const duel=match(1),team=match(2);assert.equal(duel.trollStats(duel.unit('t')).siege,team.trollStats(team.unit('t')).siege*B.economy.trollLobbySiege[1]);
 });
 test('Ferramentas dev concedem recursos com limites e não aceitam valores falsos',()=>{
   const m=match(),u=m.unit('e0'),before={gold:u.gold,wood:u.wood};
