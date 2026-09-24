@@ -33,6 +33,7 @@ function deselect(){selected=null;selectionKey='';if($('#selection-panel'))$('#s
 function stopInput(){for(const key of keys)suppressedKeys.add(key);keys.clear();if(snapshot&&(me()?.alive||me()?.ghost))send('input',{x:0,z:0});}
 function cancelContext(openMenu=false){
   awaitingBuild=false;stopInput();
+  if($('#ping-wheel')&&!$('#ping-wheel').hidden){$('#ping-wheel').hidden=true;return true;}
   if(modal){modal=null;render();return true;}
   if(assigning){assigning=null;$('#targeting-hint').hidden=true;selectionKey='';return true;}
   if(buildKind){cancelBuild();return true;}
@@ -122,6 +123,7 @@ function saveName(){const input=$('#nickname');if(input)nickname=input.value.tri
 function setupHUD(){
   hud.hidden=false;hud.innerHTML=`<div class="hud-top"><div class="identity"><img src="/client/emblem.svg" alt=""><div><b id="role-name"></b><span id="player-title"></span></div></div><div class="phase-display"><span id="phase-name"></span><b id="match-clock"></b></div><div class="hud-menu-group"><button class="hud-menu" data-do="pause" aria-label="Abrir menu">☰ <kbd>ESC</kbd></button>${devMode?'<button class="hud-menu dev-button" data-do="dev" aria-label="Abrir menu dev">DEV <kbd>F10</kbd></button>':''}</div></div><div class="resource-bar" id="resource-bar"></div><div class="objective" id="objective"></div><div class="attack-alert" id="attack-alert" hidden>⚠ SUA BASE ESTÁ SOB ATAQUE</div><div class="build-hint" id="build-hint" hidden></div><div id="debug-overlay" class="debug-overlay" hidden></div><aside id="selection-panel" class="selection-panel" hidden></aside><aside id="shop" class="shop" hidden></aside><div class="hud-bottom"><div class="health-panel"><div><b id="hp-label"></b><span id="hp-value"></span></div><div class="health-track"><i id="health-fill"></i></div><span id="cooldown-info"></span></div><div id="hotbar" class="hotbar"></div><div class="minimap-wrap"><canvas id="minimap" width="176" height="176" aria-label="Mapa local e visão da equipe"></canvas><span>VISÃO DA EQUIPE</span></div></div><div class="control-hints" id="control-hints"></div><div id="context-action" class="context-action" hidden></div><div id="targeting-hint" class="targeting-hint" hidden></div><div class="hud-shortcuts"><button data-do="core" id="core-shortcut" title="Núcleo e Wisps">${icon('wisp')}<kbd>N</kbd></button><button data-do="map" title="Mapa tático">${icon('target')}<kbd>M</kbd></button><button data-do="help" title="Guia de comandos">?<kbd>H</kbd></button></div>`;
   hud.insertAdjacentHTML('beforeend',`<div id="crosshair" class="crosshair" aria-label="Mira central" hidden><i></i></div><div id="combat-feedback" class="combat-feedback" aria-live="off" hidden></div><div id="combo-meter" class="combo-meter" hidden></div><div id="cursor-mode" class="cursor-mode"></div><div id="status-effects" class="status-effects" aria-live="off"></div><aside id="live-scoreboard" class="live-scoreboard" aria-label="Placar ao vivo"></aside><div id="team-alerts" class="team-alerts" aria-label="Alertas da equipe"></div><button id="return-camera" class="return-camera" data-do="return-camera" hidden>Observando região · voltar ao personagem <kbd>C</kbd></button><section id="tactical-panel" class="tactical-panel" aria-label="Mapa tático" hidden><div class="map-heading"><div><span class="eyebrow">VISÃO COMPARTILHADA</span><h3>Mapa da expedição</h3></div><button data-do="map" aria-label="Fechar mapa">× <kbd>M</kbd></button></div><canvas id="tactical-map" width="520" height="520" aria-label="Clique para observar uma região; Shift e clique sinaliza perigo"></canvas><div class="map-legend"><span>● Você</span><span>● Aliado</span><span>◆ Troll</span><span>◌ Última visão · 12s</span></div><p>Clique: observar · Shift + clique: perigo<br>Botão direito: pedir ajuda · <kbd>C</kbd> voltar</p><div class="ping-actions"><button data-do="ping-here" data-kind="danger">! Perigo</button><button data-do="ping-here" data-kind="help">+ Ajuda</button><button data-do="ping-here" data-kind="look">◎ Atenção</button></div></section>`);
+  hud.insertAdjacentHTML('beforeend',`<section id="ping-wheel" class="ping-wheel" hidden aria-label="Roda de comunicação"><b>COMUNICAÇÃO</b><button data-do="ping-here" data-kind="danger">! Perigo</button><button data-do="ping-here" data-kind="help">+ Ajuda</button><button data-do="ping-here" data-kind="attack">⚔ Atacar</button><button data-do="ping-here" data-kind="defend">⌂ Defender</button><button data-do="ping-here" data-kind="gold">◇ Ouro</button><button data-do="ping-here" data-kind="wood">♧ Madeira</button></section>`);
   $('#minimap').setAttribute('role','button');$('#minimap').tabIndex=0;$('#minimap').setAttribute('aria-label','Mapa: clique para observar; M amplia');
   $('.minimap-wrap>span').outerHTML='<button class="map-expand" data-do="map">AMPLIAR MAPA <kbd>M</kbd></button>';
   for(const id of ['minimap','tactical-map']){
@@ -344,7 +346,7 @@ document.addEventListener('click',async event=>{
     case 'map':toggleMap();break;
     case 'return-camera':returnCamera();break;
     case 'focus-alert':{const alert=(snapshot.alerts||[]).find(a=>a.id===button.dataset.id);if(alert)focusMap(alert);break;}
-    case 'ping-here':action({type:'ping',kind:button.dataset.kind,...(world.focusPoint||{})});break;
+    case 'ping-here':action({type:'ping',kind:button.dataset.kind,...(world.focusPoint||{})});if($('#ping-wheel'))$('#ping-wheel').hidden=true;break;
     case 'buy':action({type:'buy',key:button.dataset.key});break;
     case 'light':strike();break;
     case 'heavy':strike(true);break;
@@ -380,7 +382,7 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyC'&&!e.repeat){returnCamera();return;}
   if(e.code==='KeyB'&&!e.repeat&&me()?.role==='troll'){toggleShop();return;}
   if(e.code==='KeyN'&&!e.repeat&&me()?.role==='elf'){openCore();return;}
-  if(e.code==='KeyV'&&!e.repeat){action({type:'ping',kind:'help',...(world.focusPoint||{})});return;}
+  if(e.code==='KeyV'&&!e.repeat){const wheel=$('#ping-wheel');if(wheel){wheel.hidden=!wheel.hidden;if(!wheel.hidden)releaseCursor();}return;}
   if(e.code==='Tab'){if(!me()||(!me().alive&&!me().ghost)){e.preventDefault();spectate();}else if(mouseLook.locked){e.preventDefault();releaseCursor();$('#hotbar button')?.focus();}return;}
   if(e.code==='Space'&&e.target.closest('button'))return;
   if(['Space','ArrowUp','ArrowDown'].includes(e.code))e.preventDefault();

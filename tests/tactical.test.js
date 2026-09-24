@@ -14,6 +14,9 @@ test('Pings validam coordenadas, respeitam equipe, cooldown e expiração',()=>{
   assert.match(m.act('e0',{type:'ping'}),/Aguarde/);m.time=4;m.unit('e0').alive=false;assert.equal(m.act('e0',{type:'ping',kind:'help',x:40,z:30}),undefined);
   m.time=15;assert.equal(m.snapshot('e1').pings.length,0);
 });
+test('Roda de comunicação preserva pedidos distintos sem transferir recursos',()=>{
+  for(const[kind,text]of Object.entries({gold:'Preciso de ouro!',wood:'Preciso de madeira!',defend:'Defendam esta clareira!',attack:'Ataquem este alvo!'})){const m=match(),u=m.unit('e0'),before=[u.gold,u.wood];assert.equal(m.act(u.id,{type:'ping',kind,x:20,z:20}),undefined);assert.equal(m.pings[0].text,text);assert.deepEqual([u.gold,u.wood],before);}
+});
 test('Efeitos usam relógio do servidor e desaparecem no vencimento',()=>{
   const m=match(),u=m.unit('t');m.state=STATES.ACTIVE;m.time=20;u.lastHit=19;u.slowUntil=21.5;u.dashUntil=20.4;u.hp=900;u.exposure=12;
   let effects=m.snapshot('t').units.find(e=>e.id==='t').effects;assert.equal(effects.find(e=>e.id==='frost').until,21.5);assert.equal(effects.find(e=>e.id==='regen-delay').until,25);assert.ok(effects.some(e=>e.id==='exposure'));

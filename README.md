@@ -57,6 +57,8 @@ O processo Node é o servidor da partida, não o navegador do host. O host tem p
 | Menu, quando não há ação ou painel aberto | Esc |
 | Guia / alternar observado | H / Tab |
 
+Pressione `V` para abrir a roda de comunicação. Ela separa perigo, ajuda, ataque, defesa e pedidos de ouro/madeira; os pedidos são coordenação, não transferência direta de recursos.
+
 A Barricada é reparada gratuitamente. O primeiro Elfo canalizando aplica 100% do reparo; cada ajudante simultâneo aplica 25%. O reparo das demais estruturas continua consumindo 3 de ouro e 1 de madeira.
 
 Elfos podem construir apoio em uma clareira aliada ativa. A estrutura pertence a quem pagou — somente esse jogador pode evoluir ou cancelar — e os limites de 1 Núcleo, 1 Barricada, 5 Torres, 5 Minas e 1 Oficina valem para a clareira inteira. Recursos permanecem pessoais e não podem ser transferidos diretamente.

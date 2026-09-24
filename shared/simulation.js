@@ -84,8 +84,8 @@ export class Match {
     if((u.cooldowns.ping||0)>this.time)return 'Aguarde para sinalizar.';
     const x=cmd.x??u.x,z=cmd.z??u.z,limit=(this.map.size-1)*this.map.cell;
     if(!Number.isFinite(x)||!Number.isFinite(z)||x<0||z<0||x>limit||z>limit)return 'Posição inválida para sinalizar.';
-    const kind=['danger','help','look'].includes(cmd.kind)?cmd.kind:'help';
-    const text={danger:'Perigo aqui!',help:'Preciso de ajuda!',look:'Atenção nesta posição.'}[kind];
+    const kind=['danger','help','look','gold','wood','defend','attack'].includes(cmd.kind)?cmd.kind:'help';
+    const text={danger:'Perigo aqui!',help:'Preciso de ajuda!',look:'Atenção nesta posição.',gold:'Preciso de ouro!',wood:'Preciso de madeira!',defend:'Defendam esta clareira!',attack:'Ataquem este alvo!'}[kind];
     u.cooldowns.ping=this.time+3;
     const ping={unit:u.id,x,z,role:u.role,kind,text,time:this.time,until:this.time+10};
     this.emit('ping',ping);this.pings=this.pings.filter(p=>p.until>this.time);this.pings.push({...ping,id:this.eventId});
