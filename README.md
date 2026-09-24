@@ -63,6 +63,8 @@ Elfos podem construir apoio em uma clareira aliada ativa. A estrutura pertence a
 
 O Núcleo libera uma vaga de Mina por nível, até cinco. A cada nível, o custo-base da nova Mina cresce 25% e a produção de todas as Minas vinculadas cresce 30%; destruir o Núcleo interrompe essa produção.
 
+Quando um Elfo morre, seus recursos são perdidos e todas as estruturas e Wisps que lhe pertencem colapsam. O Troll recebe 25% da recompensa normal restante; estruturas de outros proprietários sobrevivem. A clareira do Núcleo caído fica bloqueada por 15 segundos antes de poder ser reivindicada por um aliado vivo.
+
 Obras precisam de um construtor vivo por perto. A barricada encaixa somente no portão da sua clareira. Elfos atravessam portões aliados; o Troll precisa destruí-los. Após uma ruptura, a entrada fica 12 segundos sem reconstrução e não aceita novas fundações com o Troll a menos de 5 metros.
 
 Depois que sua Barricada é rompida, um Elfo próximo pode usar **F** para atordoar o Troll por três segundos. A recarga de 60 segundos é compartilhada pela equipe. Se o Núcleo for destruído, o Elfo sobrevivente tem 60 segundos para alcançar outra clareira e usar seu voucher único de reassentamento: o próximo Núcleo não consome ouro nem madeira.

@@ -269,6 +269,7 @@ function updateBuildPreview(){
   else if(buildKind==='wall'&&distance(b.gate,buildPoint)>.45)invalid('Use a passagem iluminada');
   else if(buildKind==='wall'&&(snapshot.breaches?.[b.id]||0)>snapshot.time)invalid('Entrada rompida: reconstrução em '+Math.ceil(snapshot.breaches[b.id]-snapshot.time)+'s');
   else if(buildKind==='core'&&(core||snapshot.structures.some(s=>s.kind==='core'&&s.owner===u.id)))invalid('A clareira ou seu núcleo já está ocupado');
+  else if(buildKind==='core'&&(snapshot.reclaims?.[b.id]||0)>snapshot.time)invalid('Clareira em colapso: aguarde '+Math.ceil(snapshot.reclaims[b.id]-snapshot.time)+'s');
   else if(buildKind!=='core'&&!core)invalid('Esta clareira precisa de um núcleo ativo');
   else if(buildKind!=='core'&&!snapshot.units.some(a=>a.id===core.owner&&a.alive))invalid('O proprietário desta clareira foi eliminado');
   else if(buildKind==='mine'&&snapshot.structures.filter(s=>s.baseId===b.id&&s.kind==='mine').length>=mineEconomy(core?.tier).capacity)invalid(`Núcleo nível ${(core?.tier||1)+1} necessário para outra Mina`);

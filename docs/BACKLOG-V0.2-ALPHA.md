@@ -100,7 +100,7 @@ Versão candidata: `0.2.0-alpha.1`. Cenário principal de balanceamento: um Trol
 - [x] `GAME-102` Propriedade individual e construção aliada com limites por clareira.
 - [x] `GAME-103` Cinco Minas por clareira, com custo e produção ligados ao tier do Núcleo.
 - [x] `GAME-104` Reparo gratuito de Barricada e contribuição decrescente.
-- [ ] `GAME-105` Colapso do patrimônio, recompensa parcial e bloqueio de 15 segundos.
+- [x] `GAME-105` Colapso do patrimônio, recompensa parcial e bloqueio de 15 segundos.
 - [ ] `GAME-106` Espírito controlável, revelação, reparo, segunda morte e observação.
 - [ ] `GAME-107` Remover o limite temporal e instrumentar impasses.
 - [ ] `GAME-108` Torre e Espada Lendárias, feedback audiovisual, IA e contrajogo.

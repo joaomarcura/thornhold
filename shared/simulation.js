@@ -12,7 +12,7 @@ import { cancelJob, jobRefund } from './jobs.js';
 export class Match {
   constructor(settings,slots) {
     this.settings={...DEFAULT_SETTINGS,...settings};this.map=generateMap(this.settings.seed,this.settings.mapSize);
-    this.time=0;this.devSpeed=1;this.state=STATES.PREP;this.structures=[];this.units=[];this.wisps=[];this.controllers=new Map();this.nextId=1;this.repairSequence=0;this.events=[];this.pings=[];this.eventId=0;this.winner=null;this.elfStunReadyAt=0;this.brokenBases=new Set();this.breachUntil=new Map();this.elfBasesClaimed=new Set();
+    this.time=0;this.devSpeed=1;this.state=STATES.PREP;this.structures=[];this.units=[];this.wisps=[];this.controllers=new Map();this.nextId=1;this.repairSequence=0;this.events=[];this.pings=[];this.eventId=0;this.winner=null;this.elfStunReadyAt=0;this.brokenBases=new Set();this.breachUntil=new Map();this.reclaimUntil=new Map();this.elfBasesClaimed=new Set();
     this.stats={trollDamage:0,towerDamage:0,produced:0,destroyed:0,basesDestroyed:0,kills:0,upgrades:0,highestIncome:0,attacks:0,firstBaseFall:null,buildingsCreated:0,unitsLost:0,combatInteractions:{}};
     this.combatInteractions=new Map();this.telemetry=new CombatTelemetry(this.settings.diagnostics===true);
     this.trees=this.map.trees.map(t=>({...t}));this.preparation=this.settings.preparation+Math.max(0,slots.filter(s=>s.role==='elf'&&s.occupant).length-2)*2;
@@ -107,6 +107,7 @@ export class Match {
     if(kind==='core'){
       if(this.structures.some(s=>s.kind==='core'&&s.owner===u.id&&s.hp>0))return 'Você já possui um núcleo.';
       if(claim)return 'Esta clareira já pertence a outro Elfo.';
+      if((this.reclaimUntil.get(b.id)||0)>this.time)return `Clareira em colapso: aguarde ${Math.ceil(this.reclaimUntil.get(b.id)-this.time)} segundos.`;
     }else if(!claim)return 'Esta clareira precisa de um núcleo ativo.';
     else if(!this.unit(claim.owner)?.alive)return 'O proprietário desta clareira foi eliminado.';
     if(kind!=='wall'&&distance({x,z},b.gate)<B.construction.gateClearance)return 'Mantenha a entrada livre para a barricada.';
@@ -239,6 +240,23 @@ export class Match {
     troll.stunnedUntil=this.time+B.elf.stunDuration;troll.input={x:0,z:0};troll.pendingStrike=null;troll.queuedStrike=null;troll.dashUntil=this.time;troll.action='stunned';troll.actionUntil=troll.stunnedUntil;
     u.stats.stuns++;this.emit('stun',{unit:u.id,target:troll.id,x:troll.x,z:troll.z,duration:B.elf.stunDuration,baseId:u.baseId});
   }
+  collapseElf(u,killer){
+    const owned=this.structures.filter(s=>s.owner===u.id&&s.hp>0),homeBases=new Set(owned.filter(s=>s.kind==='core').map(s=>s.baseId));
+    const economic=this.structures.filter(s=>s.hp>0&&s.progress===1),total=economic.reduce((sum,s)=>sum+income(s),0),scale=scaling(this.units.filter(a=>a.role==='elf'&&a.alive).length,total,economic.filter(s=>s.kind==='core').length,this.time);
+    let reward=0;
+    for(const s of owned){
+      if(killer?.role==='troll')reward+=Math.min(s.hp*B.troll.goldPerDamage*scale,s.bounty||0)*.25;
+      s.hp=0;this.stats.destroyed++;this.telemetry.destroyed[s.kind]=(this.telemetry.destroyed[s.kind]||0)+1;
+      if(killer?.role==='troll')killer.stats.structuresDestroyed++;
+      if(s.kind==='wall'){this.brokenBases.add(s.baseId);this.breachUntil.set(s.baseId,this.time+B.construction.breachCooldown);this.stats.firstBaseFall??=this.time;}
+      this.emit('destroy',{entity:s.id,x:s.x,z:s.z,kind:s.kind,cause:'owner-collapse'});
+    }
+    for(const w of this.wisps.filter(w=>w.owner===u.id&&w.alive)){w.alive=false;this.emit('wisp-death',{entity:w.id,x:w.x,z:w.z,cause:'owner-collapse'});}
+    for(const baseId of homeBases)this.reclaimUntil.set(baseId,this.time+15);
+    if(killer?.role==='troll'&&reward>0){killer.gold+=reward;killer.stats.goldGenerated+=reward;}
+    this.stats.basesDestroyed=this.brokenBases.size;u.gold=0;u.wood=0;u.baseId=null;u.relocationUntil=0;
+    this.emit('collapse',{unit:u.id,x:u.x,z:u.z,reward,structures:owned.length,reclaimAt:homeBases.size?this.time+15:null});
+  }
   damage(target,amount,source,kind,sourceId){
     if(target.hp<=0||amount<=0||!Number.isFinite(amount))return 0;
     const actual=Math.min(target.hp,amount);target.hp-=actual;
@@ -266,7 +284,7 @@ export class Match {
         this.emit('destroy',{entity:target.id,x:target.x,z:target.z,kind:target.kind});
       }
       else if(target.role==='wisp'){target.alive=false;this.emit('wisp-death',{entity:target.id,x:target.x,z:target.z});}
-      else {target.alive=false;target.input={x:0,z:0};target.pendingStrike=null;target.queuedStrike=null;this.stats.kills++;this.stats.unitsLost++;target.stats.unitsLost++;if(source)source.stats.kills++;this.emit('death',{entity:target.id,x:target.x,z:target.z,name:target.name});}
+      else {target.alive=false;target.input={x:0,z:0};target.pendingStrike=null;target.queuedStrike=null;this.stats.kills++;this.stats.unitsLost++;target.stats.unitsLost++;if(source)source.stats.kills++;if(target.role==='elf')this.collapseElf(target,source);this.emit('death',{entity:target.id,x:target.x,z:target.z,name:target.name});}
       this.checkEndState();
     }return actual;
   }
@@ -276,8 +294,8 @@ export class Match {
     if(!troll?.alive||!elves.some(u=>u.alive)){this.state=STATES.END;this.winner=troll?.alive?'troll':'elves';this.endReason=troll?.alive?'army-eliminated':'troll-eliminated';this.emit('end',{winner:this.winner,reason:this.endReason});return;}
     if(this.state!==STATES.ACTIVE)return;
     const noCores=this.elfBasesClaimed.size&&[...this.elfBasesClaimed].every(id=>!this.structures.some(s=>s.kind==='core'&&s.baseId===id&&s.hp>0));
-    const canRelocate=elves.some(u=>u.alive&&(u.relocationUntil||0)>this.time);
-    if(noCores&&!canRelocate){this.state=STATES.END;this.winner='troll';this.endReason='all-elf-bases-destroyed';this.emit('end',{winner:this.winner,reason:this.endReason});}
+    const canRelocate=elves.some(u=>u.alive&&(u.relocationUntil||0)>this.time),canReclaim=elves.some(u=>u.alive)&&[...this.reclaimUntil.values()].some(until=>until+60>this.time);
+    if(noCores&&!canRelocate&&!canReclaim){this.state=STATES.END;this.winner='troll';this.endReason='all-elf-bases-destroyed';this.emit('end',{winner:this.winner,reason:this.endReason});}
     if(this.state===STATES.ACTIVE&&this.time>=B.matchSeconds&&this.elfBasesClaimed.size){const threshold=Math.max(1,Math.ceil(this.elfBasesClaimed.size/3));this.state=STATES.END;this.winner=this.stats.basesDestroyed>=threshold?'troll':'elves';this.endReason='time-limit-objective';this.emit('end',{winner:this.winner,reason:this.endReason});}
   }
   towerTargeting(s,troll=this.units.find(u=>u.role==='troll'&&u.alive)){
@@ -342,7 +360,7 @@ export class Match {
     const events=this.events.filter(e=>e.type==='phase'||e.type==='end'||(e.type==='ping'&&(observer||e.role===viewer.role))||(e.type!=='ping'&&(visibleIds.has(e.unit)||visibleIds.has(e.entity)||(Number.isFinite(e.x)&&(observer||this.teamSee(viewer,e))))));
     const pings=this.pings.filter(p=>p.until>this.time&&(observer||p.role===viewer.role));
     const alerts=[...units.filter(u=>u.alive&&(observer||u.role===viewer.role)),...structures.filter(()=>observer||viewer.role==='elf'),...wisps.filter(()=>observer||viewer.role==='elf')].filter(e=>this.time-e.lastHit<5).map(e=>({id:e.id,x:e.x,z:e.z,owner:e.owner||e.id,kind:e.kind||e.role,until:e.lastHit+5}));
-    return {state:this.state,time:this.time,preparation:this.preparation,scoreboard:this.units.map(u=>{const{hp,maxHp,...summary}=playerSummary(u);return summary;}).sort((a,b)=>b.score-a.score),elfStun:viewer?.role==='elf'?this.elfStunStatus(viewer):null,devSpeed:this.devSpeed||1,winner:this.winner,viewerId,units,structures,wisps,pings,alerts,trees:this.trees.filter(t=>observer||this.teamSee(viewer,t)),breaches:observer||viewer.role==='elf'?Object.fromEntries(this.breachUntil):{},events,stats:this.state===STATES.END?this.stats:null,debugTowers:this.debugTowers?this.structures.filter(s=>s.kind==='tower').map(s=>({id:s.id,...this.towerTargeting(s)})):undefined,finalAge:B.finalAge,hungerAge:B.hungerAge};
+    return {state:this.state,time:this.time,preparation:this.preparation,scoreboard:this.units.map(u=>{const{hp,maxHp,...summary}=playerSummary(u);return summary;}).sort((a,b)=>b.score-a.score),elfStun:viewer?.role==='elf'?this.elfStunStatus(viewer):null,devSpeed:this.devSpeed||1,winner:this.winner,viewerId,units,structures,wisps,pings,alerts,trees:this.trees.filter(t=>observer||this.teamSee(viewer,t)),breaches:observer||viewer.role==='elf'?Object.fromEntries(this.breachUntil):{},reclaims:observer||viewer.role==='elf'?Object.fromEntries(this.reclaimUntil):{},events,stats:this.state===STATES.END?this.stats:null,debugTowers:this.debugTowers?this.structures.filter(s=>s.kind==='tower').map(s=>({id:s.id,...this.towerTargeting(s)})):undefined,finalAge:B.finalAge,hungerAge:B.hungerAge};
   }
   result(){const duration=Math.max(1,this.time),interactions=[...this.combatInteractions.values()].map(i=>({...i,ttk:Object.values(i.targets).some(t=>t.death!==null)?Object.values(i.targets).filter(t=>t.death!==null).reduce((n,t)=>n+t.death-t.first,0)/Object.values(i.targets).filter(t=>t.death!==null).length:null,effectiveDps:i.damage/Math.max(.001,this.time-i.startedAt)}));const bases=this.map.bases.map(b=>{const structures=this.structures.filter(s=>s.baseId===b.id),core=structures.find(s=>s.kind==='core'&&s.hp>0)||structures.findLast(s=>s.kind==='core');return {id:b.id,name:b.name,owner:core?.owner||null,claimed:this.elfBasesClaimed.has(b.id),core:core?{id:core.id,hp:Math.round(core.hp),maxHp:Math.round(core.maxHp),progress:core.progress,tier:core.tier}:null,wall:structures.filter(s=>s.kind==='wall').map(s=>({id:s.id,hp:Math.round(s.hp),maxHp:Math.round(s.maxHp),progress:s.progress})),towers:structures.filter(s=>s.kind==='tower').map(s=>({id:s.id,hp:Math.round(s.hp),maxHp:Math.round(s.maxHp),progress:s.progress,tier:s.tier,branch:s.branch})),structureCount:structures.filter(s=>s.hp>0).length};});const finalState={state:this.state,winner:this.winner,endReason:this.endReason||null,bases,units:this.units.map(u=>({id:u.id,role:u.role,alive:u.alive,hp:Math.round(u.hp),maxHp:Math.round(u.maxHp),x:+u.x.toFixed(1),z:+u.z.toFixed(1),baseId:u.baseId,action:u.action})),objectives:{elfBasesClaimed:this.elfBasesClaimed.size,basesDestroyed:this.stats.basesDestroyed,liveElfCores:bases.filter(b=>b.core?.hp>0).length,aliveElves:this.units.filter(u=>u.role==='elf'&&u.alive).length,trollAlive:!!this.units.find(u=>u.role==='troll')?.alive}};return {seed:this.map.seed,winner:this.winner,endReason:this.endReason||null,duration:Math.round(this.time),elves:this.units.filter(u=>u.role==='elf').length,survivors:this.units.filter(u=>u.role==='elf'&&u.alive).length,...this.stats,telemetry:this.telemetry.result(this),combatInteractions:interactions,finalState,ai:this.units.filter(u=>u.controller==='bot').map(u=>({id:u.id,role:u.role,difficulty:u.difficulty,state:this.controllers.get(u.id)?.brain?.state||null,target:this.controllers.get(u.id)?.brain?.targetId||null,destination:this.controllers.get(u.id)?.destination||null,...(this.controllers.get(u.id)?.metrics||{})})),players:this.units.map(u=>({...playerSummary(u),goldPerMinute:u.stats.goldGenerated/duration*60,woodPerMinute:u.stats.woodGenerated/duration*60,...u.stats})),mvp:this.units.filter(u=>u.role===(this.winner==='troll'?'troll':'elf')).map(playerSummary).sort((a,b)=>b.score-a.score)[0]||null};}
 }

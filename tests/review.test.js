@@ -133,3 +133,15 @@ test('Núcleo destruído abre uma janela de reassentamento antes da derrota',()=
   expired.m.time=expired.u.relocationUntil+.01;expired.m.checkEndState();
   assert.equal(expired.m.state,STATES.END);assert.equal(expired.m.endReason,'all-elf-bases-destroyed');
 });
+test('Morte do Elfo colapsa patrimônio, paga 25% e libera a clareira após 15s',()=>{
+  const m=new Match({seed:'COLLAPSE'},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},{id:'e0',role:'elf',occupant:{type:'human',name:'Dono'}},{id:'e1',role:'elf',occupant:{type:'human',name:'Herdeiro'}}]);
+  const troll=m.unit('t'),owner=m.unit('e0'),ally=m.unit('e1'),base=m.map.bases[0];m.state=STATES.ACTIVE;m.time=60;owner.baseId=base.id;owner.gold=999;owner.wood=777;
+  const core={id:'collapse-core',kind:'core',owner:owner.id,baseId:base.id,x:base.x,z:base.z,tier:1,hp:360,maxHp:360,progress:1,bounty:160,lastHit:-100};
+  const tower={id:'collapse-tower',kind:'tower',owner:owner.id,baseId:base.id,x:base.x+4.4,z:base.z,tier:1,hp:360,maxHp:360,progress:1,bounty:160,lastHit:-100};
+  const allied={id:'allied-tower',kind:'tower',owner:ally.id,baseId:base.id,x:base.x-4.4,z:base.z,tier:1,hp:360,maxHp:360,progress:1,bounty:160,lastHit:-100};m.structures.push(core,tower,allied);m.elfBasesClaimed.add(base.id);
+  m.wisps.push({id:'collapse-wisp',role:'wisp',owner:owner.id,x:base.x,z:base.z,alive:true,hp:55,maxHp:55,bounty:10});
+  m.damage(owner,owner.hp,troll,'melee');const collapse=m.events.find(e=>e.type==='collapse');
+  assert.equal(owner.gold,0);assert.equal(owner.wood,0);assert.equal(core.hp,0);assert.equal(tower.hp,0);assert.equal(allied.hp,360);assert.equal(m.wisps[0].alive,false);assert.ok(collapse.reward>0&&collapse.reward<=(160+160)*.25);assert.equal(m.state,STATES.ACTIVE);
+  Object.assign(ally,{x:base.x+4.4,z:base.z,gold:1000,wood:1000});assert.match(m.act(ally.id,{type:'build',kind:'core',x:base.x,z:base.z}),/colapso/);
+  m.time=75.01;assert.equal(m.act(ally.id,{type:'build',kind:'core',x:base.x,z:base.z}),undefined);assert.equal(m.structures.at(-1).owner,ally.id);
+});
