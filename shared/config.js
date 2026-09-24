@@ -14,7 +14,7 @@ export const BALANCE = {
   elf: { hp: 85, speed: 6.4, gold: 150, wood: 110, gather: 10, gatherInterval: 0.65, repair: 42, repairCost: 3, stunDuration:3, stunCooldown:60, stunRange:10, relocationSeconds:60 },
   ghost:{hp:55,vision:8,revealRadius:18,revealDuration:10,revealCooldown:60,goldReward:25},
   legendary:{towerTier:10,towerDps:65,rampPerSecond:.35,maxRamp:4,swordLevels:10,executeThreshold:.15},
-  troll: { hp: 2200, speed: 5.8, damage: 24, interval: 1.05, range: 3.6, armor: 1, gold: 0, goldPerDamage: 0.36, regen: 1.8, regenPerLevel:4, damageGrowth:1.18,speedFactor:.88,healthPerLevel:320,armorPerLevel:3,movementPerLevel:.08,siegePerLevel:.18,finalSiege:1.35,regenDelay:6,exposureGrace:9,exposureRate:.035,heavy: 2.25,heavyRecovery:1.3, heavyCooldown: 4, dashCooldown: 7,dashDuration:.4,dashSpeed:2.5, roarCooldown: 18,roarRange:9,roarDuration:2 },
+  troll: { hp: 2200, speed: 5.8, damage: 24, interval: 1.05, range: 3.6, armor: 1, gold: 0, goldPerDamage: 0.42, regen: 1.8, regenPerLevel:4, damageGrowth:1.18,speedFactor:.88,healthPerLevel:320,armorPerLevel:3,movementPerLevel:.08,siegePerLevel:.18,finalSiege:1.35,regenDelay:6,exposureGrace:9,exposureRate:.035,heavy: 2.25,heavyRecovery:1.3, heavyCooldown: 4, dashCooldown: 7,dashDuration:.4,dashSpeed:2.5, roarCooldown: 18,roarRange:9,roarDuration:2 },
   structures: {
     core: { name:'Núcleo', gold:65, wood:25, hp:360, radius:1.55, seconds:4, income:3, growth:1.65, upgradeGold:100, upgradeWood:35, color:0xe4c37a },
     wall: { name:'Barricada', gold:35, wood:40, hp:1100, radius:1.05, seconds:3, growth:1.9, upgradeGold:85, upgradeWood:30, color:0xa48862 },
