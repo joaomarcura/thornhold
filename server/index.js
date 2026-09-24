@@ -8,7 +8,7 @@ import { SessionService, cleanText } from './sessions.js';
 import { BALANCE, STATES } from '../shared/config.js';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
-export async function createGameServer({port=Number(process.env.PORT)||3000,host=process.env.HOST||'0.0.0.0',telemetry=true}={}){
+export async function createGameServer({port=Number(process.env.PORT)||3000,host=process.env.HOST||'0.0.0.0',telemetry=true,devMode=process.env.THORNHOLD_DEV==='1'}={}){
   const sessions=new SessionService(),connections=new Map(),tokens=new Map();
   const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.json':'application/json','.png':'image/png'};
   const server=http.createServer(async(req,res)=>{
@@ -26,7 +26,7 @@ export async function createGameServer({port=Number(process.env.PORT)||3000,host
   const send=(ws,type,data={})=>{if(ws?.readyState===WebSocket.OPEN&&ws.bufferedAmount<1_000_000)ws.send(JSON.stringify({type,...data}));};
   const broadcast=(room,type,data)=>{for(const m of room.members.values())send(connections.get(m.id),type,data);};
   const lobby=room=>broadcast(room,'lobby',{room:sessions.serialize(room)});
-  const sendMatch=(ws,room,client)=>{const slot=room.slots.find(s=>s.occupant?.clientId===client.id);send(ws,'map',{map:room.match.map,viewerId:slot?.id||null});send(ws,'snapshot',{snapshot:room.match.snapshot(slot?.id||null)});if(room.state===STATES.END)send(ws,'result',{result:room.match.result()});};
+  const sendMatch=(ws,room,client)=>{const slot=room.slots.find(s=>s.occupant?.clientId===client.id);room.match.devSpeed=room.devSpeed||1;room.match.debugTowers=devMode;send(ws,'map',{map:room.match.map,viewerId:slot?.id||null});send(ws,'snapshot',{snapshot:room.match.snapshot(slot?.id||null)});if(room.state===STATES.END)send(ws,'result',{result:room.match.result()});};
   wss.on('connection',(ws,req)=>{
     const origin=req.headers.origin;if(origin){try{const originHost=new URL(origin).host;if(originHost!==req.headers.host){ws.close(1008,'Origin mismatch');return;}}catch{ws.close(1008);return;}}
     let client=null,count=0,windowAt=Date.now();ws.isAlive=true;
@@ -40,14 +40,14 @@ export async function createGameServer({port=Number(process.env.PORT)||3000,host
           const existing=typeof msg.token==='string'?tokens.get(msg.token):null;
           if(existing){client=sessions.clients.get(existing);connections.get(client.id)?.close(4001,'Session resumed');}
           else{client=sessions.addClient(randomBytes(12).toString('hex'),msg.name);client.token=randomBytes(32).toString('hex');tokens.set(client.token,client.id);}
-          client.connected=true;connections.set(client.id,ws);sessions.resume(client);send(ws,'hello',{id:client.id,token:client.token,name:client.name,roomId:client.roomId});const room=sessions.room(client);if(room){lobby(room);if(room.match)sendMatch(ws,room,client);}return;
+          client.connected=true;connections.set(client.id,ws);sessions.resume(client);send(ws,'hello',{id:client.id,token:client.token,name:client.name,roomId:client.roomId,devMode});const room=sessions.room(client);if(room){room.devSpeed??=1;lobby(room);if(room.match)sendMatch(ws,room,client);}return;
         }
         let room=sessions.room(client);
         if(msg.type==='ping'){send(ws,'pong',{sent:msg.sent,now:Date.now()});return;}
         if(msg.type==='list'){send(ws,'rooms',{rooms:sessions.list()});return;}
         if(msg.type==='name'){client.name=cleanText(msg.name,'Viajante',22);return;}
-        if(msg.type==='create'){room=sessions.create(client,msg);lobby(room);return;}
-        if(msg.type==='join'){room=sessions.join(client,msg);lobby(room);return;}
+        if(msg.type==='create'){room=sessions.create(client,msg);room.devSpeed=1;lobby(room);return;}
+        if(msg.type==='join'){room=sessions.join(client,msg);room.devSpeed??=1;lobby(room);return;}
         if(msg.type==='quick'){
           if(room)throw new Error('Saia da sala atual primeiro.');
           const candidate=[...sessions.rooms.values()].filter(r=>!r.settings.private&&!r.settings.local&&!r.password&&r.state===STATES.LOBBY&&r.settings.region===(msg.region||'SA')&&r.members.size<r.settings.elfSlots+1).sort((a,b)=>b.members.size-a.members.size)[0];
@@ -66,6 +66,20 @@ export async function createGameServer({port=Number(process.env.PORT)||3000,host
             if(!room.match)return;const slot=room.slots.find(s=>s.occupant?.clientId===client.id);if(!slot)return;
             if(msg.type==='input')room.match.input(slot.id,msg);else{const error=room.match.act(slot.id,msg.command||{});if(error)send(ws,'actionError',{message:error});}break;
           }
+          case 'dev':{
+            if(!devMode)throw new Error('Modo dev desativado neste servidor.');
+            if(!room.match)throw new Error('A partida ainda não começou.');
+            const slot=room.slots.find(s=>s.occupant?.clientId===client.id);if(!slot)throw new Error('Você não controla um personagem.');
+            room.devSpeed??=1;
+            if(msg.command==='grant'){
+              const error=room.match.devGrant(slot.id,{gold:msg.gold,wood:msg.wood});if(error)throw new Error(error);
+              send(ws,'dev',{speed:room.devSpeed,granted:{gold:Number(msg.gold)||0,wood:Number(msg.wood)||0}});
+            }else if(msg.command==='speed'){
+              const speed=Number(msg.speed);if(![1,2,4,8].includes(speed))throw new Error('Velocidade dev inválida.');
+              room.devSpeed=speed;room.match.devSpeed=speed;broadcast(room,'dev',{speed});
+            }else throw new Error('Comando dev desconhecido.');
+            break;
+          }
           default:throw new Error('Mensagem desconhecida.');
         }
       }catch(error){send(ws,'error',{message:error instanceof SyntaxError?'Mensagem inválida.':error.message});}
@@ -77,7 +91,7 @@ export async function createGameServer({port=Number(process.env.PORT)||3000,host
   const interval=setInterval(()=>{
     for(const room of sessions.rooms.values()){
       if(room.emptySince&&Date.now()-room.emptySince>120000){sessions.rooms.delete(room.id);for(const m of room.members.values()){const c=sessions.clients.get(m.id);if(c)c.roomId=null;}continue;}
-      if(!room.match)continue;room.match.step(1/BALANCE.tick);room.state=room.match.state;
+      if(!room.match)continue;room.devSpeed??=1;room.match.devSpeed=room.devSpeed;room.match.debugTowers=devMode;room.match.step(1/BALANCE.tick*room.devSpeed);room.state=room.match.state;
       if(ticks%2===0)for(const m of room.members.values()){const slot=room.slots.find(s=>s.occupant?.clientId===m.id);send(connections.get(m.id),'snapshot',{snapshot:room.match.snapshot(slot?.id||null)});}
       if(room.state===STATES.END&&!room.logged){room.logged=true;const result=room.match.result();broadcast(room,'result',{result});if(telemetry)mkdir(path.join(root,'telemetry'),{recursive:true}).then(()=>appendFile(path.join(root,'telemetry','matches.jsonl'),JSON.stringify({...result,at:new Date().toISOString()})+'\n')).catch(error=>console.error('Telemetry:',error.message));}
     }ticks++;

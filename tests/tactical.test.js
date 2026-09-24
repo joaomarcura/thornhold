@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Match } from '../shared/simulation.js';
 import { STATES, BALANCE as B, distance } from '../shared/config.js';
+import { toCell, index } from '../shared/map.js';
 import { AIController } from '../shared/controllers.js';
 import { TacticalMap } from '../client/tactical-map.js';
 const match=()=>new Match({seed:'TACTICS'},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},...['e0','e1'].map(id=>({id,role:'elf',occupant:{type:'human',name:id}}))]);
@@ -31,6 +32,17 @@ test('Mapa conserva apenas última posição observada e não acompanha Troll oc
 test('IA não memoriza nem contorna estruturas que ainda não avistou',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('hard'),b=m.map.bases[0];m.state=STATES.ACTIVE;m.time=60;
   m.structures.push({id:'hidden',kind:'wall',x:b.gate.x,z:b.gate.z,hp:1000,maxHp:1000,progress:1});assert.equal(m.canSee(u,m.structures[0]),false);c.troll(m,u);assert.equal(c.discovered.has('hidden'),false);assert.equal(c.navigationBlocks(m,u).size,0);
+});
+test('Navegação do Troll não trata a própria estrutura-alvo como obstáculo',()=>{
+  const m=match(),u=m.unit('t'),c=new AIController('hard'),tower={id:'tower-target',kind:'tower',x:u.x+6,z:u.z,hp:400,maxHp:400,tier:1,branch:'power',progress:1};
+  m.state=STATES.ACTIVE;m.structures.push(tower);c.discovered.set(tower.id,{...tower,seenAt:m.time});
+  const blocked=c.navigationBlocks(m,u,tower.id),cell=toCell(m,tower);
+  assert.equal(blocked.has(index(m,cell.x,cell.z)),false);
+  assert.equal(c.go(m,u,tower,3),false);c.follow(m,u);assert.ok(Math.hypot(u.input.x,u.input.z)>0);
+});
+test('Percepção de estruturas não depende do yaw do Troll',()=>{
+  const m=match(),u=m.unit('t'),tower={id:'tower-visible',kind:'tower',x:u.x+5,z:u.z,hp:400,maxHp:400,tier:1,branch:'power',progress:1};
+  m.structures.push(tower);m.state=STATES.ACTIVE;u.yaw=0;assert.equal(m.canSee(u,tower),true);u.yaw=Math.PI;assert.equal(m.canSee(u,tower),true);
 });
 test('IA recua de cerco perigoso e recupera vida sem ganhar atributos',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=60;u.hp=200;u.lastHit=60;

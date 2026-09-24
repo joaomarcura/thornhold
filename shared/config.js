@@ -1,20 +1,22 @@
 export const STATES = Object.freeze({ MENU:'MAIN_MENU', LOBBY:'LOBBY', LOADING:'LOADING', PREP:'PREPARATION', ACTIVE:'MATCH_ACTIVE', END:'MATCH_END', RETURN:'RETURN_TO_LOBBY' });
 export const BALANCE = {
   tick: 20, snapshot: 10, maxElves: 8, cell: 2.2, maxTier: null, visualTier: 4,
-  prep: 50, finalAge: 210, hungerAge: 480, hungerGrace: 45, hungerRate: 0.004,
-  vision: { troll: 28, elf: 24 }, interactRange: 6.5,
+  prep: 50, matchSeconds: 1200, finalAge: 210, hungerAge: 480, hungerGrace: 45, hungerRate: 0.004,
+  // The Troll needs enough sight to discover a refuge from the surrounding
+  // trail without being given hidden base coordinates.
+  vision: { troll: 30, elf: 24 }, interactRange: 6.5,
   movement:{sprint:1.25,trollRadius:.64,elfRadius:.37},
-  construction:{initialHealth:.15,breachCooldown:12,enemyClearance:5,gateClearance:4,limits:{core:1,wall:1,tower:5,mine:2,workshop:1},upgradeSeconds:3},
+  construction:{initialHealth:.15,breachCooldown:45,enemyClearance:5,gateClearance:4,limits:{core:1,wall:1,tower:5,mine:2,workshop:1},upgradeSeconds:3},
   economy:{richWood:1.65,finalRichWood:2.5,workshopGather:.3,workshopRepair:.2},
   progression:{structureGrowth:1.18,costGrowth:1.35,woodCostGrowth:1.25,trollDamageGrowth:1.12,healthGrowth:1.14},
   wisps:{gold:65,wood:15,hireGrowth:1.32,trainSeconds:6,income:1.4,incomeGrowth:1.25,upgradeGold:70,upgradeWood:20,costGrowth:1.5,seconds:4,hp:55,externalBonus:1.6,range:25,regrowSeconds:35},
   combat:{buffer:.18,lightWindup:.1,heavyWindup:.32,comboWindow:2.8,comboBonus:.25,openingSeconds:1.2,openingBonus:.2},
-  elf: { hp: 85, speed: 6.4, gold: 150, wood: 110, gather: 10, gatherInterval: 0.65, repair: 42, repairCost: 3 },
-  troll: { hp: 1500, speed: 5.8, damage: 30, interval: 1.05, range: 3.6, armor: 1, gold: 0, goldPerDamage: 0.36, regen: 1.5, regenPerLevel:6, damageGrowth:1.28,speedFactor:.88,healthPerLevel:320,armorPerLevel:3,movementPerLevel:.08,siegePerLevel:.3,finalSiege:1.35,regenDelay:6,exposureGrace:9,exposureRate:.035,heavy: 2.25,heavyRecovery:1.3, heavyCooldown: 4, dashCooldown: 7,dashDuration:.4,dashSpeed:2.5, roarCooldown: 18,roarRange:9,roarDuration:2 },
+  elf: { hp: 85, speed: 6.4, gold: 150, wood: 110, gather: 10, gatherInterval: 0.65, repair: 42, repairCost: 3, stunDuration:3, stunCooldown:60, stunRange:10, relocationSeconds:60 },
+  troll: { hp: 2200, speed: 5.8, damage: 24, interval: 1.05, range: 3.6, armor: 1, gold: 0, goldPerDamage: 0.36, regen: 1.8, regenPerLevel:4, damageGrowth:1.18,speedFactor:.88,healthPerLevel:320,armorPerLevel:3,movementPerLevel:.08,siegePerLevel:.18,finalSiege:1.35,regenDelay:6,exposureGrace:9,exposureRate:.035,heavy: 2.25,heavyRecovery:1.3, heavyCooldown: 4, dashCooldown: 7,dashDuration:.4,dashSpeed:2.5, roarCooldown: 18,roarRange:9,roarDuration:2 },
   structures: {
-    core: { name:'Núcleo', gold:65, wood:25, hp:360, radius:1.55, seconds:4, income:3, growth:1.85, upgradeGold:100, upgradeWood:35, color:0xe4c37a },
-    wall: { name:'Barricada', gold:35, wood:40, hp:850, radius:1.05, seconds:3, growth:1.9, upgradeGold:85, upgradeWood:30, color:0xa48862 },
-    tower: { name:'Torre', gold:70, wood:35, hp:260, radius:0.9, seconds:4, damage:12, interval:1.2, range:17, growth:1.65, upgradeGold:90, upgradeWood:40, color:0x81cabb },
+    core: { name:'Núcleo', gold:65, wood:25, hp:360, radius:1.55, seconds:4, income:3, growth:1.65, upgradeGold:100, upgradeWood:35, color:0xe4c37a },
+    wall: { name:'Barricada', gold:35, wood:40, hp:1100, radius:1.05, seconds:3, growth:1.9, upgradeGold:85, upgradeWood:30, color:0xa48862 },
+    tower: { name:'Torre', gold:70, wood:35, hp:360, radius:0.9, seconds:4, damage:10.5, interval:1.2, range:17, growth:1.65, upgradeGold:90, upgradeWood:40, color:0x81cabb },
     mine: { name:'Mina', gold:85, wood:35, hp:200, radius:1.05, seconds:5, income:1.3, growth:1.7, upgradeGold:110, upgradeWood:45, color:0xc2a54c },
     workshop: { name:'Oficina', gold:100, wood:50, hp:250, radius:1.1, seconds:5, growth:1.6, upgradeGold:125, upgradeWood:45, color:0x748fa3 }
   },
@@ -46,6 +48,7 @@ export const tierScale=(growth,tier)=>scaled(Math.pow(growth,Math.min(3,tier-1))
 export const structureHP=(kind,tier)=>BALANCE.structures[kind].hp*tierScale(kind==='wall'?1.85:1.5,tier);
 export const towerDamage=tier=>BALANCE.structures.tower.damage*tierScale(BALANCE.structures.tower.growth,tier);
 export const income=s=>(BALANCE.structures[s.kind].income||0)*tierScale(BALANCE.structures[s.kind].growth,s.tier);
+export const resourceProducer=s=>{const amount=income(s);return amount?{resource:'gold',amount,perMinute:amount*60,interval:1,active:true}:null;};
 export const upgradeCost=s=>({gold:Math.round(scaled(BALANCE.structures[s.kind].upgradeGold*Math.pow(1.9,Math.min(3,s.tier-1)),BALANCE.progression.costGrowth,s.tier-4)),wood:Math.round(scaled(BALANCE.structures[s.kind].upgradeWood*Math.pow(1.5,Math.min(3,s.tier-1)),BALANCE.progression.woodCostGrowth,s.tier-4))});
 export const trollCost=(key,level)=>Math.round(scaled(BALANCE.upgrades[key].cost*Math.pow(BALANCE.upgrades[key].growth,Math.min(4,level)),BALANCE.progression.costGrowth,level-4));
 export const trollHealth=level=>scaled(BALANCE.troll.hp+Math.min(4,level)*BALANCE.troll.healthPerLevel,BALANCE.progression.healthGrowth,level-4);

@@ -7,6 +7,7 @@ export function unitEffects(u, time, state, preparation) {
   const effects=[];
   const add=(id,label,kind,until,detail)=>effects.push({id,label,kind,until,detail});
   if(u.slowUntil>time)add('frost','Lentidão','debuff',u.slowUntil,'Movimento −35%');
+  if(u.stunnedUntil>time)add('stunned','Atordoado','debuff',u.stunnedUntil,'Movimento e habilidades bloqueados');
   if(u.dashUntil>time)add('dash','Esquiva','buff',u.dashUntil,'Movimento acelerado');
   if(u.role!=='troll')return effects;
   const stats=combatStats(u);

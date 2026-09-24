@@ -67,3 +67,14 @@ test('Servidor HTTP serve apenas assets permitidos; salas privadas não vazam no
   try{const base=`http://127.0.0.1:${app.port}`;assert.equal((await fetch(base)).status,200);assert.equal((await fetch(base+'/server/index.js')).status,404);assert.notEqual((await fetch(base+'/client/..%2fserver/index.js')).status,200);assert.equal((await fetch(base+'/shared/config.js')).status,200);}
   finally{await app.close();}
 });
+
+test('Modo dev fica protegido por configuração e controla recursos e velocidade',async()=>{
+  const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false,devMode:true});let host;
+  try{
+    host=await client(app.port,'Dev Troll');assert.equal(host.hello.devMode,true);
+    host.send('create',{role:'troll',fillBots:true,settings:{elfSlots:1,private:true,preparation:20}});const {room}=await host.wait('lobby');host.send('ready',{ready:true});await host.wait('lobby',m=>m.room.errors.length===0);host.send('start');await host.wait('map');
+    const live=app.sessions.rooms.get(room.id),unit=live.match.unit('t0'),gold=unit.gold,wood=unit.wood;
+    host.send('dev',{command:'grant',gold:1000,wood:250});await host.wait('dev',m=>m.granted?.gold===1000);assert.equal(unit.gold,gold+1000);assert.equal(unit.wood,wood+250);
+    host.send('dev',{command:'speed',speed:8});await host.wait('dev',m=>m.speed===8);assert.equal(live.devSpeed,8);assert.equal(live.match.devSpeed,8);
+  }finally{if(host)await closeClient(host);await app.close();}
+});
