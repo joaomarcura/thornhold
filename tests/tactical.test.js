@@ -53,6 +53,12 @@ test('IA recua de cerco perigoso e recupera vida sem ganhar atributos',()=>{
   const speed=B.troll.speed,maxHp=u.maxHp;c.troll(m,u);assert.equal(c.retreating,true);assert.equal(c.brain.state,'retreat');assert.ok(c.destination);assert.ok(distance(c.destination,u)>5);assert.equal(u.maxHp,maxHp);assert.equal(B.troll.speed,speed);
   Object.assign(u,c.destination);m.time=65;u.lastHit=60;c.troll(m,u);assert.equal(c.brain.state,'recover');assert.equal(c.destination,null);
 });
+test('Espada lendária encerra recuperação e dificuldades maiores sustentam o assalto',()=>{
+  assert.ok(B.difficulty.easy.retreat>B.difficulty.normal.retreat&&B.difficulty.normal.retreat>B.difficulty.hard.retreat);
+  const m=match(),u=m.unit('t'),c=new AIController('hard');m.state=STATES.ACTIVE;m.time=B.finalAge+50;u.hp=u.maxHp*.3;u.levels.damage=5;u.levels.siege=5;
+  c.troll(m,u);c.retreating=true;c.brain.recoveryUntil=m.time-1;c.troll(m,u);
+  assert.equal(c.retreating,false);assert.ok(!['retreat','recover'].includes(c.brain.state));
+});
 test('IA persegue Elfo exposto antes de desperdiçar tempo em estrutura resistente',()=>{
   const m=match(),u=m.unit('t'),elf=m.unit('e0'),c=new AIController('hard');m.state=STATES.ACTIVE;m.time=60;elf.x=u.x+6;elf.z=u.z;m.unit('e1').x=0;m.unit('e1').z=0;
   m.structures.push({id:'core',kind:'core',x:u.x-6,z:u.z,hp:3000,maxHp:3000,tier:4,progress:1});c.troll(m,u);assert.equal(c.brain.targetId,elf.id);assert.equal(c.brain.state,'pursue');

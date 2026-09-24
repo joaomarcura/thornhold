@@ -38,7 +38,7 @@ export const BALANCE = {
     siege:{name:'Quebra-fortaleza',description:'Mais dano a estruturas',cost:110,growth:1.9,max:null},
     utility:{name:'Rugido ancestral',description:'Rugido e esquiva; ganhos decrescentes',cost:80,growth:1.8,max:null}
   },
-  difficulty: { easy:{think:1.6,repair:0.38,retreat:0.15},normal:{think:0.7,repair:0.68,retreat:0.32},hard:{think:0.28,repair:0.88,retreat:0.48} }
+  difficulty: { easy:{think:1.6,repair:0.38,retreat:0.42},normal:{think:0.7,repair:0.68,retreat:0.3},hard:{think:0.28,repair:0.88,retreat:0.18} }
 };
 export const DEFAULT_SETTINGS = { elfSlots:5, difficulty:'normal', seed:'THORNHOLD', mapSize:'compact', preparation:50, private:true, local:false, region:'SA', takeover:true, allowRoles:true };
 export const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));

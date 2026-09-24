@@ -21,7 +21,7 @@ export class TrollBrain {
     for(const[id,e]of c.discovered)if((m.canSee(u,e)&&!visible.some(a=>a.id===id))||now-e.seenAt>(e.role?8:100))c.discovered.delete(id);
     this.avoid=this.avoid.filter(a=>a.until>now);
     const knownTowers=[...c.discovered.values()].filter(e=>e.kind==='tower'&&e.progress===1);
-    const threatened=now-u.lastHit<3,stats=m.trollStats(u);
+    const threatened=now-u.lastHit<3,stats=m.trollStats(u),legendaryAssault=m.legendarySword(u)&&now>B.finalAge;
     const risk=p=>knownTowers.reduce((d,t)=>{
       const branch=B.branches[t.branch]||B.branches.power;
       if(t.disabledUntil>now||distance(p,t)>B.structures.tower.range+branch.range||!lineOfSight(m.map,p,t))return d;
@@ -56,7 +56,7 @@ export class TrollBrain {
     const survival=u.hp/Math.max(1,dps),health=u.hp/u.maxHp;
     const overextended=threatened&&((survival<5.5&&!finishing)||(u.exposure>17&&survival<18&&!finishing));
     const hungerSoon=now>B.hungerAge-10&&now-u.lastAttack>B.hungerGrace-10;
-    if(!c.retreating&&(overextended||(health<c.profile.retreat&&!finishing&&(threatened||(!hungerSoon&&now>this.reengageAfter))))){
+    if(!legendaryAssault&&!c.retreating&&(overextended||(health<c.profile.retreat&&!finishing&&(threatened||(!hungerSoon&&now>this.reengageAfter))))){
       c.retreating=true;c.metrics.retreatAttempts++;this.state='retreat';this.safePoint=null;this.recoveryUntil=now+36;
       // Keep a failed siege excluded beyond recovery so the hunter searches another branch.
       if(target)this.avoid.push({x:target.x,z:target.z,until:now+35});
@@ -65,7 +65,7 @@ export class TrollBrain {
     if(c.retreating){
       const recovering=!threatened&&risk(u)<1;
       const hungerSoon=now>B.hungerAge-10&&now-u.lastAttack>B.hungerGrace-10;
-      if(recovering&&(health>.76||(now>this.recoveryUntil&&health>.5)||hungerSoon)){
+      if((legendaryAssault&&now>this.recoveryUntil)||recovering&&(health>.76||(now>this.recoveryUntil&&health>.5)||hungerSoon)){
         c.retreating=false;this.safePoint=null;this.state='rotate';c.exploreTarget=null;c.metrics.retreatSuccesses++;this.reengageAfter=now+12;
       }else{
         if(recovering){this.state='recover';c.stop(u);return;}
