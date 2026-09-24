@@ -96,7 +96,7 @@ Versão candidata: `0.2.0-alpha.1`. Cenário principal de balanceamento: um Trol
 
 ### Etapa 1 — fechar o gameplay principal
 
-- [ ] `GAME-101` Voucher único de reassentamento, com UI, IA e testes de abuso.
+- [x] `GAME-101` Voucher único de reassentamento, com UI, IA e testes de abuso.
 - [ ] `GAME-102` Propriedade individual e construção aliada com limites por clareira.
 - [ ] `GAME-103` Cinco Minas por clareira, com custo e produção ligados ao tier do Núcleo.
 - [ ] `GAME-104` Reparo gratuito de Barricada e contribuição decrescente.

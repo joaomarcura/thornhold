@@ -28,8 +28,9 @@ try{
   assert.ok(troll.stunnedUntil-m.time<=3&&troll.stunnedUntil-m.time>2.8);await page.locator('.troll-label').getByText('ATORDOADO',{exact:false}).waitFor();
   await page.screenshot({path:'artifacts/elf-stun-live-scoreboard.png'});report.stunAndLiveScoreboard=true;
   const core={id:'relocation-core',kind:'core',owner:u.id,baseId:base.id,x:base.x,z:base.z,hp:360,maxHp:360,progress:1,healthProgress:1,tier:1,bounty:360,lastHit:-100};
-  m.structures.push(core);m.elfBasesClaimed.add(base.id);u.baseId=base.id;m.damage(core,core.hp,troll,'melee');
-  await page.getByText('REASSENTAMENTO',{exact:false}).waitFor();assert.ok(u.relocationUntil>m.time);
+  m.structures.push(core);m.elfBasesClaimed.add(base.id);u.baseId=base.id;u.gold=0;u.wood=0;m.damage(core,core.hp,troll,'melee');
+  await page.locator('#objective').getByText('REASSENTAMENTO',{exact:false}).waitFor();assert.ok(u.relocationUntil>m.time);
+  await until(()=>page.locator('#hotbar [data-kind=core]').textContent().then(text=>text.includes('GRÁTIS')),'Free relocation was not shown in the hotbar');assert.equal(u.relocationVouchers,1);
   await page.screenshot({path:'artifacts/elf-relocation-countdown.png'});report.relocationCountdown=true;
   // End through authoritative damage so the normal server result flow renders.
   troll.stunnedUntil=0;m.damage(troll,troll.hp,u,'tower','test-tower');

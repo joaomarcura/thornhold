@@ -59,7 +59,7 @@ O processo Node é o servidor da partida, não o navegador do host. O host tem p
 
 Obras precisam de um construtor vivo por perto. A barricada encaixa somente no portão da sua clareira. Elfos atravessam portões aliados; o Troll precisa destruí-los. Após uma ruptura, a entrada fica 12 segundos sem reconstrução e não aceita novas fundações com o Troll a menos de 5 metros.
 
-Depois que sua Barricada é rompida, um Elfo próximo pode usar **F** para atordoar o Troll por três segundos. A recarga de 60 segundos é compartilhada pela equipe. Se o Núcleo for destruído, o Elfo sobrevivente tem 60 segundos para alcançar outra clareira e reassentar; esta regra ainda receberá o voucher garantido descrito no [backlog da alpha](docs/BACKLOG-V0.2-ALPHA.md).
+Depois que sua Barricada é rompida, um Elfo próximo pode usar **F** para atordoar o Troll por três segundos. A recarga de 60 segundos é compartilhada pela equipe. Se o Núcleo for destruído, o Elfo sobrevivente tem 60 segundos para alcançar outra clareira e usar seu voucher único de reassentamento: o próximo Núcleo não consome ouro nem madeira.
 
 O cursor livre permite selecionar estruturas e usar os painéis. Loja, ajuda e mapa liberam o cursor automaticamente; a bolinha do mouse retorna à câmera. Ao observar outra região, seu personagem permanece parado: **C** retorna ao personagem, **M** fecha o mapa. A partida continua nesses painéis.
 

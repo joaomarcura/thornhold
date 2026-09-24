@@ -111,10 +111,13 @@ test('Núcleo destruído abre uma janela de reassentamento antes da derrota',()=
   const first=fixture(),{m,u,core}=first,troll=m.unit('t');m.state=STATES.ACTIVE;m.time=60;
   m.damage(core,core.hp,troll,'melee');
   assert.equal(m.state,STATES.ACTIVE);assert.equal(u.baseId,null);assert.equal(u.relocationUntil,60+B.elf.relocationSeconds);
-  assert.equal(m.snapshot(u.id).units.find(a=>a.id===u.id).relocationUntil,u.relocationUntil);
-  const next=m.map.bases.find(b=>b.id!==core.baseId);Object.assign(u,{x:next.x+4.4,z:next.z,gold:1000,wood:1000});
+  const own=m.snapshot(u.id).units.find(a=>a.id===u.id);assert.equal(own.relocationUntil,u.relocationUntil);assert.equal(own.relocationVouchers,1);
+  const next=m.map.bases.find(b=>b.id!==core.baseId);Object.assign(u,{x:next.x+4.4,z:next.z,gold:0,wood:0});
   assert.equal(m.act(u.id,{type:'build',kind:'core',x:next.x,z:next.z}),undefined);
+  assert.equal(u.gold,0);assert.equal(u.wood,0);assert.equal(u.relocationVouchers,0);assert.equal(u.stats.relocations,1);
   assert.equal(u.relocationUntil,0);assert.equal(m.state,STATES.ACTIVE);
+  const replacement=m.structures.at(-1);replacement.progress=1;replacement.hp=replacement.maxHp;
+  m.damage(replacement,replacement.hp,troll,'melee');assert.equal(u.relocationUntil,0);assert.equal(m.state,STATES.END);
 
   const expired=fixture();expired.m.state=STATES.ACTIVE;expired.m.time=60;
   expired.m.damage(expired.core,expired.core.hp,expired.m.unit('t'),'melee');

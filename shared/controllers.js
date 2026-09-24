@@ -92,7 +92,7 @@ export class AIController {
       // Reach the interior before laying a foundation, then stand off its footprint.
       if(!lineOfSight(match.map,u,p)||distance(u,p)>6){this.go(match,u,{x:p.x+4.4,z:p.z},.5);return;}
       if(distance(u,p)<2.1){this.go(match,u,{x:p.x+4.4,z:p.z},.5);return;}
-      if(u.gold<B.structures.core.gold||u.wood<B.structures.core.wood){this.gather(match,u,base);return;}
+      if(!match.freeRelocation(u)&&(u.gold<B.structures.core.gold||u.wood<B.structures.core.wood)){this.gather(match,u,base);return;}
       match.act(u.id,{type:'build',kind:'core',...p});this.stop(u);return;
     }
     base=match.map.bases.find(b=>b.id===core.baseId);
