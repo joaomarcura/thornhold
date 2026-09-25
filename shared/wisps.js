@@ -5,7 +5,7 @@ export function availableTrees(m,u,core){
   return m.trees.filter(t=>t.amount>0&&distance(t,core)<=B.wisps.range&&
     (baseAt(m.map,t)?.id===core.baseId||(t.rich&&m.teamSee(u,t)))&&
     !m.wisps.some(w=>w.alive&&w.treeId===t.id))
-    .sort((a,b)=>Number(a.rich)-Number(b.rich)||distance(a,core)-distance(b,core));
+    .sort((a,b)=>distance(a,core)-distance(b,core)||a.id.localeCompare(b.id));
 }
 export function commandWisp(m,u,cmd){
   if(u.role!=='elf')return 'Apenas Elfos cultivam Wisps.';
@@ -13,7 +13,7 @@ export function commandWisp(m,u,cmd){
     const core=m.structures.find(s=>s.id===cmd.target&&s.kind==='core'&&s.owner===u.id&&s.hp>0&&s.progress===1);
     if(!core||distance(core,u)>B.interactRange||!m.canSee(u,core))return 'Aproxime-se do seu núcleo concluído.';
     if(m.wisps.some(w=>w.alive&&w.owner===u.id&&w.readyAt>m.time))return 'Um Wisp já está sendo formado.';
-    const trees=availableTrees(m,u,core),tree=cmd.tree?trees.find(t=>t.id===cmd.tree):trees[0];
+    const trees=availableTrees(m,u,core),tree=trees[0];
     if(!tree)return 'Nenhuma árvore livre no alcance do núcleo. Evolua seus Wisps ou aguarde o rebrote.';
     const cost=wispCost(m.wisps.filter(w=>w.owner===u.id&&w.alive).length);
     if(u.gold<cost.gold||u.wood<cost.wood)return 'Recursos insuficientes para formar Wisp.';
@@ -22,20 +22,29 @@ export function commandWisp(m,u,cmd){
       level:1,hp:B.wisps.hp,maxHp:B.wisps.hp,alive:true,readyAt:m.time+B.wisps.trainSeconds,upgradingUntil:0,lastHit:-100,bounty:cost.gold*.3};
     w.job={type:'train',...cost,duration:B.wisps.trainSeconds,until:w.readyAt};m.wisps.push(w);m.emit('wisp-trained',{entity:w.id,unit:u.id,x:w.x,z:w.z});return;
   }
+  if(cmd.type==='upgradeAllWisps'){
+    const core=m.structures.find(s=>s.id===cmd.target&&s.kind==='core'&&s.owner===u.id&&s.hp>0&&s.progress===1);
+    if(!core||distance(core,u)>B.interactRange||!m.canSee(u,core))return 'Gerencie Wisps perto do seu núcleo.';
+    const eligible=m.wisps.filter(w=>w.alive&&w.owner===u.id&&w.level<B.maxTier&&w.readyAt<=m.time&&w.upgradingUntil<=m.time).sort((a,b)=>a.id.localeCompare(b.id));
+    let upgraded=0;
+    for(const w of eligible){
+      const cost=wispUpgradeCost(w.level);if(u.gold<cost.gold||u.wood<cost.wood)continue;
+      u.gold-=cost.gold;u.wood-=cost.wood;w.upgradingUntil=m.time+B.wisps.seconds;w.job={type:'wisp-upgrade',...cost,duration:B.wisps.seconds,until:w.upgradingUntil};upgraded++;
+      m.emit('upgrade',{unit:u.id,entity:w.id,x:w.x,z:w.z});
+    }
+    if(!upgraded)return 'Nenhum Wisp elegível pôde ser evoluído com os recursos atuais.';
+    u.stats.upgrades+=upgraded;m.stats.upgrades+=upgraded;return;
+  }
   const w=m.wisps.find(w=>w.id===cmd.target&&w.alive&&w.owner===u.id);
   if(!w)return 'Selecione um Wisp seu.';
   const core=m.structures.find(s=>s.owner===u.id&&s.kind==='core'&&s.hp>0&&s.progress===1);
   if(!core||distance(core,u)>B.interactRange||!m.canSee(u,core))return 'Gerencie Wisps perto do seu núcleo.';
   if(w.readyAt>m.time||w.upgradingUntil>m.time)return 'O Wisp está em formação ou evoluindo.';
   if(cmd.type==='upgradeWisp'){
+    if(w.level>=B.maxTier)return 'Wisp no nível Épico máximo.';
     const cost=wispUpgradeCost(w.level);if(u.gold<cost.gold||u.wood<cost.wood)return 'Recursos insuficientes para evoluir Wisp.';
     u.gold-=cost.gold;u.wood-=cost.wood;w.upgradingUntil=m.time+B.wisps.seconds;w.job={type:'wisp-upgrade',...cost,duration:B.wisps.seconds,until:w.upgradingUntil};u.stats.upgrades++;m.stats.upgrades++;
     m.emit('upgrade',{unit:u.id,entity:w.id,x:w.x,z:w.z});return;
-  }
-  if(cmd.type==='assignWisp'){
-    const tree=availableTrees(m,u,core).find(t=>t.id===cmd.tree);
-    if(!tree)return 'Escolha uma árvore livre, visível e no alcance do núcleo.';
-    Object.assign(w,{treeId:tree.id,rich:tree.rich,x:tree.x,z:tree.z,readyAt:m.time+B.wisps.trainSeconds});return;
   }
 }
 export function wispActive(m,w){

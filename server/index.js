@@ -26,7 +26,10 @@ export async function createGameServer({port=Number(process.env.PORT)||3000,host
   const send=(ws,type,data={})=>{if(ws?.readyState===WebSocket.OPEN&&ws.bufferedAmount<1_000_000)ws.send(JSON.stringify({type,...data}));};
   const broadcast=(room,type,data)=>{for(const m of room.members.values())send(connections.get(m.id),type,data);};
   const lobby=room=>broadcast(room,'lobby',{room:sessions.serialize(room)});
+  const queueState=client=>send(connections.get(client.id),'queue',sessions.queueStatus(client));
+  const broadcastQueue=()=>{for(const client of sessions.clients.values())if(client.connected&&!sessions.room(client))queueState(client);};
   const sendMatch=(ws,room,client)=>{const slot=room.slots.find(s=>s.occupant?.clientId===client.id);room.match.devSpeed=room.devSpeed||1;room.match.debugTowers=devMode;send(ws,'map',{map:room.match.map,viewerId:slot?.id||null});send(ws,'snapshot',{snapshot:room.match.snapshot(slot?.id||null)});if(room.state===STATES.END)send(ws,'result',{result:room.match.result()});};
+  const launchMatch=room=>{room.devSpeed=1;broadcast(room,'phase',{state:STATES.LOADING});for(const member of room.members.values())sendMatch(connections.get(member.id),room,member);room.state=room.match.state;lobby(room);};
   wss.on('connection',(ws,req)=>{
     const origin=req.headers.origin;if(origin){try{const originHost=new URL(origin).host;if(originHost!==req.headers.host){ws.close(1008,'Origin mismatch');return;}}catch{ws.close(1008);return;}}
     let client=null,count=0,windowAt=Date.now();ws.isAlive=true;
@@ -40,7 +43,7 @@ export async function createGameServer({port=Number(process.env.PORT)||3000,host
           const existing=typeof msg.token==='string'?tokens.get(msg.token):null;
           if(existing){client=sessions.clients.get(existing);connections.get(client.id)?.close(4001,'Session resumed');}
           else{client=sessions.addClient(randomBytes(12).toString('hex'),msg.name);client.token=randomBytes(32).toString('hex');tokens.set(client.token,client.id);}
-          client.connected=true;connections.set(client.id,ws);sessions.resume(client);send(ws,'hello',{id:client.id,token:client.token,name:client.name,roomId:client.roomId,devMode});const room=sessions.room(client);if(room){room.devSpeed??=1;lobby(room);if(room.match)sendMatch(ws,room,client);}return;
+          client.connected=true;connections.set(client.id,ws);sessions.resume(client);send(ws,'hello',{id:client.id,token:client.token,name:client.name,roomId:client.roomId,devMode});const room=sessions.room(client);if(room){room.devSpeed??=1;lobby(room);if(room.match)sendMatch(ws,room,client);}else queueState(client);return;
         }
         let room=sessions.room(client);
         if(msg.type==='ping'){send(ws,'pong',{sent:msg.sent,now:Date.now()});return;}
@@ -53,15 +56,23 @@ export async function createGameServer({port=Number(process.env.PORT)||3000,host
           const candidate=[...sessions.rooms.values()].filter(r=>r.settings.mode==='normal'&&!r.settings.private&&!r.settings.local&&!r.password&&r.state===STATES.LOBBY&&r.settings.region===(msg.region||'SA')&&r.members.size<r.settings.elfSlots+1).sort((a,b)=>b.members.size-a.members.size)[0];
           room=candidate?sessions.join(client,{code:candidate.id}):sessions.create(client,{name:'Expedição pública',settings:{mode:'normal',private:false,region:msg.region||'SA'},fillBots:true});lobby(room);return;
         }
+        if(msg.type==='partyCreate'){sessions.createParty(client);broadcastQueue();return;}
+        if(msg.type==='partyJoin'){sessions.joinParty(client,msg.code);broadcastQueue();return;}
+        if(msg.type==='partyLeave'){sessions.leaveParty(client);broadcastQueue();return;}
+        if(msg.type==='rankedCancel'){sessions.dequeueRanked(client);broadcastQueue();return;}
+        if(msg.type==='rankedQueue'){
+          const matched=sessions.queueRanked(client,msg.role,msg.fillBots===true);broadcastQueue();if(matched)launchMatch(matched);return;
+        }
         if(!room)throw new Error('Entre em uma sala primeiro.');
         switch(msg.type){
-          case 'leave':sessions.disconnect(client,true);send(ws,'left');lobby(room);break;
+          case 'leave':sessions.disconnect(client,true);send(ws,'left');queueState(client);lobby(room);break;
           case 'ready':sessions.editable(room);room.members.get(client.id).ready=msg.ready===true;lobby(room);break;
           case 'slot':sessions.changeSlot(room,client,msg);lobby(room);break;
           case 'observe':sessions.observe(room,client);lobby(room);break;
           case 'settings':sessions.configure(room,client,msg.settings||{});lobby(room);break;
-          case 'start':sessions.start(room,client);broadcast(room,'phase',{state:STATES.LOADING});for(const m of room.members.values())sendMatch(connections.get(m.id),room,m);room.state=room.match.state;lobby(room);break;
+          case 'start':sessions.start(room,client);launchMatch(room);break;
           case 'return':sessions.returnToLobby(room,client);broadcast(room,'phase',{state:STATES.RETURN});lobby(room);break;
+          case 'surrender':{const status=sessions.surrender(room,client);broadcast(room,'surrender',{status});lobby(room);break;}
           case 'input':case 'action':{
             if(!room.match)return;const slot=room.slots.find(s=>s.occupant?.clientId===client.id);if(!slot)return;
             if(msg.type==='input')room.match.input(slot.id,msg);else{const error=room.match.act(slot.id,msg.command||{});if(error)send(ws,'actionError',{message:error});}break;
@@ -87,7 +98,7 @@ export async function createGameServer({port=Number(process.env.PORT)||3000,host
         if(message==='Saia da sala atual primeiro.'&&client){const active=sessions.room(client);if(active){lobby(active);if(active.match)sendMatch(ws,active,client);}}
       }
     });
-    ws.on('close',()=>{if(client&&connections.get(client.id)===ws){connections.delete(client.id);client.connected=false;const room=sessions.room(client);sessions.disconnect(client);if(room)lobby(room);}});
+    ws.on('close',()=>{if(client&&connections.get(client.id)===ws){connections.delete(client.id);client.connected=false;const room=sessions.room(client);sessions.disconnect(client);if(room)lobby(room);else broadcastQueue();}});
     ws.on('error',()=>{});
   });
   let ticks=0;

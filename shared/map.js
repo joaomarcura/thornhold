@@ -103,8 +103,19 @@ export function pathfind(map,from,to,blocked=new Set()){
     for(const[dx,dz]of[[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,nz=z+dz,n=index(map,nx,nz);if(!traversable(map,x,z,nx,nz)||closed.has(n)||blocked.has(n))continue;const score=g.get(k)+1;if(score<(g.get(n)??Infinity)){parent.set(n,k);g.set(n,score);if(!open.includes(n))open.push(n);}}
   }return [];
 }
-export function lineOfSight(map,a,b){
-  const n=Math.ceil(Math.hypot(a.x-b.x,a.z-b.z)/(map.cell*.45)),ay=heightAt(map,a.x,a.z)+1.8,by=heightAt(map,b.x,b.z)+1.8;
+export function lineOfSight(map,a,b,fromHeight=1.8,toHeight=1.8){
+  const n=Math.ceil(Math.hypot(a.x-b.x,a.z-b.z)/(map.cell*.45)),ay=heightAt(map,a.x,a.z)+fromHeight,by=heightAt(map,b.x,b.z)+toHeight;
   for(let i=1;i<n;i++){const t=i/n,x=a.x+(b.x-a.x)*t,z=a.z+(b.z-a.z)*t,p=toCell(map,{x,z});if(!walkable(map,p.x,p.z)||heightAt(map,x,z)>ay+(by-ay)*t)return false;}return true;
 }
-
+// Defensive towers are elevated above their own refuge perimeter. The perimeter
+// blocks ground movement, but must not become an infinitely tall invisible wall
+// that only lets a tower shoot when it happens to align perfectly with the gate.
+export function towerLineOfSight(map,a,b,baseId,fromHeight=4.5,toHeight=2){
+  const base=map.bases.find(base=>base.id===baseId),n=Math.ceil(Math.hypot(a.x-b.x,a.z-b.z)/(map.cell*.45)),ay=heightAt(map,a.x,a.z)+fromHeight,by=heightAt(map,b.x,b.z)+toHeight;
+  for(let i=1;i<n;i++){
+    const t=i/n,x=a.x+(b.x-a.x)*t,z=a.z+(b.z-a.z)*t,p=toCell(map,{x,z}),ray=ay+(by-ay)*t;
+    const ownPerimeter=base&&Math.abs(p.x-base.cx)<=base.rx&&Math.abs(p.z-base.cz)<=base.rz;
+    if((!walkable(map,p.x,p.z)&&!ownPerimeter)||heightAt(map,x,z)>ray)return false;
+  }
+  return true;
+}

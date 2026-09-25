@@ -15,6 +15,8 @@ npm start
 
 Abra **http://localhost:3000**. No Windows, também é possível executar **Iniciar Thornhold.cmd**. As dependências já instaladas permitem jogar sem CDN ou conexão com serviços externos.
 
+Para testes manuais, use `npm run start:dev`. O botão **DEV · F10** oferece recursos e velocidades 1×, 2×, 4× e 8×. O comando `npm start` continua seguro para produção e não expõe essas ferramentas.
+
 A interface inicia em português. Use o botão **EN/PT** no cabeçalho ou no HUD para alternar para inglês durante a partida; a preferência fica salva neste navegador.
 
 1. Escolha **Jogar contra bots**, seu papel e a quantidade de Elfos.
@@ -39,18 +41,19 @@ O processo Node é o servidor da partida, não o navegador do host. O host tem p
 | Ação | Controle |
 |---|---|
 | Movimento / correr | WASD / Shift |
-| Câmera / mira / zoom | Clique no cenário para começar; mova o mouse / mira central / roda |
-| Liberar cursor / voltar à câmera | Clique na bolinha do mouse |
-| Selecionar árvore ou construção | Clique esquerdo |
-| Construir | 1–5, aponte o projeto, clique ou Enter |
+| Câmera / mira / zoom | Clique no cenário para prender a mira; mova o mouse / mira central / roda |
+| Selecionar árvore ou construção | Aponte com a mira central e clique |
+| Construir | 1–5, aponte com a mira central e clique ou Enter |
 | Girar projeto / alternar snap | R / G |
-| Coletar / ajudar obra | E; segure para repetir |
-| Reparar estrutura selecionada | R; segure para repetir |
+| Ajudar obra selecionada | E |
+| Coletar árvore próxima / reparar Barricada | R; segure para repetir |
 | Ataque Troll / pesado | Clique ou segurar clique / Q |
 | Esquiva do Troll / habilidade de papel | Espaço / F |
 | Loja / atributos do Troll | B |
-| Formar e evoluir Wisps no núcleo | N ou clique no recurso madeira |
-| Evoluir seleção / formar Wisp no núcleo selecionado | U / T |
+| Abrir Núcleo e gerenciamento de Wisps | N ou clique no recurso madeira |
+| Evoluir seleção / formar Wisp no núcleo selecionado | Q / T |
+| Evoluir todos os Wisps elegíveis uma vez | Shift + Q no painel do Núcleo |
+| Cura do Troll (20% da vida em 6s) | R |
 | Repetir a mesma construção | Shift + clique ou Shift + Enter |
 | Mapa ampliado / voltar ao personagem | M / C |
 | Observar região ou aliado sob ataque | Clique no mapa ou no alerta da equipe |
@@ -63,7 +66,7 @@ Pressione `V` para abrir a roda de comunicação. Ela separa perigo, ajuda, ataq
 
 A Barricada é reparada gratuitamente. O primeiro Elfo canalizando aplica 100% do reparo; cada ajudante simultâneo aplica 25%. O reparo das demais estruturas continua consumindo 3 de ouro e 1 de madeira.
 
-Elfos podem construir apoio em uma clareira aliada ativa. A estrutura pertence a quem pagou — somente esse jogador pode evoluir ou cancelar — e os limites de 1 Núcleo, 1 Barricada, 5 Torres, 5 Minas e 1 Oficina valem para a clareira inteira. Recursos permanecem pessoais e não podem ser transferidos diretamente.
+Elfos podem construir apoio em uma clareira aliada ativa. A estrutura pertence a quem pagou — somente esse jogador pode evoluir ou demolir — e os limites de 1 Núcleo, 1 Barricada, 5 Torres, 5 Minas e 1 Oficina valem para a clareira inteira. Recursos permanecem pessoais e não podem ser transferidos diretamente.
 
 O Núcleo libera uma vaga de Mina por nível, até cinco. A cada nível, o custo-base da nova Mina cresce 25% e a produção de todas as Minas vinculadas cresce 30%; destruir o Núcleo interrompe essa produção.
 
@@ -71,15 +74,15 @@ Quando um Elfo morre, seus recursos são perdidos e todas as estruturas e Wisps 
 
 O Elfo eliminado retorna como Espírito controlável com visão curta. Ele não causa dano nem impede a vitória do Troll, mas pode revelar uma área de 18 m por 10 segundos a cada 60 segundos e reparar Barricadas a 50% da velocidade-base. O Troll vê e pode matar o Espírito por 25 de ouro; essa segunda morte não conta como nova eliminação e encerra a participação ativa do jogador.
 
-Não há vitória por limite de tempo. No Tier 10, uma única Torre élfica viva ascende a Lendária e canaliza um raio cujo dano cresce enquanto mantém linha de visão; perder visão ou sofrer Rugido reinicia o acúmulo. Para o Troll, Fúria + Quebra-fortaleza somando 10 libera a Espada Lendária: qualquer golpe executa uma estrutura que termine abaixo de 15% de HP.
+Não há vitória por limite de tempo. No nível 10, Núcleo, Barricada e Torre tornam-se Lendários; a progressão continua até o nível Épico 20. O Núcleo dobra sua produção própria, a Barricada recebe 4× HP e a Torre passa a canalizar um raio com dano-base 5× maior, crescente enquanto mantém linha de visão. Para o Troll, Fúria + Quebra-fortaleza somando 10 libera a Espada Lendária: qualquer golpe executa uma estrutura que termine abaixo de 15% de HP. Atributos do Troll e Wisps também têm limite 20.
 
 Obras precisam de um construtor vivo por perto. A barricada encaixa somente no portão da sua clareira. Elfos atravessam portões aliados; o Troll precisa destruí-los. Após uma ruptura, a entrada fica 12 segundos sem reconstrução e não aceita novas fundações com o Troll a menos de 5 metros.
 
 Depois que sua Barricada é rompida, um Elfo próximo pode usar **F** para atordoar o Troll por três segundos. A recarga de 60 segundos é compartilhada pela equipe. Se o Núcleo for destruído, o Elfo sobrevivente tem 60 segundos para alcançar outra clareira e usar seu voucher único de reassentamento: o próximo Núcleo não consome ouro nem madeira.
 
-O cursor livre permite selecionar estruturas e usar os painéis. Loja, ajuda e mapa liberam o cursor automaticamente; a bolinha do mouse retorna à câmera. Ao observar outra região, seu personagem permanece parado: **C** retorna ao personagem, **M** fecha o mapa. A partida continua nesses painéis.
+A mira permanece travada durante a partida; não existe mais modo de cursor livre nem alternância pela bolinha. Clique no cenário para retomar a mira caso o navegador solte o Pointer Lock por segurança. Estruturas são selecionadas pela mira central e suas ações usam hotkeys. A loja do Troll é operada por WASD/setas e Enter. Ao observar outra região, seu personagem permanece parado: **C** retorna ao personagem e **M** fecha o mapa.
 
-Uma construção confirmada encerra o projeto; segure **Shift** para continuar colocando. **E** mostra e executa a interação próxima. Wisps orbitam as árvores com brilho, rastro e marcador clicável de produção; o botão **Localizar** permite inspecioná-los. **Esc** fecha o contexto atual sem desfazer investimentos. Para cancelar uma obra, formação ou evolução ainda em andamento, use seu botão **Cancelar**, que mostra a devolução de 75% da parte ainda não executada. Exige proximidade e cinco segundos sem dano no alvo. Dicas permanentes podem ser desligadas no menu.
+Uma construção confirmada encerra o projeto; segure **Shift** para continuar colocando. O alcance de colocação é 9,75 m; coleta, reparo e gerenciamento continuam em 6,5 m. **R** executa coleta ou reparo contextual. **T**, no Núcleo selecionado, forma um Wisp e o servidor o envia automaticamente à árvore livre mais próxima; não existe transferência manual. **Esc** fecha o contexto atual sem desfazer investimentos. Obras incompletas e formação de Wisp podem ser canceladas com devolução de 75% da parcela pendente; upgrades são compromissos.
 
 O menu **Acessibilidade e controles** permite remapear movimento, combate e interface, ajustar a UI entre 90% e 125% e reduzir animações, partículas e movimento de câmera. As preferências ficam salvas no navegador; modo daltônico não faz parte deste ciclo.
 
@@ -92,12 +95,12 @@ O Troll aparece como um losango laranja quando a equipe o avista. Ao sair da vis
 - Criação/entrada por código e senha, browser público, filtros, Quick Play, troca de papel, mover humanos, adicionar/remover bots, abrir/fechar slots, Ready, host migrado, resultado e revanche.
 - Um único `Match` para humanos e IA. Desconexões podem transferir o mesmo personagem para IA. Recarregar a aba retoma a sessão por token enquanto o servidor e a sala permanecem ativos.
 - Mapa determinístico com doze refúgios de três tamanhos e quantidades diferentes de árvores, cada uma com estoque atual de 1.000 madeiras, além de platôs e baixadas ligados por rampas. Trilhas com bifurcações atravessam uma floresta sólida; o minimapa revela o terreno explorado. Cada clareira tem um único portão validado pelo servidor.
-- Núcleo com renda crescente, barricada reparável, cinco torres por Elfo, quatro especializações de torre, mina e oficina. Obras, coleta, melhorias e destruição usam recursos reais e alteram o estado compartilhado.
-- Wisps formados no núcleo: um por árvore, produção contínua sem consumir o tronco, evolução sem nível máximo e transferência para árvores externas com maior rendimento e exposição. Árvores esgotadas pela coleta manual rebrotam após 35 segundos se não houver uma construção no local.
-- Loja do Troll com nove equipamentos, três espaços e sugestões de Cerco, Caçador e Sustentação. Itens comprados ficam na coleção; trocar exige cinco segundos fora de combate. Oito atributos e tiers de estruturas evoluem sem limite de nível, com custos crescentes e ganhos decrescentes de velocidade.
+- Núcleo com renda crescente, barricada reparável, cinco torres por Elfo, mina e oficina. A Torre padrão usa o antigo perfil de Balista; especializações permanecem isoladas e desligadas da progressão/UI. Obras, coleta, melhorias e destruição usam recursos reais e alteram o estado compartilhado.
+- Wisps formados no núcleo: um por árvore, escolha automática da árvore livre mais próxima, produção contínua sem consumir o tronco e evolução até o nível 20. Árvores esgotadas pela coleta manual rebrotam após 35 segundos se não houver uma construção no local.
+- Loja do Troll com nove equipamentos, três espaços e sugestões de Cerco, Caçador e Sustentação. A loja usa navegação por teclado; atributos evoluem até o nível 20. Estruturas tornam-se Lendárias no nível 10 e Épicas no nível 20.
 - Ataques leves/pesados com preparação e alcance verificados no impacto, combo de três acertos, esquiva que cancela a preparação e fortalece o próximo golpe, rugido e feedback de ruptura. Dano aplicado gera ouro, limitado pelo HP real e pelo orçamento de recompensa da estrutura.
 - Visão por distância e linha de visão. O servidor omite inimigos escondidos e sua economia dos snapshots. Bots do Troll descobrem terreno e alvos pela visão; não consultam o cadastro de bases para caçá-las.
-- Melhorias de estruturas e atributos do Troll ficam disponíveis sem bloqueio temporal. O Núcleo exige uma Barricada ativa: níveis 2–3 pedem Barricada 1, níveis 4–5 pedem Barricada 2, e assim por diante. Aos 3:30, a Era do Cerco ainda amplia recursos externos e o bônus de cerco; a fome começa após 8:00 se o Troll passar 45 segundos sem causar dano.
+- Melhorias de estruturas e atributos do Troll ficam disponíveis sem bloqueio temporal, até o nível 20. O Núcleo exige uma Barricada ativa: níveis 2–3 pedem Barricada 1, níveis 4–5 pedem Barricada 2, e assim por diante. Aos 3:30, a Era do Cerco ainda amplia recursos externos e o bônus de cerco; inatividade nunca causa dano ao Troll.
 - Transferência de recursos, assistência a obras e reparo aliado. Elfos eliminados acompanham a visão da equipe e conservam um sinal de ajuda limitado.
 - Modelos estilizados procedurais, animação de caminhada/ataque, projéteis, partículas, estágios de dano, áudio sintetizado, HUD, seleção 3D, ghost e minimapa de exploração.
 
@@ -118,7 +121,8 @@ npm run audit:progression -- 6 artifacts/progression-current-20hz.json
 - `npm test`: regras, física, economia, fog, mapa, simulações completas e cenários de rede A–G com conexões WebSocket independentes.
 - `npm run verify`: sintaxe, testes de regras/rede e os fluxos críticos de navegador para upgrades, recursos, stun, reassentamento, placar, resultado, alternância PT-BR/EN e preferências de acessibilidade.
 - `npm run balance`: HP, DPS, tempo para romper barricada, tempo para matar o Troll e retorno do investimento econômico por tier. Gera `artifacts/balance.json`.
-- `npm run simulate -- 240`: partidas determinísticas em 1v2/1v3/1v5/1v8 e três dificuldades. Gera `artifacts/simulations.json`, incluindo win rate, duração, dano, renda, primeira ruptura, melhorias e sobreviventes. O teste não concede bônus de vitória nem altera regras por resultado.
+- `npm run simulate -- 100`: baseline determinístico exclusivamente no lobby padrão 1 Troll × 5 Elfos, dificuldade Normal. Gera `artifacts/simulations.json`, incluindo win rate, duração, dano, renda, primeira ruptura, melhorias e sobreviventes. Cenários menores existem somente em testes funcionais isolados e nunca entram na medição de balanceamento.
+- Patrulha do Troll, preferência de refúgios, perfil econômico/defensivo e layout das construções élficas variam com a seed. A mesma seed continua reproduzindo exatamente o mesmo plano para diagnóstico.
 - O servidor grava resultados reais em `telemetry/matches.jsonl`.
 - `npm run audit:combat`: 126 cenários controlados com o combate real, reparo, habilidades e exposição. Gera `artifacts/combat-audit.json`; a arena sintética não representa uma clareira legal.
 - `npm run audit:progression -- 6 CAMINHO`: 72 partidas pareadas a 20 Hz, dificuldade separada por papel, compras, economia, comandos rejeitados e duração. Partidas sem vencedor em 25 min são registradas e fazem o comando retornar código 1.
@@ -126,7 +130,7 @@ npm run audit:progression -- 6 artifacts/progression-current-20hz.json
 - [Auditoria anterior](docs/BALANCEAMENTO-E-PROGRESSAO.md): pesquisa das variantes e diagnóstico antes da progressão infinita; mantida como histórico.
 - `scripts/browser-check.js`, `scripts/browser-gameplay.js`, `scripts/browser-lifecycle.js`, `scripts/browser-controls.js`, `scripts/browser-progression.js` e `scripts/browser-hud.js` verificam a interface, construção, resultado, revanche, câmera, loja, Wisps, combate e cancelamento em uma sessão Chrome isolada via CDP. Consulte `docs/VALIDACAO.md`.
 
-Balanceamento principal em `shared/config.js`. Os relatórios são uma linha de base de bots, **não uma comprovação de equilíbrio competitivo humano**. A variação por tamanho de lobby permanece um ponto de ajuste.
+Balanceamento principal em `shared/config.js`. Os relatórios são uma linha de base de bots, **não uma comprovação de equilíbrio competitivo humano**. O único lobby de referência é 1×5; variações históricas permanecem documentadas, mas não orientam novos ajustes.
 
 A IA do Troll avalia o risco das torres observadas, mantém compromisso com alvos, persegue Elfos expostos, recua para pontos seguros, regenera e retorna ou troca de frente. Compras respondem ao combate. As referências do modo e as adaptações estão em [docs/MODO-E-TATICAS.md](docs/MODO-E-TATICAS.md).
 

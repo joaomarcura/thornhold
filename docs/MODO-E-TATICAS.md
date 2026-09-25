@@ -17,7 +17,7 @@ As fontes orientam o ciclo de exploração, pressão econômica, compras e cerco
 2. **Escolher alvo:** considerar distância, vida observada, tempo estimado de destruição, pressão das torres e Elfos expostos. Manter o alvo por uma janela curta para evitar oscilações.
 3. **Combater:** usar os mesmos ataques, compras, cooldowns e colisões dos humanos. Reservar rugido para torres próximas e esquiva para fuga ou perseguição.
 4. **Recuar:** comparar vida, dano recente e pressão das torres conhecidas. Buscar um ponto alcançável com menor risco, em vez de sempre atravessar o mapa até o spawn.
-5. **Recuperar e alternar:** esperar regeneração fora do fogo, dar um intervalo ao setor perigoso e procurar outra oportunidade. A aproximação da fome limita a espera.
+5. **Recuperar e alternar:** esperar regeneração fora do fogo, dar um intervalo ao setor perigoso e procurar outra oportunidade. Inatividade prolongada aumenta apenas a prioridade comportamental de procurar combate; nunca retira vida.
 6. **Comprar:** priorizar vida quando ferido, regeneração para novas investidas, armadura conforme as torres e capacidade de cerco para evoluir os ataques.
 
 Não houve aumento de HP, dano, renda ou recursos dos bots. Dificuldade continua alterando decisões e tempo de reação. Essas heurísticas aproximam decisões comuns de jogadores; não foram treinadas com replays e não equivalem a um jogador competitivo experiente.
@@ -26,7 +26,7 @@ Não houve aumento de HP, dano, renda ou recursos dos bots. Dificuldade continua
 
 Os mapas recebem apenas o snapshot autorizado pelo servidor. Alertas apontam o aliado/estrutura atingido, sem revelar coordenadas do atacante escondido. A última visão do Troll é uma posição congelada, distinguida por círculo tracejado, que desaparece após 12 segundos. Pings de perigo/ajuda/atenção são anotações dos jogadores; não concedem visão e não confirmam a presença de inimigos.
 
-Os efeitos usam tempos absolutos do servidor. Reaplicar gelo renova a contagem; receber um ataque adia a regeneração. A exposição mostra o prazo estimado sem novos acertos. Fome e regeneração são condições contínuas e exibem a condição de encerramento ou a taxa, sem inventar uma duração fixa. Fome impede regeneração pela própria regra, mas não conta como ataque inimigo nem renova exposição ou alertas.
+Os efeitos usam tempos absolutos do servidor. Reaplicar gelo renova a contagem; receber um ataque adia a regeneração. A exposição mostra o prazo estimado sem novos acertos. A regeneração exibe sua taxa sem inventar uma duração fixa. O Troll não sofre dano, bloqueio de regeneração ou alerta por permanecer inativo.
 
 ## Pesquisa e auditoria de progressão — 22/09/2026
 

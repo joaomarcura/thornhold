@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Match } from '../shared/simulation.js';
-import { BALANCE as B, STATES, wispCost, wispIncome, structureHP, trollCost, upgradeCost, mineEconomy, resourceProducer } from '../shared/config.js';
+import { BALANCE as B, STATES, wispCost, wispIncome, structureHP, structureRewardHP, tierScale, trollCost, upgradeCost, mineEconomy, resourceProducer } from '../shared/config.js';
 import { combatStats, ITEMS } from '../shared/equipment.js';
 import { jobRefund } from '../shared/jobs.js';
+import { availableTrees } from '../shared/wisps.js';
 
 function match(){return new Match({seed:'PROGRESSION'},[
   {id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},
@@ -24,16 +25,78 @@ function arena(){
 }
 function ready(m,t){advance(m,Math.max(0,(t.cooldowns.attack||0)-m.time)+.05);}
 
-test('Cancelar investimento devolve apenas trabalho pendente e não permite duplicar recursos',()=>{
-  const m=match(),{e,core}=baseFixture(m);m.act('e',{type:'upgrade',target:core.id});advance(m,1);
+test('Melhorias são compromissos; apenas obra e formação podem ser canceladas',()=>{
+  const m=match(),{e,core}=baseFixture(m),upgradePrice=upgradeCost(core);m.act('e',{type:'upgrade',target:core.id});advance(m,1);
   const refund=jobRefund(core,m.time),gold=e.gold,wood=e.wood,hp=core.hp;
-  assert.equal(m.act('e',{type:'cancelJob',target:core.id}),undefined);
-  assert.equal(e.gold,gold+refund.gold);assert.equal(e.wood,wood+refund.wood);assert.equal(core.upgrading,0);assert.equal(core.hp,hp);
-  assert.match(m.act('e',{type:'cancelJob',target:core.id}),/andamento/);assert.equal(e.gold,gold+refund.gold);
-  advance(m,5);assert.equal(core.tier,1);
+  assert.equal(refund,null);
+  assert.match(m.act('e',{type:'cancelJob',target:core.id}),/não podem/);
+  assert.equal(e.gold,gold);assert.equal(e.wood,wood);assert.ok(core.upgrading>0);assert.equal(core.hp,hp);
+  advance(m,5);assert.equal(core.tier,2);
   m.act('e',{type:'trainWisp',target:core.id});const w=m.wisps[0];advance(m,1);const before=e.gold,cost=jobRefund(w,m.time);
   m.act('e',{type:'cancelJob',target:w.id});assert.equal(w.alive,false);assert.equal(e.gold,before+cost.gold);advance(m,7);assert.equal(m.snapshot('e').wisps.length,0);
-  m.act('e',{type:'trainWisp',target:core.id});advance(m,7);const worker=m.wisps[1];m.act('e',{type:'upgradeWisp',target:worker.id});advance(m,1);m.act('e',{type:'cancelJob',target:worker.id});advance(m,5);assert.equal(worker.level,1);assert.ok(m.snapshot('e').wisps[0].income>0);
+  m.act('e',{type:'trainWisp',target:core.id});advance(m,7);const worker=m.wisps[1];m.act('e',{type:'upgradeWisp',target:worker.id});advance(m,1);assert.match(m.act('e',{type:'cancelJob',target:worker.id}),/não podem/);advance(m,5);assert.equal(worker.level,2);assert.ok(m.snapshot('e').wisps[0].income>0);
+});
+
+test('Upgrade All evolui cada Wisp elegível exatamente uma vez',()=>{
+  const m=match(),{e,core}=baseFixture(m);Object.assign(e,{gold:100000,wood:100000,x:core.x+2,z:core.z});
+  assert.equal(m.act(e.id,{type:'trainWisp',target:core.id}),undefined);advance(m,7);
+  assert.equal(m.act(e.id,{type:'trainWisp',target:core.id}),undefined);advance(m,7);
+  const before=m.wisps.map(w=>w.level);assert.equal(m.act(e.id,{type:'upgradeAllWisps',target:core.id}),undefined);
+  assert.ok(m.wisps.every(w=>w.job?.type==='wisp-upgrade'));assert.match(m.act(e.id,{type:'upgradeAllWisps',target:core.id}),/Nenhum Wisp/);
+  advance(m,5);assert.deepEqual(m.wisps.map(w=>w.level),before.map(level=>level+1));
+});
+
+test('Cura do Troll usa cargas, persiste sob dano e recarrega lentamente',()=>{
+  const m=match(),t=m.unit('t');m.state=STATES.ACTIVE;m.time=80;t.hp=t.maxHp*.4;t.lastHit=m.time;
+  assert.equal(m.act(t.id,{type:'heal'}),undefined);assert.equal(t.healCharges,1);advance(m,3);m.damage(t,20,m.unit('e'),'tower','test-tower');advance(m,3.1);
+  assert.ok(Math.abs(m.telemetry.healing.consumable-t.maxHp*.2)<2);assert.equal(m.telemetry.healing.uses,1);assert.equal(t.healingUntil,0);
+  m.time=t.healRechargeAt; m.step(.05);assert.equal(t.healCharges,2);
+});
+
+test('Santuário do Troll acelera cura somente fora de combate e dentro da base',()=>{
+  const m=match(),t=m.unit('t');m.state=STATES.ACTIVE;m.time=80;t.hp=t.maxHp*.4;t.lastHit=70;Object.assign(t,m.map.trollSpawn);
+  const before=t.hp;advance(m,1);assert.ok(t.hp-before>t.maxHp*B.troll.sanctuaryRegenRate*.95);assert.ok(m.telemetry.healing.sanctuary>0);assert.ok(m.snapshot(t.id).units.find(u=>u.id===t.id).effects.some(e=>e.id==='sanctuary'));
+  const sanctuary=m.telemetry.healing.sanctuary;Object.assign(t,{x:m.map.trollSpawn.x+B.troll.sanctuaryRadius+3,z:m.map.trollSpawn.z});advance(m,1);assert.equal(m.telemetry.healing.sanctuary,sanctuary);
+  Object.assign(t,m.map.trollSpawn);t.lastHit=m.time;advance(m,1);assert.equal(m.telemetry.healing.sanctuary,sanctuary);
+});
+
+test('Nível 10 é Lendário, nível 20 é Épico e somente 20 bloqueia novas melhorias',()=>{
+  const m=match(),{e,core,wall}=baseFixture(m);Object.assign(e,{gold:1000000,wood:1000000});wall.tier=5;
+  core.tier=9;core.maxHp=structureHP('core',9);core.hp=core.maxHp*.75;Object.assign(e,{x:core.x+2,z:core.z});const income9=resourceProducer(core).amount;
+  assert.equal(m.act(e.id,{type:'upgrade',target:core.id}),undefined);advance(m,11);assert.equal(core.tier,10);assert.equal(core.legendary,true);assert.ok(Math.abs(core.hp/core.maxHp-.75)<.001);assert.ok(Math.abs(resourceProducer(core).amount/income9-B.legendary.coreIncome*tierScale(B.structures.core.growth,10)/tierScale(B.structures.core.growth,9))<1e-9);
+  wall.tier=20;wall.maxHp=structureHP('wall',20);wall.hp=wall.maxHp;for(let tier=11;tier<=20;tier++){assert.equal(m.act(e.id,{type:'upgrade',target:core.id}),undefined);advance(m,11);assert.equal(core.tier,tier);}assert.equal(core.epic,true);assert.match(m.act(e.id,{type:'upgrade',target:core.id}),/máximo/);
+  wall.tier=9;wall.maxHp=structureHP('wall',9);wall.hp=wall.maxHp*.6;wall.bounty=500;wall.bountyFactor=1.3;Object.assign(e,{x:wall.x,z:wall.z});const bounty=wall.bounty,expectedDelta=(structureRewardHP('wall',10)-structureRewardHP('wall',9))*B.troll.goldPerDamage*wall.bountyFactor;
+  assert.equal(m.act(e.id,{type:'upgrade',target:wall.id}),undefined);advance(m,11);assert.equal(wall.legendary,true);assert.equal(wall.maxHp,structureRewardHP('wall',10)*B.legendary.wallHealth);assert.ok(Math.abs(wall.hp/wall.maxHp-.6)<.001);assert.ok(Math.abs(wall.bounty-bounty-expectedDelta)<.01);
+});
+
+test('Torre | Portão | Torre cabe com respiro e não fecha a passagem aberta',()=>{
+  const m=match(),{e,wall,b}=baseFixture(m),inward={x:b.gate.axis==='x'?-b.gate.sign:0,z:b.gate.axis==='z'?-b.gate.sign:0},lateral={x:b.gate.axis==='x'?0:1,z:b.gate.axis==='x'?1:0};
+  const positions=[-1,1].map(sign=>({x:b.gate.x+inward.x*2.2+lateral.x*sign*1.2,z:b.gate.z+inward.z*2.2+lateral.z*sign*1.2}));
+  for(const p of positions){Object.assign(e,{x:p.x+inward.x*2,z:p.z+inward.z*2});assert.equal(m.act(e.id,{type:'build',kind:'tower',...p}),undefined);const tower=m.structures.at(-1);Object.assign(tower,{progress:1,healthProgress:1,hp:tower.maxHp});}
+  wall.hp=0;const troll=m.unit('t');Object.assign(troll,b.gate);assert.equal(m.positionValid(troll,b.gate.x,b.gate.z),true);
+});
+
+test('Demolição de estrutura pronta devolve 75% do custo original e respeita combate',()=>{
+  const m=match(),{e,wall}=baseFixture(m),cost=wall.constructionCost;Object.assign(e,{x:wall.x,z:wall.z});
+  const gold=e.gold,wood=e.wood;wall.lastHit=m.time;
+  assert.match(m.act('e',{type:'demolish',target:wall.id}),/5 s/);wall.lastHit=-100;
+  assert.equal(m.act('e',{type:'demolish',target:wall.id}),undefined);assert.equal(wall.hp,0);
+  assert.equal(e.gold,gold+Math.floor(cost.gold*.75));assert.equal(e.wood,wood+Math.floor(cost.wood*.75));
+  assert.match(m.act('e',{type:'demolish',target:wall.id}),/concluída/);
+});
+
+test('Sprint adicional de 15% pertence apenas aos Elfos',()=>{
+  const m=match(),elf=m.unit('e'),troll=m.unit('t');m.state=STATES.ACTIVE;m.map.grid.fill(0);
+  const elfStart=elf.x;m.input(elf.id,{x:1,z:0,sprint:true});m.step(.1);const elfDistance=elf.x-elfStart;
+  const trollStart=troll.x;m.input(troll.id,{x:1,z:0,sprint:true});m.step(.1);const trollDistance=troll.x-trollStart;
+  assert.ok(Math.abs(elfDistance-B.elf.speed*B.movement.elfSprint*.1)<.001);
+  assert.ok(Math.abs(trollDistance-B.troll.speed*B.movement.sprint*.1)<.001);
+});
+
+test('Eventos de renda de aliados não são enviados ao jogador',()=>{
+  const m=match();m.emit('resource',{unit:'e',entity:'income-e',x:m.unit('e').x,z:m.unit('e').z,resource:'gold',amount:2});m.emit('resource',{unit:'ally',entity:'income-a',x:m.unit('e').x,z:m.unit('e').z,resource:'gold',amount:3});
+  const events=m.snapshot('e').events.filter(e=>e.type==='resource');assert.deepEqual(events.map(e=>e.unit),['e']);
+  assert.equal(m.snapshot().events.filter(e=>e.type==='resource').length,2);
 });
 
 test('Cancelamento respeita proprietário, distância, combate e obra concluída',()=>{
@@ -88,8 +151,7 @@ test('Núcleo forma Wisp com custo, fila, árvore exclusiva e renda contínua',(
 test('Wisp respeita dono, núcleo, visão e perda de produção quando destruído',()=>{
   const m=match(),{e,core}=baseFixture(m);
   assert.match(m.act('ally',{type:'trainWisp',target:core.id}),/núcleo/);
-  assert.match(m.act('e',{type:'trainWisp',target:core.id,tree:m.trees.at(-1).id}),/árvore/);
-  m.act('e',{type:'trainWisp',target:core.id});advance(m,7);const w=m.wisps[0];
+  const automatic=availableTrees(m,e,core)[0].id;assert.equal(m.act('e',{type:'trainWisp',target:core.id,tree:m.trees.at(-1).id}),undefined);advance(m,7);const w=m.wisps[0];assert.equal(w.treeId,automatic);
   assert.match(m.act('ally',{type:'upgradeWisp',target:w.id}),/seu/);
   const old=wispIncome(w);m.act('e',{type:'upgradeWisp',target:w.id});advance(m,4.1);assert.equal(w.level,2);assert.ok(wispIncome(w)>old);
   core.hp=0;const paused=e.wood;advance(m,2);assert.equal(e.wood,paused);
@@ -124,13 +186,13 @@ test('Golpe tem preparação, não acerta alvo que saiu do alcance nem repete po
 });
 
 test('Buffer aceita um comando perto do fim do cooldown e esquiva cancela preparação',()=>{
-  const {m,t,e}=arena();m.act('t',{type:'attack'});advance(m,.95);m.act('t',{type:'attack'});assert.ok(t.queuedStrike);advance(m,.3);assert.equal(e.hp,10000-2*B.troll.damage);
+  const {m,t,e}=arena();m.act('t',{type:'attack'});advance(m,.95);m.act('t',{type:'attack'});assert.ok(t.queuedStrike);advance(m,.3);assert.ok(Math.abs(e.hp-(10000-2*B.troll.damage))<1e-8);
   ready(m,t);m.act('t',{type:'attack',heavy:true});const hp=e.hp;m.act('t',{type:'dash'});assert.equal(t.pendingStrike,null);advance(m,.4);assert.equal(e.hp,hp);assert.ok(t.z>m.map.trollSpawn.z);assert.ok(t.openingUntil>m.time);
 });
 
 test('Terceiro acerto no mesmo alvo finaliza combo; alvo atrás não recebe dano',()=>{
   const {m,t,e}=arena();for(let i=0;i<3;i++){m.act('t',{type:'attack'});advance(m,.15);ready(m,t);}
-  assert.equal(e.hp,10000-B.troll.damage*(3+B.combat.comboBonus));assert.ok(m.events.some(e=>e.type==='impact'&&e.finisher));
+  assert.ok(Math.abs(e.hp-(10000-B.troll.damage*(3+B.combat.comboBonus)))<1e-8);assert.ok(m.events.some(e=>e.type==='impact'&&e.finisher));
   e.z=t.z-2;const hp=e.hp;m.act('t',{type:'attack'});advance(m,.15);assert.equal(e.hp,hp);
 });
 
@@ -154,7 +216,7 @@ test('Progressão lendária resolve estruturas e aumenta o raio enquanto mantém
   const beam=match(),troll=beam.unit('t'),elf=beam.unit('e');beam.state=STATES.ACTIVE;beam.time=80;troll.hp=troll.maxHp=10000;Object.assign(elf,{x:troll.x+8,z:troll.z+8});
   const tower={id:'legend',kind:'tower',owner:elf.id,baseId:'b',x:troll.x,z:troll.z+5,tier:10,hp:1000,maxHp:1000,progress:1,branch:'pierce',lastShot:-100,lastHit:-100,bounty:100};beam.structures.push(tower);
   advance(beam,.1);assert.equal(tower.legendary,true);const hp0=troll.hp;advance(beam,1);const first=hp0-troll.hp,hp1=troll.hp;advance(beam,1);const second=hp1-troll.hp;assert.ok(second>first);assert.ok(beam.events.some(e=>e.type==='beam'));
-  tower.disabledUntil=beam.time+1;advance(beam,.5);assert.equal(tower.beamStartedAt,0);const paused=troll.hp;advance(beam,.4);assert.equal(troll.hp,paused);
+  tower.disabledUntil=beam.time+1;advance(beam,.5);assert.equal(tower.beamStartedAt,0);const paused=troll.hp;advance(beam,.4);assert.ok(troll.hp>paused,'sustentação de combate continua enquanto a torre está silenciada');
 });
 test('Partida não termina por relógio e resultado registra diagnóstico de impasse',()=>{
   const m=match(),{core}=baseFixture(m);m.state=STATES.ACTIVE;m.time=B.matchSeconds+30;m.elfBasesClaimed.add(core.baseId);m.checkEndState();assert.equal(m.state,STATES.ACTIVE);

@@ -13,7 +13,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function until(fn,message,timeout=9000){const end=Date.now()+timeout;while(Date.now()<end){if(await fn())return;await sleep(70);}throw Error(message);}
 try{
   await page.goto(`http://127.0.0.1:${app.port}`);await page.getByText('Servidor conectado',{exact:false}).waitFor();
-  await page.getByRole('button',{name:'Jogar contra bots',exact:false}).click();await page.locator('[name=elves]').selectOption('2');await page.getByRole('button',{name:'Criar partida local →'}).click();
+  await page.getByRole('button',{name:'Jogar contra bots',exact:false}).click();await page.locator('[name=elves]').selectOption('5');await page.getByRole('button',{name:'Criar partida local →'}).click();
   await page.getByRole('button',{name:'Marcar como pronto'}).click();await page.getByRole('button',{name:'Iniciar expedição →'}).click();await page.locator('#role-name').waitFor();
   // Only this isolated server has fixture resources and positions. Every interaction below uses real UI commands.
   const m=[...app.sessions.rooms.values()][0].match,u=m.unit('e0'),base=m.map.bases[0];m.controllers.clear();m.time=300;m.state=STATES.ACTIVE;
@@ -24,12 +24,10 @@ try{
   await until(()=>page.locator('[data-do=train-wisp]').isEnabled(),'Formação disponível');await page.keyboard.press('KeyT');await until(()=>m.wisps.length===2,'Novo Wisp');const w=m.wisps[1];
   await page.keyboard.press('Escape');await page.locator('#selection-panel').waitFor({state:'hidden'});assert.equal(w.alive,true);assert.equal(await page.getByRole('dialog').count(),0);report.escapeOnlyClosesContext=true;
   await until(()=>w.readyAt<=m.time,'Wisp pronto');await page.keyboard.press('KeyE');await page.locator('[data-do=train-wisp]').waitFor();report.contextualInteraction=true;
-  await page.locator(`[data-do=select-wisp][data-id=${w.id}]`).click();await page.keyboard.press('KeyU');await until(()=>w.upgradingUntil>m.time,'U evolui Wisp');
-  await page.locator('[data-do=cancel-job]').click();await until(()=>!w.upgradingUntil,'Melhoria cancelada');assert.equal(w.level,1);report.upgradeCancelled=true;
-  await page.locator('[data-do=relocate-wisp]').click();await page.locator('#targeting-hint').waitFor();const old=w.treeId;await page.locator('.tree-choice').first().waitFor();
-  await page.keyboard.press('Escape');await page.locator('#targeting-hint').waitFor({state:'hidden'});assert.equal(w.treeId,old);
-  await page.locator('[data-do=relocate-wisp]').click();await page.locator('.tree-choice').first().click();await until(()=>w.treeId!==old,'Destino clicado no cenário');report.worldTreeTargeting=true;
-  await until(()=>w.readyAt<=m.time,'Novo vínculo');await page.locator('[data-do=locate]').click();await page.locator('#return-camera').waitFor();await sleep(1100);
+  await page.locator(`[data-do=select-wisp][data-id=${w.id}]`).click();await page.keyboard.press('KeyQ');await until(()=>w.upgradingUntil>m.time,'Q evolui Wisp');
+  assert.equal(await page.locator('[data-do=cancel-job]').count(),0);await until(()=>w.level===2,'Melhoria comprometida não concluiu');report.upgradeCommitted=true;
+  assert.equal(await page.locator('[data-do=relocate-wisp],.tree-choice').count(),0);report.wispTreeAssignmentRemoved=true;
+  await page.locator('[data-do=locate]').click();await page.locator('#return-camera').waitFor();await sleep(1100);
   const label=page.locator(`.wisp-label[data-id=${w.id}]`);await label.waitFor();assert.match(await label.textContent(),/\+/);await page.screenshot({path:'artifacts/hud-wisp-visible.png'});report.wispWorldMarker=true;await page.locator('[data-do=deselect]').click();await page.locator('#selection-panel').waitFor({state:'hidden'});await label.click();await page.locator('[data-do=locate]').waitFor();report.wispMarkerClickable=true;
   await page.keyboard.press('KeyC');await page.keyboard.press('KeyN');await page.locator('[data-do=train-wisp]').focus();await sleep(1200);
   assert.equal(await page.evaluate(()=>document.activeElement.dataset.do),'train-wisp');report.focusSurvivesLiveUpdates=true;

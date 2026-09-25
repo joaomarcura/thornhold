@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateMap, validateBase, index, pathfind } from '../shared/map.js';
+import { generateMap, validateBase, index, lineOfSight, towerLineOfSight, pathfind, world } from '../shared/map.js';
 import { Match } from '../shared/simulation.js';
 import { BALANCE as B, STATES, distance } from '../shared/config.js';
 import { SessionService } from '../server/sessions.js';
@@ -44,6 +44,33 @@ test('Ferramentas dev concedem recursos com limites e não aceitam valores falso
 test('Targeting de torres é determinístico e explica borda, cooldown e estado',()=>{
   const m=match(1),t=m.unit('t'),s={id:'tower-debug',kind:'tower',owner:'e0',x:t.x+B.structures.tower.range,z:t.z,tier:1,branch:'power',hp:260,maxHp:260,progress:1,lastShot:-100,disabledUntil:0};m.structures.push(s);m.state=STATES.ACTIVE;
   assert.equal(m.towerTargeting(s).valid,true);s.lastShot=m.time;assert.equal(m.towerTargeting(s).reason,'cooldown');s.disabledUntil=m.time+2;assert.equal(m.towerTargeting(s).reason,'disabled');s.disabledUntil=0;t.alive=false;assert.equal(m.towerTargeting(s).reason,'no-troll');
+});
+test('Torre usa altura real, mantém alvo na borda e registra por que não disparou',()=>{
+  const m=match(1),t=m.unit('t'),terrain=generateMap('THORNHOLD'),a=world(terrain,84,19),b=world(terrain,86,26),def=B.structures.tower;m.map=terrain;
+  assert.equal(lineOfSight(terrain,a,b),false);assert.equal(lineOfSight(terrain,a,b,def.muzzleHeight,def.targetHeight),true);
+  Object.assign(t,b);const s={id:'tower-height',kind:'tower',owner:'e0',...a,tier:1,branch:'power',hp:260,maxHp:260,progress:1,lastShot:-100,disabledUntil:0};m.structures.push(s);m.state=STATES.ACTIVE;
+  assert.equal(m.towerTargeting(s).valid,true);m.step(.05);assert.equal(s.targetLock,t.id);
+  m.map={size:20,cell:2.2,grid:Array(400).fill(0),heights:Array(400).fill(0),bases:[],trees:[]};Object.assign(s,{x:10,z:10,lastShot:-100});Object.assign(t,{x:s.x+def.range+.5,z:s.z});
+  const retained=m.towerTargeting(s);assert.equal(retained.valid,true);assert.equal(retained.retained,true);
+  t.x=s.x+def.range+def.retainRange+.1;assert.equal(m.towerTargeting(s).reason,'out-of-range');m.step(.05);
+  const diagnostic=m.telemetry.result(m).towerDiagnostics.find(row=>row.id===s.id);assert.ok(diagnostic);assert.ok(diagnostic.shots>=1);assert.ok(diagnostic.reasons.ready>=1);
+});
+test('Duas torres atacam através da própria borda elevada da clareira',()=>{
+  const m=match(1),t=m.unit('t'),base=m.map.bases[0],def=B.structures.tower;
+  const outside=world(m.map,base.gate.cx+(base.gate.axis==='x'?base.gate.sign*2:0),base.gate.cz+(base.gate.axis==='z'?base.gate.sign*2:0));
+  const candidates=[];for(let z=base.cz-base.rz+1;z<base.cz+base.rz;z++)for(let x=base.cx-base.rx+1;x<base.cx+base.rx;x++){const p=world(m.map,x,z);if(distance(p,outside)<=def.range&&lineOfSight(m.map,p,outside,def.muzzleHeight,def.targetHeight)!==towerLineOfSight(m.map,p,outside,base.id,def.muzzleHeight,def.targetHeight))candidates.push(p);}
+  assert.ok(candidates.length,'O mapa deve conter uma posição interna cuja borda bloqueava a torre');
+  const blocked=candidates[0],aligned=world(m.map,base.gate.cx-(base.gate.axis==='x'?base.gate.sign:0),base.gate.cz-(base.gate.axis==='z'?base.gate.sign:0));Object.assign(t,outside);m.state=STATES.ACTIVE;
+  const make=(id,p)=>({id,kind:'tower',owner:'e0',baseId:base.id,...p,tier:1,branch:'power',hp:360,maxHp:360,progress:1,lastShot:-100,disabledUntil:0});m.structures.push(make('tower-offset',blocked),make('tower-gate',aligned));
+  const hp=t.hp;m.step(.05);assert.ok(t.hp<hp-1.5*B.structures.tower.damage,'As duas torres deveriam causar dano no mesmo tick');
+  const diagnostics=m.telemetry.result(m).towerDiagnostics;assert.equal(diagnostics.find(row=>row.id==='tower-offset').shots,1);assert.equal(diagnostics.find(row=>row.id==='tower-gate').shots,1);
+});
+test('Bots Elfos adotam perfis distintos e todos constroem economia mínima',()=>{
+  const elves=Array.from({length:5},(_,i)=>({id:'e'+i,role:'elf',occupant:{type:'bot',name:'Elfo '+i}}));
+  const m=new Match({seed:'ECON-TEST',difficulty:'normal',preparation:50},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},...elves]);
+  for(let i=0;i<6000;i++)m.step(.05);
+  const offsets={economy:-1,balanced:0,defense:1},rows=m.units.filter(u=>u.role==='elf').map(u=>{const own=m.structures.filter(s=>s.owner===u.id&&s.hp>0);return {strategy:m.controllers.get(u.id).elfProfile,core:own.find(s=>s.kind==='core'),wall:own.find(s=>s.kind==='wall'),mines:own.filter(s=>s.kind==='mine'),towers:own.filter(s=>s.kind==='tower')};});
+  assert.ok(new Set(rows.map(row=>row.strategy)).size>=3);assert.ok(rows.every(row=>row.core?.tier>=2&&row.wall?.tier>=2&&row.mines.length>=1));assert.ok(rows.every(row=>row.towers.every(t=>t.tier<=Math.max(1,row.core.tier+offsets[row.strategy]))));
 });
 test('IA do Elfo prioriza a primeira torre antes da barricada',()=>{
   const m=new Match({seed:'EARLY-DEFENSE',difficulty:'easy',preparation:20},[{id:'t',role:'troll',occupant:{type:'bot',name:'Troll',difficulty:'easy'}},{id:'e0',role:'elf',occupant:{type:'bot',name:'Elfo',difficulty:'easy'}}]);
@@ -103,10 +130,10 @@ test('Transferência direta de recursos foi removida',()=>{
   const m=match(),a=m.unit('e0'),b=m.unit('e1'),before=[a.gold,a.wood,b.gold,b.wood];
   assert.match(m.act(a.id,{type:'transfer',target:b.id,gold:25,wood:10}),/desconhecido/);assert.deepEqual([a.gold,a.wood,b.gold,b.wood],before);
 });
-test('Vitórias simétricas, resultado imutável e punição por inatividade',()=>{
+test('Vitórias simétricas, resultado imutável e nenhuma punição de vida por inatividade',()=>{
   const m=match(1);m.unit('t').hp=0;m.unit('t').alive=false;m.step(.05);assert.equal(m.state,STATES.END);assert.equal(m.winner,'elves');const time=m.time;m.step(1);assert.equal(m.time,time);
   const n=match(1);n.unit('e0').alive=false;n.step(.05);assert.equal(n.winner,'troll');
-  const hunger=match();hunger.state=STATES.ACTIVE;hunger.time=B.hungerAge+1;const hp=hunger.unit('t').hp;hunger.step(1);assert.ok(hunger.unit('t').hp<hp);
+  const idle=match();idle.state=STATES.ACTIVE;idle.time=B.idlePressureAge+1;const hp=idle.unit('t').hp;idle.step(1);assert.equal(idle.unit('t').hp,hp);
 });
 test('IA usa os mesmos atributos em fácil, normal e difícil',()=>{
   for(const difficulty of Object.keys(B.difficulty)){const m=new Match({difficulty},slots(2,'bot'));assert.equal(m.unit('t').maxHp,B.troll.hp);assert.equal(m.unit('e0').gold,B.elf.gold);assert.equal(m.unit('e0').maxHp,B.elf.hp);}
@@ -134,7 +161,8 @@ test('Modos Normal, Personalizado e Ranqueado são presets autoritativos',()=>{
   service.configure(room,host,{mapSize:'large',elfSlots:2});assert.equal(room.settings.mapSize,'compact');assert.equal(room.settings.elfSlots,5);
   assert.throws(()=>service.changeSlot(room,host,{slot:'e0',action:'difficulty',difficulty:'hard'}),/fixa/);
   service.configure(room,host,{mode:'custom',mapSize:'large',elfSlots:2,difficulty:'hard',preparation:20});assert.equal(room.settings.mode,'custom');assert.equal(room.settings.mapSize,'large');assert.equal(room.settings.elfSlots,2);assert.equal(room.settings.difficulty,'hard');
-  const oldSeed=room.settings.seed;service.configure(room,host,{mode:'ranked',private:true,local:true,seed:'CHEAT'});assert.equal(room.settings.mode,'ranked');assert.equal(room.settings.private,false);assert.equal(room.settings.local,false);assert.equal(room.settings.allowRoles,false);assert.match(room.settings.seed,/^RANK-[A-F0-9]{16}$/);assert.notEqual(room.settings.seed,oldSeed);assert.equal(service.publicRoom(room).mode,'ranked');
+  assert.throws(()=>service.configure(room,host,{mode:'ranked'}),/fila ranqueada/);
+  const rankedHost=service.addClient('ranked-host','Ranked Host'),ranked=service.create(rankedHost,{role:'troll',matchmade:true,settings:{mode:'ranked',private:true,local:true,seed:'CHEAT'}});assert.equal(ranked.settings.mode,'ranked');assert.equal(ranked.settings.private,false);assert.equal(ranked.settings.local,false);assert.equal(ranked.settings.allowRoles,false);assert.match(ranked.settings.seed,/^RANK-[A-F0-9]{16}$/);assert.equal(service.publicRoom(ranked).mode,'ranked');assert.throws(()=>service.addBot(ranked,'e0'),/preenchimento de teste/);
 });
 test('Referência de sala expirada não impede criar ou entrar em outra partida',()=>{
   const service=new SessionService(),host=service.addClient('stale-host','Host'),guest=service.addClient('stale-guest','Guest');

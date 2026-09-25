@@ -9,8 +9,25 @@ import { AIController } from '../shared/controllers.js';
 import { combatRisk } from '../shared/combat-risk.js';
 import { lineOfSight } from '../shared/map.js';
 import { playerScore } from '../shared/score.js';
+import { BUILD_CAMERA_DISTANCE, FOLLOW_CAMERA_HEIGHT, boundedConstructionPoint, followCameraOffset } from '../client/renderer.js';
 
 const create=()=>new Match({seed:'REVIEW',diagnostics:true},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},{id:'e',role:'elf',occupant:{type:'human',name:'Elf'}}]);
+
+test('Zoom altera distância horizontal sem elevar a câmera de acompanhamento',()=>{
+  const offsets=[5,13,23].map(zoom=>followCameraOffset(Math.PI*.37,zoom));
+  assert.ok(offsets.every(offset=>Math.abs(offset.y-FOLLOW_CAMERA_HEIGHT)<1e-9));
+  assert.ok(Math.hypot(offsets[0].x,offsets[0].z)<Math.hypot(offsets[1].x,offsets[1].z));
+  assert.ok(Math.hypot(offsets[1].x,offsets[1].z)<Math.hypot(offsets[2].x,offsets[2].z));
+});
+test('Câmera de construção mantém a projeção da mira dentro do alcance',()=>{
+  const origin={x:10,z:-4},range=B.construction.range;
+  const fallback=boundedConstructionPoint(origin,null,Math.PI/2,range);
+  assert.ok(Math.abs(distance(origin,fallback)-Math.min(BUILD_CAMERA_DISTANCE,range-.5))<1e-9);
+  const clamped=boundedConstructionPoint(origin,{x:100,z:100},0,range);
+  assert.ok(distance(origin,clamped)<=range-.5+1e-9);
+  const nearby=boundedConstructionPoint(origin,{x:12,z:-1},0,range);
+  assert.deepEqual(nearby,{x:12,z:-1});
+});
 function fixture(){
   const m=create(),u=m.unit('e'),b=m.map.bases[0];Object.assign(u,{x:b.x+4.4,z:b.z});
   assert.equal(m.act(u.id,{type:'build',kind:'core',x:b.x,z:b.z}),undefined);
@@ -52,6 +69,11 @@ test('Selection changes at resource threshold without a clock tick and explains 
   u.x+=10;assert.match(render(),/Aproxime-se:/);
   const amount=resource('gold',99.99);assert.match(amount,/>99</);assert.doesNotMatch(amount,/>100</);
   const costs=resourceCost({gold:100,wood:35});assert.match(costs,/resource-gold/);assert.match(costs,/resource-wood/);assert.doesNotMatch(costs,/[◇♧]/);
+});
+
+test('Seleção oferece demolição pronta com reembolso e confirmação no cliente',()=>{
+  const {m,u,core}=fixture(),snapshot=m.snapshot('e'),entity=snapshot.structures.find(s=>s.id===core.id),html=selectionMarkup(entity,{u,snapshot,map:m.map});
+  assert.match(html,/data-do="demolish"/);assert.match(html,/75% do custo original/);assert.match(html,/Demolir estrutura/);
 });
 test('Selection identifies free barricade repair and diminishing assistance',()=>{
   const {m,u,core}=fixture(),wall={...core,id:'wall-ui',kind:'wall',hp:core.maxHp-50};

@@ -9,7 +9,9 @@ Este documento é a fonte de verdade do produto para a primeira alpha por convit
 - Operar inicialmente no Brasil, em uma única instância econômica na AWS.
 - Aprender com partidas humanas antes de abrir acesso público ou distribuir o servidor.
 
-Versão candidata: `0.2.0-alpha.2`. Cenário principal de balanceamento: um Troll contra cinco Elfos humanos, mapa compacto. O Troll deve vencer aproximadamente 55–60% das partidas ranqueadas, sem invulnerabilidade ou vitória decidida por relógio.
+Versão candidata: `0.2.0-alpha.2`. Cenário principal de balanceamento: um Troll contra cinco Elfos humanos, mapa compacto. A meta é 50% para cada lado, com faixa operacional inicial de 45–55% nas simulações, sem invulnerabilidade ou vitória decidida por relógio.
+
+Regra de medição: todo baseline e toda rodada de balanceamento usam exclusivamente 1 Troll × 5 Elfos, dificuldade Normal. Composições menores podem aparecer em testes funcionais de uma regra específica, mas nunca como referência de balanceamento.
 
 ## Regras de produto aprovadas
 
@@ -18,7 +20,7 @@ Versão candidata: `0.2.0-alpha.2`. Cenário principal de balanceamento: um Trol
 - Não existe limite fixo de duração. Impasses são resolvidos pela progressão lendária e pelas condições normais de eliminação/base.
 - Uma clareira comporta 1 Núcleo, 1 Barricada, 5 Torres, 5 Minas e 1 Oficina.
 - Aliados podem construir e reparar na mesma clareira. Recursos, renda e propriedade continuam individuais.
-- Uma estrutura pertence a quem pagou por ela. Somente o proprietário pode melhorar ou cancelar; não há transferência direta de recursos.
+- Uma estrutura pertence a quem pagou por ela. Somente o proprietário pode melhorar ou demolir; não há transferência direta de recursos. Upgrades iniciados não podem ser cancelados.
 - Ao morrer, o Elfo perde recursos, Wisps e todas as suas estruturas. O colapso concede ao Troll 25% da recompensa normal e não devolve investimento.
 - Uma clareira afetada pelo colapso pode ser reivindicada por outro Elfo após 15 segundos.
 
@@ -39,9 +41,11 @@ Versão candidata: `0.2.0-alpha.2`. Cenário principal de balanceamento: um Trol
 
 ### Progressão lendária
 
-- Apenas uma Torre Lendária pode existir por equipe. Qualquer Torre de um Elfo vivo pode ascender no Tier 10.
-- A Torre Lendária usa um raio contínuo cujo dano aumenta enquanto mantém contato. Perder linha de visão interrompe o acúmulo.
-- Se a Torre Lendária colapsar com seu dono, outro Elfo elegível pode criar uma nova.
+- Nível 10 é o nível Lendário máximo para Núcleo, Barricada e Torre; não há um upgrade Lendário separado.
+- O Núcleo Lendário dobra sua produção própria final. A Barricada Lendária recebe 4× o HP final, preserva a porcentagem de vida e mantém recompensa econômica aproximadamente normalizada.
+- Toda Torre que chega ao nível 10 vira Laser/Lendária e usa um raio contínuo cujo dano aumenta enquanto mantém contato. Perder linha de visão interrompe o acúmulo.
+- Construções preservam a cor individual do proprietário; Lendárias combinam essa cor com detalhes dourados.
+- Especializações de Torre estão fora da progressão/UI; o antigo perfil da Balista é o baseline da Torre padrão.
 - A Espada Lendária fica disponível quando a soma dos níveis de Dano e Cerco do Troll chega a 10.
 - Qualquer golpe da Espada Lendária executa estruturas abaixo de 15% de HP.
 - Lendárias criam vantagem extrema, mas não acionam vitória automática.
@@ -71,7 +75,7 @@ Versão candidata: `0.2.0-alpha.2`. Cenário principal de balanceamento: um Trol
 ### Comunicação, acessibilidade e administração
 
 - Sem chat na alpha. A roda rápida oferece perigo, ajuda, atacar, defender, preciso de ouro, preciso de madeira e recuar.
-- Português e inglês, desktop. Inclui remapeamento de teclas, escala de UI, modo daltônico e redução de movimento.
+- Português e inglês, desktop. Inclui remapeamento de teclas, escala de UI e redução de movimento. Modo daltônico ficou fora deste ciclo.
 - O jogo oferece denúncia de jogador, bug e feedback.
 - Painel administrativo cobre convites, contas, partidas, punições e métricas, protegido por conta separada e MFA.
 - Telemetria detalhada permanece durante a alpha, pseudonimizada, com consentimento e exclusão ao apagar a conta.
@@ -105,8 +109,13 @@ Versão candidata: `0.2.0-alpha.2`. Cenário principal de balanceamento: um Trol
 - [x] `GAME-107` Remover o limite temporal e instrumentar impasses.
 - [x] `GAME-108` Torre e Espada Lendárias, feedback audiovisual, IA e contrajogo.
 - [x] `GAME-109` Roda de comunicação sem transferência de recursos.
-- [x] `GAME-110` Repetir 100 partidas pareadas e separar 1v1, 1v2, 1v5 e 1v8 por mapa/dificuldade.
-- [x] `GAME-111` Corrigir a curva por dificuldade e lobby: matriz final 105–135, cenário principal 4–6, zero inacabadas; o resíduo 1v1 de 20–40 está diagnosticado no relatório.
+- [x] `GAME-110` Histórico: repetir partidas em múltiplas composições para diagnosticar a curva inicial. Esse método foi substituído pelo baseline exclusivo 1×5.
+- [x] `GAME-111` Histórico: corrigir a curva inicial por dificuldade e lobby. Novos ajustes usam apenas o cenário padrão 1×5 Normal.
+- [x] `GAME-112` Sustain do Troll, cura com cargas, regeneração percentual, reengage em 58%, progressão Lendária completa, Torre padrão, Upgrade All de Wisps e footprints separados.
+- [x] `GAME-113` Fixar o baseline em 1×5 Normal, corrigir a janela de recuperação da fuga e fechar 100 partidas em 57–43, sem timeout.
+- [x] `GAME-114` Variar por seed a patrulha do Troll, os refúgios, perfis e layouts dos bots Elfos; recalibrar 300 partidas 1×5 em 144–156, sem timeout.
+- [x] `GAME-115` Progressão até nível 20, Épico no 20, Torre Lendária 5×, Wisp automático, prioridade econômica/Barricada 2 dos bots e baseline pareado 1×5 em 50–50 sem timeout.
+- [ ] `GAME-116` Alongar a mediana sem multiplicadores globais de dano/recompensa: projetar um objetivo intermediário ou curva contínua de compras, preservando 45–55% e zero partidas sem resolução.
 
 Critério: zero estados sem saída, zero partidas automatizadas inacabadas, 1v5 próximo da meta e nenhuma configuração principal acima de 65% para um lado sem diagnóstico explícito.
 
@@ -114,8 +123,10 @@ Critério: zero estados sem saída, zero partidas automatizadas inacabadas, 1v5 
 
 - [x] `UX-201` Internacionalização PT-BR/EN sem strings de regra duplicadas; troca ao vivo persistente e cobertura de menu, ajuda, lobby, HUD, seleção, loja e resultado.
 - [x] `UX-202` Remapeamento, escala de UI e redução de movimento. Modo daltônico foi retirado deste ciclo por decisão de produto.
+- [x] `UX-202B` Fixar a altura da câmera de acompanhamento durante o zoom e restaurar o servidor local dev com recursos e velocidades 1×/2×/4×/8×.
+- [x] `UX-203` Mira central permanentemente travada, câmera 20% mais baixa, colocação a 9,75 m, fechamento contextual e arsenal operado por teclado.
 - [x] `MODE-203` Separar Normal, Personalizado e Ranqueado no lobby, com presets autoritativos e identificação pública.
-- [ ] `MODE-204` Filas por papel, grupos élficos, rendição e revanche ranqueada.
+- [x] `MODE-204` Filas por papel, grupos élficos sem separação, composição 1×5, preenchimento temporário por bots para playtest, rendição aos 10 minutos e revanche ranqueada preservando papéis.
 - [ ] `MODE-205` MMR separado, colocações, divisões, temporada e decaimento.
 - [ ] `COS-206` Nível de conta e primeiros cosméticos sem alterar identificação competitiva.
 

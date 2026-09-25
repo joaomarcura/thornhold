@@ -79,7 +79,7 @@ const EN=new Map(Object.entries({
   'A evolução está disponível desde o início e continua sem teto de nível.':'Progression is available from the start and continues without a level cap.',
   'Lentidão':'Slow','Movimento −35%':'Movement −35%','Atordoado':'Stunned','Movimento e habilidades bloqueados':'Movement and abilities disabled','Movimento acelerado':'Accelerated movement',
   'Selo de preparação':'Preparation Seal','Aguarde a libertação':'Await release','Fome':'Hunger','Cause dano para encerrar':'Deal damage to end it','Regeneração bloqueada':'Regeneration blocked',
-  'Evite receber dano':'Avoid taking damage','Regenerando':'Regenerating','Abertura da esquiva':'Dodge opening','Exposição':'Exposure','Rugido · desativada':'Roar · disabled','Torre não pode disparar':'Tower cannot fire',
+  'Evite receber dano':'Avoid taking damage','Regenerando':'Regenerating','Santuário ancestral':'Ancestral Sanctuary','Abertura da esquiva':'Dodge opening','Exposição':'Exposure','Rugido · desativada':'Roar · disabled','Torre não pode disparar':'Tower cannot fire',
   'Rajada':'Volley','Gelo':'Frost','Ruptura':'Breach','Balista':'Ballista','Fúria':'Fury','Frenesi':'Frenzy','Vitalidade':'Vitality','Pele de pedra':'Stone Skin','Vigor':'Vigor','Passos largos':'Long Strides','Quebra-fortaleza':'Fortress Breaker','Rugido ancestral':'Ancestral Roar',
   'Regras oficiais sem pontuação ranqueada.':'Official rules without ranked scoring.','O host controla mapa, lobby e regras.':'The host controls the map, lobby, and rules.','Preset competitivo; MMR será ativado na etapa de filas.':'Competitive preset; MMR will be enabled with matchmaking.',
   'Apenas Elfos cultivam Wisps.':'Only Elves cultivate Wisps.','Aproxime-se do seu núcleo concluído.':'Move closer to your completed Core.','Um Wisp já está sendo formado.':'A Wisp is already being trained.',
@@ -108,7 +108,7 @@ const EN=new Map(Object.entries({
   'Normal usa o preset oficial. Personalizado libera todas as regras. Ranqueado prepara as regras competitivas; MMR entra na etapa de filas.':'Normal uses the official preset. Custom unlocks all rules. Ranked prepares competitive rules; MMR arrives with matchmaking.','No lobby, apenas o modo Personalizado permite alterar as regras.':'Only Custom mode allows rule changes in the lobby.',
   'Observando a expedição. Pressione Tab para trocar de personagem.':'Spectating the expedition. Press Tab to change character.','ESPÍRITO · F revela a área por 10s · R repara Barricadas a 50% · evite o Troll.':'SPIRIT · F reveals the area for 10s · R repairs Barricades at 50% · avoid the Troll.',
   'Explore uma clareira pelas trilhas. Depois, pressione 1 para construir o núcleo.':'Explore a clearing along the trails. Then press 1 to build the Core.','Proteja a única entrada: pressione 2 e clique no portão iluminado.':'Protect the only entrance: press 2 and click the highlighted gate.',
-  'O selo contém sua força. Os Elfos estão preparando seus refúgios.':'The seal contains your strength. The Elves are preparing their refuges.','Procure atividade nas clareiras. Ataque para ganhar ouro; B abre suas melhorias.':'Search for activity in the clearings. Attack to earn gold; B opens your upgrades.',
+  'O selo contém sua força. Os Elfos estão preparando seus refúgios.':'The seal contains your strength. The Elves are preparing their refuges.','Retorne ao círculo de pedras do Santuário para recuperar vida com segurança.':'Return to the Sanctuary stone circle to recover health safely.','Procure atividade nas clareiras. Ataque para ganhar ouro; B abre suas melhorias.':'Search for activity in the clearings. Attack to earn gold; B opens your upgrades.',
   'OBSERVADOR':'SPECTATOR','ESPÍRITO DA CLAREIRA':'SPIRIT OF THE CLEARING','TROLL DO BOSQUE':'FOREST TROLL','Todos os bots · Tab para alternar':'All bots · Tab to switch','A ÚLTIMA CAÇADA':'THE LAST HUNT','ERA DO CERCO':'SIEGE AGE','ESSÊNCIA':'ESSENCE','FORÇA ANCESTRAL':'ANCIENT STRENGTH','ATIVO':'ACTIVE',
   'Clique para observar a região →':'Click to view the area →','Voucher de reassentamento: sem custo':'Resettlement voucher: free','Custo, vagas e produção escalam com o Núcleo':'Cost, slots, and production scale with the Core','Disponível após sua Barricada ser rompida':'Available after your Barricade is breached',
   'fechar arsenal · A partida continua':'close arsenal · The match continues','construir ·':'build ·','repetir ·':'repeat ·','cancelar':'cancel','escolher árvore ·':'choose tree ·','mover ·':'move ·','correr':'run','coletar ·':'gather ·','reparar':'repair','mapa':'map',
@@ -121,6 +121,17 @@ const EN=new Map(Object.entries({
   ,'Explore depois que o selo cair. Dano efetivo rende ouro. Escolha arma, proteção e relíquia na loja':'Explore after the seal breaks. Effective damage earns gold. Choose a weapon, armor, and relic in the','; a aba Atributos permite evolução contínua. Torres punem exposição longa: recue e escolha seus alvos.':' shop; the Attributes tab allows continuous progression. Towers punish prolonged exposure: retreat and choose your targets.'
   ,'golpe pesado ·':'heavy strike ·','esquiva ·':'dodge ·','rugido, que interrompe torres próximas. Três acertos leves no mesmo alvo fortalecem o terceiro. Esquive para cancelar a preparação e aproveite 1,2 s de abertura.':'roar, which interrupts nearby towers. Three light hits on the same target empower the third. Dodge to cancel wind-up and use the 1.2 s opening.'
   ,'Bolinha do mouse':'Middle mouse button','Shift + clique':'Shift + click','Botão direito':'Right click','Espaço':'Space'
+  ,'Mantenha a mira central sobre uma árvore ou estrutura e clique para selecionar. Segure':'Keep the center reticle over a tree or structure and click to select it. Hold'
+  ,'para coletar ou reparar. No Núcleo,':'to gather or repair. At the Core,'
+  ,'forma um Wisp e o envia automaticamente à árvore livre mais próxima. Após sua Barricada cair, aproxime-se do Troll e use':'trains a Wisp and automatically sends it to the nearest free tree. After your Barricade falls, approach the Troll and use'
+  ,'para atordoá-lo por 3 segundos e escapar.':'to stun it for 3 seconds and escape.'
+  ,'Explore depois que o selo cair. Dano efetivo rende ouro. Abra o arsenal com':'Explore after the seal breaks. Effective damage earns gold. Open the arsenal with'
+  ,'e opere-o pelo teclado: setas ou WASD navegam e Enter confirma.':'and operate it by keyboard: arrows or WASD navigate and Enter confirms.'
+  ,'rugido. Torres punem exposição longa; recue, cure-se e escolha seus alvos.':'roar. Towers punish prolonged exposure; retreat, heal, and choose your targets.'
+  ,'Mira central sempre travada':'Center reticle always locked','Clique':'Click','Selecionar / agir':'Select / act','Formar Wisp automático':'Train Wisp automatically'
+  ,'Melhorias não possuem bloqueio temporal. Estruturas e atributos evoluem até o nível 20: Lendário no 10 e Épico no 20.':'Upgrades have no time gate. Structures and attributes progress to level 20: Legendary at 10 and Epic at 20.'
+  ,'Mira travada · clique para agir':'Aim locked · click to act','Clique no cenário para retomar a mira':'Click the world to resume locked aim'
+  ,'Atributos · 20':'Attributes · 20','Lendário no nível 10 · Épico e limite máximo no nível 20.':'Legendary at level 10 · Epic and maximum level at 20.'
 }));
 
 const PATTERNS=[
@@ -145,7 +156,7 @@ const PATTERNS=[
   [/^Núcleo T(\d+) · Barricada T(\d+) · (\d+) torres\. Selecione o núcleo para formar Wisps e automatizar madeira\.$/, 'Core T$1 · Barricade T$2 · $3 towers. Select the Core to train Wisps and automate wood.'],
   [/^COMBO (.+) · terceiro acerto \+25%$/, 'COMBO $1 · third hit +25%'],[/^(.+): (\d+) ouro, (\d+) madeira$/, '$1: $2 gold, $3 wood'],
   [/^DESATIVADA (.+)$/, 'DISABLED $1'],[/^ATORDOADO (.+)$/, 'STUNNED $1'],[/^Vincular à árvore (.+)$/, 'Link to tree $1']
-  ,[/^Melhorias não possuem bloqueio temporal\. O Núcleo exige uma Barricada ativa e acompanha metade de seu nível\. Após (.+) minutos, o Troll perde vida se ficar sem causar dano\. Custos crescem e ganhos de velocidade diminuem\.$/, 'Upgrades have no time gate. The Core requires an active Barricade at half its level. After $1 minutes, the Troll loses health while not dealing damage. Costs grow and speed gains diminish.']
+  ,[/^Melhorias não possuem bloqueio temporal\. O Núcleo exige uma Barricada ativa e acompanha metade de seu nível\. O Troll não perde vida por inatividade e recupera-se fora de combate\. Custos crescem e ganhos de velocidade diminuem\.$/, 'Upgrades have no time gate. The Core requires an active Barricade at half its level. The Troll never loses health from inactivity and recovers out of combat. Costs grow and speed gains diminish.']
   ,[/^Barricada nível (\d+) necessária — atual: nível (\d+)\.$/, 'Barricade level $1 required — current: level $2.'],[/^Barricada nível (\d+) necessária — atual: não construída\.$/, 'Barricade level $1 required — current: not built.']
 ];
 

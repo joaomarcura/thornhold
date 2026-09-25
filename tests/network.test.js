@@ -78,3 +78,35 @@ test('Modo dev fica protegido por configuração e controla recursos e velocidad
     host.send('dev',{command:'speed',speed:8});await host.wait('dev',m=>m.speed===8);assert.equal(live.devSpeed,8);assert.equal(live.match.devSpeed,8);
   }finally{if(host)await closeClient(host);await app.close();}
 });
+
+test('MODE-204: fila ranqueada forma 1×5 humano e quatro Elfos podem se render após 10 minutos',async()=>{
+  const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false}),clients=[];
+  try{
+    for(let i=0;i<6;i++)clients.push(await client(app.port,i===0?'Troll ranqueado':`Elfo ranqueado ${i}`));
+    for(let i=1;i<6;i++)clients[i].send('rankedQueue',{role:'elf'});
+    clients[0].send('rankedQueue',{role:'troll'});
+    const maps=await Promise.all(clients.map(c=>c.wait('map',()=>true,6000)));assert.equal(maps.filter(m=>m.viewerId==='t0').length,1);assert.equal(maps.filter(m=>m.viewerId?.startsWith('e')).length,5);
+    const live=[...app.sessions.rooms.values()].find(r=>r.settings.mode==='ranked');assert.ok(live);assert.equal(live.members.size,6);assert.equal(live.slots.filter(s=>s.occupant?.type==='human').length,6);assert.equal(live.slots.filter(s=>s.occupant?.type==='bot').length,0);assert.equal(live.settings.mapSize,'compact');
+    live.match.state=STATES.ACTIVE;live.state=STATES.ACTIVE;live.match.time=600;
+    const elfClients=clients.filter(c=>live.slots.find(s=>s.occupant?.clientId===c.hello.id)?.role==='elf');
+    for(let i=0;i<3;i++){elfClients[i].send('surrender');const vote=await elfClients[i].wait('surrender',m=>m.status.role==='elf'&&m.status.votes===i+1);assert.equal(vote.status.ended,false);}
+    assert.notEqual(live.match.state,STATES.END);elfClients[3].send('surrender');const finalVote=await elfClients[3].wait('surrender',m=>m.status.votes===4);assert.equal(finalVote.status.ended,true);assert.equal(live.match.winner,'troll');assert.equal(live.match.endReason,'elf-surrender');
+  }finally{await Promise.all(clients.map(closeClient));await app.close();}
+});
+
+test('MODE-204: grupo élfico entra junto na fila e o Troll não aceita grupo',async()=>{
+  const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false}),clients=[];
+  try{
+    const leader=await client(app.port,'Líder'),ally=await client(app.port,'Aliado');clients.push(leader,ally);leader.send('partyCreate');const created=await leader.wait('queue',m=>m.party?.members.length===1);const code=created.party.id;ally.send('partyJoin',{code});await ally.wait('queue',m=>m.party?.id===code&&m.party.members.length===2);leader.send('rankedQueue',{role:'elf'});const queued=await leader.wait('queue',m=>m.queued&&m.role==='elf');assert.equal(queued.players.elf,2);ally.send('create',{role:'elf'});assert.match((await ally.wait('error')).message,/Cancele a fila/);ally.send('rankedCancel');await leader.wait('queue',m=>!m.queued);
+    leader.send('rankedQueue',{role:'troll'});assert.match((await leader.wait('error')).message,/sozinho/);
+  }finally{await Promise.all(clients.map(closeClient));await app.close();}
+});
+
+test('Ranqueada de teste começa imediatamente e completa ambos os times com bots',async()=>{
+  const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false}),clients=[];
+  try{
+    const troll=await client(app.port,'Troll humano');clients.push(troll);troll.send('rankedQueue',{role:'troll',fillBots:true});const trollMap=await troll.wait('map');assert.equal(trollMap.viewerId,'t0');const trollRoom=app.sessions.room(app.sessions.clients.get(troll.hello.id));assert.equal(trollRoom.slots.filter(s=>s.occupant?.type==='bot').length,5);assert.equal(trollRoom.match.units.length,6);assert.equal(trollRoom.rankedBotFill,true);
+    const elf=await client(app.port,'Elfo humano');clients.push(elf);elf.send('rankedQueue',{role:'elf',fillBots:true});const elfMap=await elf.wait('map');assert.match(elfMap.viewerId,/^e/);const elfRoom=app.sessions.room(app.sessions.clients.get(elf.hello.id));assert.equal(elfRoom.slots.find(s=>s.role==='troll').occupant.type,'bot');assert.equal(elfRoom.slots.filter(s=>s.occupant?.type==='bot').length,5);assert.equal(elfRoom.match.units.length,6);
+    elfRoom.match.state=STATES.ACTIVE;elfRoom.state=STATES.ACTIVE;elfRoom.match.time=600;elf.send('surrender');const vote=await elf.wait('surrender');assert.equal(vote.status.needed,1);assert.equal(vote.status.ended,true);assert.equal(elfRoom.match.winner,'troll');
+  }finally{await Promise.all(clients.map(closeClient));await app.close();}
+});

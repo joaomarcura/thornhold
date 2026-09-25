@@ -27,7 +27,8 @@ export function combatStats(u){
     damage:scaled(B.troll.damage*B.troll.damageGrowth**Math.min(4,l.damage),B.progression.trollDamageGrowth,l.damage-4)*product('damage'),
     interval:Math.max(.25,baseInterval*product('interval')),
     armor:Math.max(0,B.troll.armor+3*(Math.min(4,l.armor)+Math.log2(1+Math.max(0,l.armor-4)))+sum('armor')),
-    regen:(B.troll.regen+B.troll.regenPerLevel*l.regen)*product('regen'),
+    combatRegen:(B.troll.combatRegenRate+B.troll.combatRegenPerLevel*Math.min(B.troll.regenLevelCap,l.regen))*product('regen'),
+    restRegen:(B.troll.restRegenRate+B.troll.restRegenPerLevel*Math.min(B.troll.regenLevelCap,l.regen))*product('regen'),
     regenDelay:Math.max(3,B.troll.regenDelay+sum('regenDelay')),
     siege:(1+B.troll.siegePerLevel*l.siege)*product('siege'),
     movement:B.troll.speed*(1+.4*(1-Math.exp(-l.movement/5)))*product('movement'),
@@ -40,6 +41,6 @@ export function combatStats(u){
 }
 export function upgradePreview(u,key){
   const a=combatStats(u),b=combatStats({...u,levels:{...u.levels,[key]:u.levels[key]+1}});
-  const fields={damage:['damage','dano'],speed:['interval','s entre golpes'],health:['maxHp','vida'],armor:['armor','armadura'],regen:['regen','vida/s'],movement:['movement','m/s'],siege:['siege','× contra estruturas'],utility:['roarDuration','s de silêncio']};
+  const fields={damage:['damage','dano'],speed:['interval','s entre golpes'],health:['maxHp','vida'],armor:['armor','armadura'],regen:['restRegen','× vida máxima/s fora de combate'],movement:['movement','m/s'],siege:['siege','× contra estruturas'],utility:['roarDuration','s de silêncio']};
   const [field,label]=fields[key];return `${a[field].toFixed(2)} → ${b[field].toFixed(2)} ${label}`;
 }

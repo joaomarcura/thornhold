@@ -2,6 +2,32 @@
 
 Os testes exercitam o código real, não telas simuladas. As conexões chamadas de “humanas” nos testes automáticos são clientes de rede sintéticos, sem controlador IA do servidor. Isso valida protocolo e ocupação dos slots; não substitui sessões de usabilidade com pessoas.
 
+## Sustain, progressão Lendária e UX de upgrades — 24/09/2026
+
+Regra vigente: simulações de balanceamento usam exclusivamente o lobby padrão 1 Troll × 5 Elfos, dificuldade Normal. Matrizes antigas com outras composições são mantidas apenas como diagnóstico histórico.
+
+- A câmera de acompanhamento mantém cerca de 5,69 m de altura relativa ao alvo em qualquer nível de zoom; a roda altera somente a distância horizontal. A visão tática continua usando sua câmera elevada independente.
+- `npm run start:dev` inicia o servidor local com o menu F10, concessão de recursos, debug de combate e velocidades 1×/2×/4×/8×. `npm start` mantém as ferramentas desativadas.
+
+- 102 testes de regras, física, IA e rede aprovados; 56 arquivos JavaScript passaram em `node --check`.
+- Fluxos reais de navegador aprovados para upgrade por Q, custo insuficiente em vermelho, Torre padrão sem especializações, upgrade sem cancelamento, stun, placar/MVP, PT-BR/EN e preferências.
+- Cura do Troll: duas cargas, 20% do HP máximo em 6 segundos, cooldown de 75 s e uma carga recuperada a cada 180 s. Dano não interrompe o efeito.
+- Regeneração: 0,10% do HP máximo/s em combate e 0,30%/s após quatro segundos sem dano; Vigor escala ambas e tem limite 10.
+- A antiga fome foi removida: inatividade não causa dano, não bloqueia regeneração e não pode matar o Troll. A IA ainda recebe pressão comportamental para voltar ao combate.
+- O Santuário na base do Troll acrescenta 0,50% do HP máximo/s após quatro segundos sem dano, além da regeneração normal.
+- A IA usa a cura antes de abandonar uma pressão sustentável, reengaja perto de 58% e limita recuperação segura a 18 segundos.
+- O simulador agora grava `Combat Time %`, `Retreat Time %`, duração média das retiradas, cura por consumível/regen, HP de retirada/reengage, estruturas destruídas e dano do Troll por minuto.
+- O simulador de balanceamento usa por padrão o mesmo passo de 50 ms/20 Hz do servidor e seeds reproduzíveis no formato ranqueado `RANK-[A-F0-9]{16}`. O passo de 100 ms fica disponível somente para varreduras diagnósticas rápidas e não pode aprovar um baseline.
+- Baseline atual após progressão 20 e IA econômica, 1×5 Normal a 20 Hz: 100 partidas concluídas, zero timeout, 50 vitórias Troll e 50 Elfos; média 9:55 e mediana 9:36. Quatro partidas terminaram em até seis minutos, 23 ficaram na janela de 12–18 minutos e as falhas médias de navegação caíram de 0,23 para 0,15. Artefato: `artifacts/usability-level20-balanced-1x5-100.json`.
+- Experimento de ritmo rejeitado: reduzir simetricamente o dano básico para 70% elevou a mediana a 12:31 e colocou 62 partidas na faixa de 12–18 minutos, mas terminou 35–63 com dois jogos sem resolução em 20 minutos. Compensar a renda do Troll em 1,50× resolveu os impasses, porém inverteu para 69–31 e mediana 11:00. Os artefatos `combat-pace-v8-1x5-100.json` e `combat-pace-v8-gold150-1x5-100.json` ficam como diagnóstico; nenhum desses valores foi promovido. O próximo ajuste de duração deve evitar o limiar discreto de compras da IA e usar uma mudança estrutural de objetivos/ritmo.
+- O lote dinâmico anterior de 300 partidas a 10 Hz fica preservado como histórico: 144 vitórias Troll e 156 Elfos (48%–52%); média 8:11 e mediana 8:16. Ele não é mais considerado baseline oficial porque as mesmas 100 seeds produziram apenas 71% de concordância de vencedor entre 10 Hz e 20 Hz.
+- A meta vigente é 50% para cada lado, aceitando inicialmente 45–55% nas simulações. O ajuste 1×5 usa 1,10× de dano de cerco e fator 1,41 de recompensa-base.
+- O Troll recebe por seed um setor inicial e sentido de patrulha. Os Elfos recebem rotação de perfis, preferência de refúgios e ordens distintas para posicionar Torres, Minas e Oficina. Em 300 partidas apareceram 24 patrulhas, 300 ordens de refúgio e 1.093 planos de construção distintos; repetir a seed preserva o mesmo resultado.
+- O ciclo de fuga inicia os 18 segundos de recuperação apenas depois que o Troll realmente sai do fogo das Torres, evitando reentrada quase morto.
+- Rodada histórica mista de 100 partidas: 100 concluídas, zero timeout, 11 vitórias Troll e 89 Elfos; média 7:54. Esse lote misturava quantidades de Elfos e dificuldades e não é mais aceito como baseline de balanceamento.
+- Comparação histórica com a amostra imediatamente anterior de 24 seeds: taxa Troll 4,2% → 11%, duração média 9:30 → 7:54 e falhas médias de navegação 0,17 → 0,12. O resultado permanece útil como diagnóstico comportamental, não como referência de equilíbrio.
+- Artefatos: `artifacts/usability-level20-balanced-1x5-100.json` é a referência atual; `artifacts/no-self-damage-100.json` e os lotes anteriores permanecem como comparações históricas.
+
 ## Candidata 0.2.0-alpha.2 — 24/09/2026
 
 - 81 testes de regras, física, IA e rede aprovados.
@@ -22,12 +48,12 @@ A `alpha.2` remove o encerramento por relógio. O simulador usa um teto técnico
 
 ### Modos de partida
 
-`MODE-203` separa três contratos no servidor e na interface. **Normal** aplica o preset oficial sem MMR; **Personalizado** libera lobby, mapa, preparação e IA; **Ranqueado** força regras competitivas, sala pública e seed gerada pelo servidor. O MMR ainda não é gravado: filas, grupos e elegibilidade pertencem a `MODE-204`, enquanto colocações e divisões pertencem a `MODE-205`. Quick Play procura exclusivamente salas Normais. O navegador automatizado valida a presença dos três modos, o bloqueio do preset Normal, o desbloqueio do Personalizado e o início real da partida.
+`MODE-203` separa três contratos no servidor e na interface. **Normal** aplica o preset oficial sem MMR; **Personalizado** libera lobby, mapa, preparação e IA; **Ranqueado** força regras competitivas, sala pública e seed gerada pelo servidor. `MODE-204` acrescenta filas separadas de Troll e Elfo, grupos élficos de até cinco membros que nunca são divididos, composição autoritativa de 1 Troll e 5 Elfos, rendição após 10 minutos e revanche com os mesmos papéis. Durante o playtest sem população ativa, a fila inicia imediatamente e preenche as vagas restantes com bots; esta exceção fica marcada na sala e bots não podem ser adicionados manualmente. O Troll se rende sozinho; os Elfos precisam de 4/5 votos humanos, reduzidos à quantidade de Elfos humanos disponível no teste. Desconexões continuam sob controle temporário da IA. O MMR, colocações e divisões pertencem a `MODE-205`. Quick Play procura exclusivamente salas Normais.
 
 ## Estado atual — HUD e interação, 22/09/2026
 
 - **45 testes de regras/rede aprovados.** Os dois cenários novos verificam cancelamento de investimentos: reembolso parcial calculado no servidor, ausência de duplicação, dono, proximidade, bloqueio após dano e proteção de obras já concluídas.
-- `browser-hud.js` passou com formação por T, evolução por U, cancelamento, E contextual, escolha de árvore no cenário, clique no marcador do Wisp, Esc sem desfazer compra, foco preservado, Tab, botão direito, interrupção de tecla mantida, repetição por Shift, dicas opcionais e layout em 1280×720. Sem exceções JavaScript.
+- Registro histórico: `browser-hud.js` validava formação por T, evolução, cancelamento de formação, E contextual, escolha de árvore, foco, teclado e layout. O roteiro foi migrado para Q e para upgrades comprometidos; cancelamento permanece apenas em formação/obra.
 - Os roteiros de controles, progressão, construção, lobby/reconexão e revanche também passaram após a revisão. A revanche terminou com vitória natural aos 280 segundos de simulação.
 - A construção agora encerra o projeto por padrão. O roteiro de construção foi atualizado para verificar isso e fechar seleção pelo botão próprio; pressionar Esc quando já não existe um projeto abre corretamente o menu. O roteiro de progressão agora expande a lista opcional de árvores antes de usá-la.
 - Capturas inspecionadas: `hud-wisp-visible.png`, `hud-1280.png`, `wisp-economy.png`, `troll-arsenal.png`. Wisps têm modelo luminoso fora do tronco, rastro e identificação própria; foram verificados visualmente no cenário.
@@ -109,7 +135,7 @@ Relatórios e capturas ficam em `artifacts/`. Os scripts fecham somente seus con
 
 `balance.json` é uma referência analítica: duas Balistas e ataque leve sustentado. Os níveis do Troll são explícitos, incluindo níveis 4, 6 e 10; a fase de cerco inclui seu bônus. Não inclui itens, combo, reparo, golpe pesado, rugido nem escalada por exposição. O retorno econômico considera ouro; madeira e tempo de obra são custos adicionais. Não é uma previsão exata da duração de combate em movimento.
 
-`simulations.json` contém partidas completas e agrupamento por quantidade de Elfos/dificuldade. Os bots usam passo de 100 ms para execução em lote; o servidor real usa 50 ms. Tendências do lote orientam ajustes, mas não demonstram equilíbrio competitivo. Playtests humanos, latência real entre cidades e testes de carga prolongados continuam necessários antes de tratar o slice como lançamento de produção.
+`simulations.json` contém partidas completas do lobby padrão 1×5 Normal. O simulador usa 50 ms por padrão, igual ao servidor; 100 ms deve ser solicitado explicitamente e serve apenas para diagnóstico rápido. Mesmo com paridade de tick, bots não demonstram equilíbrio competitivo humano. Playtests humanos, latência real entre cidades e testes de carga prolongados continuam necessários antes de tratar o slice como lançamento de produção.
 
 ## Auditoria de progressão — 22/09/2026
 

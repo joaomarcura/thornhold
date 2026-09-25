@@ -12,10 +12,10 @@ export function unitEffects(u, time, state, preparation) {
   if(u.role!=='troll')return effects;
   const stats=combatStats(u);
   if(state===STATES.PREP){add('seal','Selo de preparação','debuff',preparation,'Aguarde a libertação');return effects;}
-  const hunger=time>B.hungerAge&&time-u.lastAttack>B.hungerGrace;
-  if(hunger)add('hunger','Fome','debuff',null,'Cause dano para encerrar');
-  else if(time-u.lastHit<stats.regenDelay)add('regen-delay','Regeneração bloqueada','debuff',u.lastHit+stats.regenDelay,'Evite receber dano');
-  else if(u.hp<u.maxHp)add('regen','Regenerando','buff',null,`+${stats.regen.toFixed(1)} vida/s`);
+  if(time-u.lastHit<stats.regenDelay)add('regen-delay','Regeneração plena bloqueada','debuff',u.lastHit+stats.regenDelay,'Sustentação de combate permanece ativa');
+  if(u.healingUntil>time)add('consumable-heal','Cura ancestral','buff',u.healingUntil,'20% da vida máxima em 6s');
+  if(u.inSanctuary&&u.hp<u.maxHp&&time-u.lastHit>=stats.regenDelay)add('sanctuary','Santuário ancestral','buff',null,`+${(B.troll.sanctuaryRegenRate*u.maxHp).toFixed(1)} vida/s`);
+  if(u.hp<u.maxHp){const resting=time-u.lastHit>=stats.regenDelay,rate=(resting?stats.restRegen:stats.combatRegen)*u.maxHp;add(resting?'regen':'combat-regen',resting?'Regenerando':'Sustentação','buff',null,`+${rate.toFixed(1)} vida/s`);}
   if(u.openingUntil>time)add('opening','Abertura da esquiva','buff',u.openingUntil,`Próximo acerto +${Math.round(stats.opening*100)}% dano`);
   if(u.exposure>B.troll.exposureGrace){const linger=Math.max(0,2-(time-u.lastHit));add('exposure','Exposição','debuff',time+linger+(u.exposure+linger-B.troll.exposureGrace)/2,`+${Math.round((u.exposure-B.troll.exposureGrace)*B.troll.exposureRate*100)}% dano · prazo sem novos acertos`);}
   return effects;

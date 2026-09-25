@@ -1,4 +1,4 @@
-import { BALANCE as B, distance, mitigation, trollCost, towerDamage } from './config.js';
+import { BALANCE as B, distance, mitigation, trollCost, towerDamage, towerProfile } from './config.js';
 import { ITEMS, BUILDS } from './equipment.js';
 import { combatRisk } from './combat-risk.js';
 import { lineOfSight, pathfind, toCell, walkable, index } from './map.js';
@@ -23,12 +23,15 @@ export class TrollBrain {
     const knownTowers=[...c.discovered.values()].filter(e=>e.kind==='tower'&&e.progress===1);
     const threatened=now-u.lastHit<3,stats=m.trollStats(u),legendaryAssault=m.legendarySword(u)&&now>B.finalAge;
     const risk=p=>knownTowers.reduce((d,t)=>{
-      const branch=B.branches[t.branch]||B.branches.power;
-      if(t.disabledUntil>now||distance(p,t)>B.structures.tower.range+branch.range||!lineOfSight(m.map,p,t))return d;
+      const branch=towerProfile(t);
+      if(t.disabledUntil>now||distance(p,t)>B.structures.tower.range+branch.range||!lineOfSight(m.map,t,p,B.structures.tower.muzzleHeight,B.structures.tower.targetHeight))return d;
       return d+towerDamage(t.tier)*branch.damage/(B.structures.tower.interval*branch.interval)*mitigation(stats.armor*(1-branch.armorPierce));
     },0);
     const known=[...c.discovered.values()],localRisk=combatRisk(m,u,known);
     const dps=Math.max(this.damageRate,localRisk.dps);this.riskScore=localRisk;
+    const needsProjection=threatened&&knownTowers.length&&(u.hp/u.maxHp<.65||u.hp/Math.max(1,dps)<12);
+    let escapePlan=null;if(needsProjection){const cached=this.escapePlanCache;if(cached&&now-cached.at<1.5&&distance(u,cached.origin)<4)escapePlan=cached.plan;else{escapePlan=this.planEscape(c,m,u,knownTowers);this.escapePlanCache={at:now,origin:{x:u.x,z:u.z},plan:escapePlan};}}
+    this.projectedEscapeHp=escapePlan?(u.hp-escapePlan.damage)/Math.max(1,u.maxHp):1;
     this.purchase(m,u,threatened,knownTowers);
     const avoided=e=>this.avoid.some(a=>a.id?a.id===e.id:distance(a,e)<16);
     const candidates=visible.filter(e=>!m.wallBlocks(u,e)&&!avoided(e));
@@ -54,33 +57,41 @@ export class TrollBrain {
     const targetRisk=target?combatRisk(m,u,known,u,target):localRisk;
     const finishing=inRange&&targetRisk.killSeconds+targetRisk.escapeSeconds+2<u.hp/Math.max(1,dps)&&targetRisk.killSeconds<3;
     const survival=u.hp/Math.max(1,dps),health=u.hp/u.maxHp;
+    // After several successful retreats in the late game, stop replaying the
+    // same safe loop. The Troll still preserves itself at truly critical HP,
+    // but commits through ordinary pressure to force a result.
+    const hardened=now>B.finalAge&&c.metrics.retreatAttempts>=5,lastStand=now>B.finalAge&&c.metrics.retreatAttempts>=10,decisiveAssault=legendaryAssault||hardened;
+    const emergencyHealth=hardened&&!legendaryAssault ? .12 : .22,emergencySeconds=hardened&&!legendaryAssault?2.5:4;
+    const emergency=!lastStand&&threatened&&(health<=emergencyHealth||survival<emergencySeconds);
     const overextended=threatened&&((survival<5.5&&!finishing)||(u.exposure>17&&survival<18&&!finishing));
-    const hungerSoon=now>B.hungerAge-10&&now-u.lastAttack>B.hungerGrace-10;
-    if(!legendaryAssault&&!c.retreating&&(overextended||(health<c.profile.retreat&&!finishing&&(threatened||(!hungerSoon&&now>this.reengageAfter))))){
-      c.retreating=true;c.metrics.retreatAttempts++;this.state='retreat';this.safePoint=null;this.recoveryUntil=now+36;
-      // Keep a failed siege excluded beyond recovery so the hunter searches another branch.
-      if(target)this.avoid.push({x:target.x,z:target.z,until:now+35});
+    const predictiveEscape=!lastStand&&!decisiveAssault&&threatened&&localRisk.towers>0&&this.projectedEscapeHp<.25&&!finishing;
+    // Long inactivity changes only the bot's priorities. It must never alter
+    // health: a human Troll may wait, scout or return to the Sanctuary safely.
+    const idlePressure=now>B.idlePressureAge-10&&now-u.lastAttack>B.idlePressureGrace-10;
+    const healingAvailable=(u.healCharges||0)>0&&!(u.cooldowns.heal>now)&&u.hp<u.maxHp*.92;
+    if(threatened&&health<.55&&healingAvailable)m.act(u.id,{type:'heal'});
+    const sustainedByHeal=(u.healingUntil||0)>now&&health>.24;
+    if(!c.retreating&&(emergency||predictiveEscape||(!sustainedByHeal&&!decisiveAssault&&(overextended||(health<c.profile.retreat&&!finishing&&(threatened||(!idlePressure&&now>this.reengageAfter))))))){
+      c.retreating=true;c.metrics.retreatAttempts++;this.state='retreat';this.safePoint=escapePlan?.point||null;this.recoveryUntil=0;m.telemetry.retreatStart(m,u);
       this.targetId=null;c.exploreTarget=null;
     }
     if(c.retreating){
       const recovering=!threatened&&risk(u)<1;
-      const hungerSoon=now>B.hungerAge-10&&now-u.lastAttack>B.hungerGrace-10;
-      if((legendaryAssault&&now>this.recoveryUntil)||recovering&&(health>.76||(now>this.recoveryUntil&&health>.5)||hungerSoon)){
-        c.retreating=false;this.safePoint=null;this.state='rotate';c.exploreTarget=null;c.metrics.retreatSuccesses++;this.reengageAfter=now+12;
+      const atSanctuary=distance(u,m.map.trollSpawn)<=B.troll.sanctuaryRadius-1;
+      const returnToSanctuary=recovering&&health<.3&&!idlePressure&&!atSanctuary;
+      if(returnToSanctuary){this.state='recover';this.safePoint=m.map.trollSpawn;this.recoveryUntil=0;c.go(m,u,this.safePoint,B.troll.sanctuaryRadius-1);return;}
+      // Count the recovery window only after the Troll actually reaches
+      // safety. Previously most of the 18 seconds elapsed while it was still
+      // escaping tower fire, forcing it to reengage at critically low HP.
+      if(recovering&&!this.recoveryUntil)this.recoveryUntil=now+18;
+      else if(!recovering)this.recoveryUntil=0;
+      const recoveredEnough=health>=.58||(this.recoveryUntil&&now>=this.recoveryUntil&&health>=.45);
+      if(recovering&&(recoveredEnough||idlePressure)){
+        c.retreating=false;this.safePoint=null;this.state='rotate';c.exploreTarget=null;c.metrics.retreatSuccesses++;this.reengageAfter=now+6;m.telemetry.reengage(m,u);
       }else{
         if(recovering){this.state='recover';c.stop(u);return;}
         this.state='retreat';
-        if(!this.safePoint||risk(this.safePoint)>2||distance(u,this.safePoint)<2){
-          const options=[],blocked=c.navigationBlocks(m,u),obstacles=[...c.discovered.values()].filter(e=>e.kind);
-          for(const radius of [12,22,32])for(let i=0;i<12;i++){
-            const p={x:u.x+Math.sin(i*Math.PI/6)*radius,z:u.z+Math.cos(i*Math.PI/6)*radius};
-            const cell=toCell(m.map,p);
-            const clear=[[0,0],[B.movement.trollRadius,0],[-B.movement.trollRadius,0],[0,B.movement.trollRadius],[0,-B.movement.trollRadius]].every(([dx,dz])=>{const edge=toCell(m.map,{x:p.x+dx,z:p.z+dz});return walkable(m.map,edge.x,edge.z);})&&!obstacles.some(s=>distance(p,s)<B.structures[s.kind].radius+B.movement.trollRadius);
-            if(clear&&!blocked.has(index(m.map,cell.x,cell.z)))options.push({...p,score:risk(p)*8+radius});
-          }
-          options.sort((a,b)=>a.score-b.score);
-          this.safePoint=options.find(p=>pathfind(m.map,u,p,c.navigationBlocks(m,u)).length)||m.map.trollSpawn;
-        }
+        if(!this.safePoint||risk(this.safePoint)>2||distance(u,this.safePoint)<2)this.safePoint=this.planEscape(c,m,u,knownTowers)?.point||m.map.trollSpawn;
         // AIController.follow is the single movement application point for a tick.
         c.go(m,u,this.safePoint,1.2);
         if(threatened&&Math.hypot(u.input.x,u.input.z)>.5&&!(u.cooldowns.dash>now))m.act(u.id,{type:'dash'});
@@ -104,6 +115,22 @@ export class TrollBrain {
     if(memories.length){c.go(m,u,memories[0],3);return;}
     c.explore(m,u);
   }
+  planEscape(c,m,u,knownTowers){
+    const blocked=c.navigationBlocks(m,u),obstacles=[...c.discovered.values()].filter(e=>e.kind),stats=m.trollStats(u),speed=stats.movement*B.movement.sprint*(u.slowUntil>m.time?B.branches.frost.slow:1),options=[];
+    for(const radius of [12,22,32])for(let i=0;i<12;i++)options.push({x:u.x+Math.sin(i*Math.PI/6)*radius,z:u.z+Math.cos(i*Math.PI/6)*radius});
+    options.push({...m.map.trollSpawn,sanctuary:true});
+    const plans=[];
+    for(const p of options){
+      const cell=toCell(m.map,p),clear=[[0,0],[B.movement.trollRadius,0],[-B.movement.trollRadius,0],[0,B.movement.trollRadius],[0,-B.movement.trollRadius]].every(([dx,dz])=>{const edge=toCell(m.map,{x:p.x+dx,z:p.z+dz});return walkable(m.map,edge.x,edge.z);})&&!obstacles.some(s=>distance(p,s)<B.structures[s.kind].radius+B.movement.trollRadius);
+      if(!clear||blocked.has(index(m.map,cell.x,cell.z)))continue;
+      const route=pathfind(m.map,u,p,blocked),start=toCell(m.map,u);if(!route.length&&(start.x!==cell.x||start.z!==cell.z))continue;
+      const points=[u,...route];if(!route.length||distance(route.at(-1),p)>.05)points.push(p);
+      let damage=0,length=0;
+      for(let j=1;j<points.length;j++){const a=points[j-1],b=points[j],segment=distance(a,b),mid={x:(a.x+b.x)/2,z:(a.z+b.z)/2};length+=segment;damage+=combatRisk(m,u,knownTowers,mid).dps*segment/Math.max(.1,speed);}
+      const endpointDps=combatRisk(m,u,knownTowers,p).dps;if(endpointDps<1)plans.push({point:p,damage,length,score:damage+length*.2+(p.sanctuary&&u.hp/u.maxHp<.45?-12:0)});
+    }
+    plans.sort((a,b)=>a.score-b.score);return plans[0]||null;
+  }
   purchase(m,u,threatened,towers){
     const legendaryProgress=(u.levels.damage||0)+(u.levels.siege||0),pursuingLegendary=legendaryProgress<B.legendary.swordLevels&&legendaryProgress>=2;
     if(!pursuingLegendary&&!u.pendingStrike&&m.time-u.lastHit>=5&&m.time-u.lastAttack>=5&&Object.values(u.levels).reduce((a,b)=>a+b,0)>=2){
@@ -114,8 +141,8 @@ export class TrollBrain {
     const injured=u.hp/u.maxHp<.6,armored=towers.some(t=>t.branch==='pierce');
     const weights={damage:5,speed:3.7,siege:4.5,health:injured?13:3,armor:threatened&&!armored?9:3,regen:u.hp<u.maxHp*.85?10:4,movement:this.state==='pursue'?6:1.5,utility:towers.length>1?4:1};
     if(u.slowUntil>m.time)weights.movement+=3;
-    if(pursuingLegendary){const legendaryOptions=['damage','siege'].filter(k=>u.gold>=trollCost(k,u.levels[k])).sort((a,b)=>u.levels[a]-u.levels[b]||trollCost(a,u.levels[a])-trollCost(b,u.levels[b]));if(legendaryOptions[0])m.act(u.id,{type:'buy',key:legendaryOptions[0]});return;}
-    const options=Object.keys(weights).filter(k=>u.gold>=trollCost(k,u.levels[k]));
+    if(pursuingLegendary){const legendaryOptions=['damage','siege'].filter(k=>u.levels[k]<(B.upgrades[k].max??B.maxTier)&&u.gold>=trollCost(k,u.levels[k])).sort((a,b)=>u.levels[a]-u.levels[b]||trollCost(a,u.levels[a])-trollCost(b,u.levels[b]));if(legendaryOptions[0])m.act(u.id,{type:'buy',key:legendaryOptions[0]});return;}
+    const options=Object.keys(weights).filter(k=>u.levels[k]<(B.upgrades[k].max??B.maxTier)&&u.gold>=trollCost(k,u.levels[k]));
     options.sort((a,b)=>weights[b]/(1+u.levels[b]*1.2)-weights[a]/(1+u.levels[a]*1.2));
     if(options[0])m.act(u.id,{type:'buy',key:options[0]});
   }

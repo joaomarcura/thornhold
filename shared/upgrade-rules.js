@@ -15,6 +15,7 @@ export function upgradeStatus(u,s,time,state,structures=[]){
     if(u&&distance(u,s)>B.interactRange)block('distance',`Aproxime-se: ${distance(u,s).toFixed(1)} m / alcance ${B.interactRange.toFixed(1)} m.`);
     if(s.progress<1)block('construction','Conclua a construção primeiro.');
     if(s.upgrading>0)block('upgrading',`Melhoria em andamento: ${Math.ceil(s.upgrading)}s.`);
+    if(s.tier>=B.maxTier)block('maximum','Estrutura no nível Épico máximo.');
     if(s.kind==='core'){
       const required=requiredBarricadeTier(s.tier+1),wall=structures.find(a=>a.kind==='wall'&&a.owner===u?.id&&a.baseId===s.baseId&&a.progress>=1&&a.hp>0);
       if(!wall||wall.tier<required)block('barricade',`Barricada nível ${required} necessária — atual: ${wall?`nível ${wall.tier}`:'não construída'}.`);

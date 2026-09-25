@@ -7,6 +7,18 @@ import { AIController } from '../shared/controllers.js';
 import { TacticalMap } from '../client/tactical-map.js';
 const match=()=>new Match({seed:'TACTICS'},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},...['e0','e1'].map(id=>({id,role:'elf',occupant:{type:'human',name:id}}))]);
 
+test('Seed varia patrulha do Troll, refúgios e planos de construção sem perder reprodutibilidade',()=>{
+  const plan=seed=>{
+    const slots=[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},...Array.from({length:5},(_,i)=>({id:`e${i}`,role:'elf',occupant:{type:'human',name:`Elfo ${i}`}}))];
+    const m=new Match({seed},slots),elf=new AIController('normal'),troll=new AIController('normal');
+    elf.elf(m,m.unit('e0'));troll.searchStarted=true;troll.explore(m,m.unit('t'));
+    return {strategy:elf.elfProfile,build:elf.buildPlan,refuges:elf.metrics.refugeOrder,patrol:troll.metrics.patrolOrder};
+  };
+  assert.deepEqual(plan('DYNAMIC-A'),plan('DYNAMIC-A'));
+  const variants=Array.from({length:8},(_,i)=>JSON.stringify(plan(`DYNAMIC-${i}`)));
+  assert.ok(new Set(variants).size>=6,JSON.stringify(variants));
+});
+
 test('Pings validam coordenadas, respeitam equipe, cooldown e expiração',()=>{
   const m=match();assert.match(m.act('e0',{type:'ping',x:NaN,z:1}),/inválida/);assert.match(m.act('e0',{type:'ping',x:-1,z:1}),/inválida/);assert.match(m.act('e0',{type:'ping',x:99999,z:1}),/inválida/);
   assert.equal(m.act('e0',{type:'ping',kind:'danger',x:30,z:40}),undefined);
@@ -19,9 +31,9 @@ test('Roda de comunicação preserva pedidos distintos sem transferir recursos',
 });
 test('Efeitos usam relógio do servidor e desaparecem no vencimento',()=>{
   const m=match(),u=m.unit('t');m.state=STATES.ACTIVE;m.time=20;u.lastHit=19;u.slowUntil=21.5;u.dashUntil=20.4;u.hp=900;u.exposure=12;
-  let effects=m.snapshot('t').units.find(e=>e.id==='t').effects;assert.equal(effects.find(e=>e.id==='frost').until,21.5);assert.equal(effects.find(e=>e.id==='regen-delay').until,25);assert.ok(effects.some(e=>e.id==='exposure'));
+  let effects=m.snapshot('t').units.find(e=>e.id==='t').effects;assert.equal(effects.find(e=>e.id==='frost').until,21.5);assert.equal(effects.find(e=>e.id==='regen-delay').until,23);assert.ok(effects.some(e=>e.id==='exposure'));
   m.time=26;effects=m.snapshot('t').units.find(e=>e.id==='t').effects;assert.ok(!effects.some(e=>['frost','dash','regen-delay'].includes(e.id)));assert.ok(effects.some(e=>e.id==='regen'));
-  m.time=B.hungerAge+50;assert.ok(m.snapshot('t').units.find(e=>e.id==='t').effects.some(e=>e.id==='hunger'));
+  m.time=B.idlePressureAge+50;effects=m.snapshot('t').units.find(e=>e.id==='t').effects;assert.ok(!effects.some(e=>e.id==='hunger'));assert.ok(effects.some(e=>e.id==='regen'));
 });
 test('Ataques aliados geram alerta sem revelar posição atual do atacante oculto',()=>{
   const m=match(),t=m.unit('t'),ally=m.unit('e1'),base=m.map.bases[0];m.time=20;Object.assign(ally,{x:base.x,z:base.z});Object.assign(t,m.map.bases[7]);m.damage(ally,10,t,'melee');
@@ -51,7 +63,14 @@ test('IA recua de cerco perigoso e recupera vida sem ganhar atributos',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=60;u.hp=200;u.lastHit=60;
   m.structures.push({id:'tower',kind:'tower',x:u.x+5,z:u.z,hp:400,maxHp:400,tier:3,branch:'power',progress:1});
   const speed=B.troll.speed,maxHp=u.maxHp;c.troll(m,u);assert.equal(c.retreating,true);assert.equal(c.brain.state,'retreat');assert.ok(c.destination);assert.ok(distance(c.destination,u)>5);assert.equal(u.maxHp,maxHp);assert.equal(B.troll.speed,speed);
-  Object.assign(u,c.destination);m.time=65;u.lastHit=60;c.troll(m,u);assert.equal(c.brain.state,'recover');assert.equal(c.destination,null);
+  Object.assign(u,c.destination);m.time=65;u.lastHit=60;c.troll(m,u);assert.equal(c.brain.state,'recover');assert.equal(c.destination.x,m.map.trollSpawn.x);assert.equal(c.destination.z,m.map.trollSpawn.z);
+});
+test('IA antecipa dano da rota de fuga e usa o Santuário quando muito ferida',()=>{
+  const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=100;u.hp=u.maxHp*.35;u.lastHit=m.time;
+  for(let i=0;i<3;i++)m.structures.push({id:'predictive-'+i,kind:'tower',x:u.x-5+i*5,z:u.z+4,hp:600,maxHp:600,tier:4,branch:'power',progress:1,disabledUntil:0});
+  c.troll(m,u);assert.ok(c.brain.projectedEscapeHp<.35,JSON.stringify({projection:c.brain.projectedEscapeHp,risk:c.brain.riskScore}));assert.equal(c.retreating,true);assert.ok(c.destination);
+  m.structures=[];c.discovered.clear();u.hp=u.maxHp*.25;u.lastHit=-100;Object.assign(u,{x:m.map.trollSpawn.x+30,z:m.map.trollSpawn.z});c.troll(m,u);
+  assert.equal(c.brain.state,'recover');assert.equal(c.destination.x,m.map.trollSpawn.x);assert.equal(c.destination.z,m.map.trollSpawn.z);
 });
 test('IA encontra rota de fuga fora da barricada enquanto o Elfo repara sob fogo de torre',()=>{
   const m=new Match({seed:'THORNHOLD'},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},{id:'e0',role:'elf',occupant:{type:'human',name:'Elf'}}]),t=m.unit('t'),elf=m.unit('e0'),c=new AIController('normal'),base=m.map.bases[4];m.state=STATES.ACTIVE;m.time=157;
@@ -65,11 +84,32 @@ test('IA encontra rota de fuga fora da barricada enquanto o Elfo repara sob fogo
   const diagnostic=JSON.stringify({hp:t.hp,wall:wall.hp,state:c.brain?.state,retreating:c.retreating,maxDistance,states:[...states],risk:c.brain?.riskScore,metrics:c.metrics});
   assert.equal(t.alive,true,diagnostic);assert.equal(retreated,true,diagnostic);assert.ok(minHp>0);
 });
-test('Espada lendária encerra recuperação e dificuldades maiores sustentam o assalto',()=>{
+test('Espada lendária mantém agressividade, mas respeita recuo emergencial até 58%',()=>{
   assert.ok(B.difficulty.easy.retreat>B.difficulty.normal.retreat&&B.difficulty.normal.retreat>B.difficulty.hard.retreat);
-  const m=match(),u=m.unit('t'),c=new AIController('hard');m.state=STATES.ACTIVE;m.time=B.finalAge+50;u.hp=u.maxHp*.3;u.levels.damage=5;u.levels.siege=5;
-  c.troll(m,u);c.retreating=true;c.brain.recoveryUntil=m.time-1;c.troll(m,u);
-  assert.equal(c.retreating,false);assert.ok(!['retreat','recover'].includes(c.brain.state));
+  const m=match(),u=m.unit('t'),c=new AIController('hard');m.state=STATES.ACTIVE;m.time=B.finalAge+50;u.hp=u.maxHp*.18;u.levels.damage=5;u.levels.siege=5;u.lastHit=m.time;
+  m.structures.push({id:'legend-danger',kind:'tower',x:u.x+5,z:u.z,hp:400,maxHp:400,tier:5,branch:'power',progress:1,disabledUntil:0});
+  c.troll(m,u);assert.equal(c.retreating,true);assert.equal(c.brain.state,'retreat');
+  m.structures=[];c.discovered.clear();u.lastHit=-100;Object.assign(u,c.brain.safePoint||u);u.hp=u.maxHp*.57;c.troll(m,u);assert.equal(c.retreating,true);
+  u.hp=u.maxHp*.58;c.troll(m,u);assert.equal(c.retreating,false);assert.ok(!['retreat','recover'].includes(c.brain.state));
+});
+test('Janela de recuperação começa somente quando o Troll sai do fogo das torres',()=>{
+  const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=120;u.hp=u.maxHp*.2;u.lastHit=m.time;
+  m.structures.push({id:'recovery-danger',kind:'tower',x:u.x+5,z:u.z,hp:400,maxHp:400,tier:3,branch:'power',progress:1,disabledUntil:0});
+  c.troll(m,u);assert.equal(c.retreating,true);assert.equal(c.brain.recoveryUntil,0);
+  m.time+=12;u.lastHit=-100;m.structures=[];c.discovered.clear();Object.assign(u,c.brain.safePoint||u);c.troll(m,u);
+  assert.equal(c.brain.recoveryUntil,0);assert.equal(c.destination.x,m.map.trollSpawn.x);
+  Object.assign(u,m.map.trollSpawn);c.troll(m,u);assert.ok(c.brain.recoveryUntil>=m.time+17.9);assert.equal(c.retreating,true);
+});
+test('Após cinco recuos o Troll encerra o ciclo, mas ainda foge com vida crítica',()=>{
+  const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=B.finalAge+50;u.lastHit=m.time;c.metrics.retreatAttempts=5;
+  const tower={id:'late-danger',kind:'tower',x:u.x+5,z:u.z,hp:400,maxHp:400,tier:3,branch:'power',progress:1,disabledUntil:0};m.structures.push(tower);
+  u.hp=u.maxHp*.2;c.troll(m,u);assert.equal(c.retreating,false);
+  u.hp=u.maxHp*.1;c.troll(m,u);assert.equal(c.retreating,true);assert.equal(c.brain.state,'retreat');
+});
+test('Após dez recuos tardios o Troll faz um último assalto sem novo ciclo',()=>{
+  const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=B.finalAge+50;u.lastHit=m.time;u.hp=u.maxHp*.05;c.metrics.retreatAttempts=10;
+  m.structures.push({id:'last-stand-danger',kind:'tower',x:u.x+5,z:u.z,hp:400,maxHp:400,tier:5,branch:'power',progress:1,disabledUntil:0});c.troll(m,u);
+  assert.equal(c.retreating,false);assert.ok(['siege','pursue'].includes(c.brain.state));
 });
 test('Troll preserva ouro para completar a espada após o selo lendário',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('hard');m.state=STATES.ACTIVE;m.time=B.finalAge+1;u.levels.damage=4;u.levels.siege=3;u.gold=100;
@@ -89,24 +129,24 @@ test('Rugido interrompe torres e informa o prazo ao dono sem desativar a economi
   m.time=33;s=m.snapshot('e0');assert.equal(s.structures.find(e=>e.id==='tower').effects.length,0);assert.match(m.act('t',{type:'roar'}),/recarregando/);
 });
 
-test('Fome causa desgaste, mas não simula ataque inimigo nem aumenta exposição',()=>{
-  const m=match(),u=m.unit('t');m.state=STATES.ACTIVE;m.time=B.hungerAge+1;u.hp=900;u.exposure=5;
+test('Inatividade do Troll nunca causa dano nem simula ataque inimigo',()=>{
+  const m=match(),u=m.unit('t');m.state=STATES.ACTIVE;m.time=B.idlePressureAge+1;u.hp=900;u.exposure=5;Object.assign(u,{x:m.map.trollSpawn.x+20,z:m.map.trollSpawn.z});
   const hp=u.hp,lastHit=u.lastHit;
   for(let i=0;i<60;i++)m.step(1/B.tick);
-  assert.ok(Math.abs(u.hp-(hp-u.maxHp*B.hungerRate*3))<1e-7);
+  assert.ok(u.hp>hp);
   assert.equal(u.lastHit,lastHit);assert.equal(u.exposure,0);
   const snapshot=m.snapshot('t'),effects=snapshot.units.find(e=>e.id==='t').effects;
-  assert.ok(effects.some(e=>e.id==='hunger'));assert.ok(!effects.some(e=>e.id==='regen-delay'));
+  assert.ok(!effects.some(e=>e.id==='hunger'));assert.ok(!effects.some(e=>e.id==='regen-delay'));
   assert.ok(!snapshot.alerts.some(a=>a.id==='t'));
 });
 
-test('IA faminta abandona recuperação segura e procura combate',()=>{
-  const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=B.hungerAge+1;u.hp=200;
+test('IA sob pressão de inatividade abandona recuperação segura sem perder vida',()=>{
+  const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=B.idlePressureAge+1;u.hp=200;
   for(const elf of m.units.filter(e=>e.role==='elf'))Object.assign(elf,m.map.bases[0]);
   c.troll(m,u);c.retreating=true;c.brain.recoveryUntil=m.time+36;
   m.step(1/B.tick);c.troll(m,u);
   assert.equal(c.retreating,false);assert.ok(['rotate','scout'].includes(c.brain.state));assert.ok(c.destination);
-  // A real hit must still trigger a defensive response even while hungry.
+  // A real hit must still trigger a defensive response under idle pressure.
   m.damage(u,1,m.unit('e0'),'tower');c.troll(m,u);
   assert.equal(c.retreating,true);assert.equal(c.brain.state,'retreat');
 });

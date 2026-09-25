@@ -9,6 +9,7 @@
 .playing button:focus-visible, .playing select:focus-visible, .playing summary:focus-visible {
   outline: 2px solid #f1d58d; outline-offset: 3px;
 }
+.keyboard-note{margin:-7px 0 13px!important;color:#d9c894!important;font-size:10px!important;letter-spacing:.25px}.keyboard-note kbd{border-color:#d7bd7b66;background:#d7bd7b12;color:#f2dca4}
 .playing #vignette { opacity: .3; }
 .hud-top { inset: 20px 24px auto; align-items: flex-start; }
 .identity { gap: 9px; text-shadow: 0 2px 6px #000; }
