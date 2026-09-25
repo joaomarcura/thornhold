@@ -4,10 +4,10 @@ import { icon } from './icons.js';
 import { resource } from './resources.js';
 
 export function shopMarkup(u,time,tab='gear',build='siege'){
-  const equipped=Object.values(u.equipment||{}),recommended=BUILDS[build],legendary=(u.levels.damage||0)+(u.levels.siege||0)>=B.legendary.swordLevels;
+  const equipped=Object.values(u.equipment||{}),recommended=BUILDS[build],totalLevels=Object.values(u.levels||{}).reduce((sum,level)=>sum+level,0),legendary=(u.levels.damage||0)+(u.levels.siege||0)>=B.legendary.swordLevels&&totalLevels>=B.legendary.swordTotalLevels;
   const busy=time-u.lastHit<5||(u.lastAttack>0&&time-u.lastAttack<5)||(u.cooldowns.attack||0)>time;
   const header=`<button class="modal-close" data-do="shop" aria-label="Fechar loja">${icon('close')} <kbd>B</kbd></button><div class="eyebrow">ARSENAL DO BOSQUE</div><h2>Arsenal <span>${resource('gold',u.gold)}</span></h2><p class="keyboard-note"><kbd>WASD</kbd>/<kbd>↑↓</kbd> navegar · <kbd>Enter</kbd> confirmar · <kbd>B</kbd> fechar</p><div class="shop-tabs" role="tablist" aria-label="Loja do Troll"><button role="tab" aria-selected="${tab==='gear'}" data-do="shop-tab" data-tab="gear">Equipamentos</button><button role="tab" aria-selected="${tab==='levels'}" data-do="shop-tab" data-tab="levels">Atributos · 20</button></div>`;
-  if(tab==='levels')return header+`<p>${legendary?'⚔ ESPADA LENDÁRIA ATIVA · golpes executam estruturas abaixo de 15% HP.':`Espada Lendária: Fúria + Quebra-fortaleza ${u.levels.damage+u.levels.siege}/${B.legendary.swordLevels}.`}</p><div class="attribute-grid">${Object.entries(B.upgrades).map(([key,d])=>{
+  if(tab==='levels')return header+`<p>${legendary?'⚔ ESPADA LENDÁRIA ATIVA · golpes executam estruturas abaixo de 15% HP.':`Espada Lendária: Fúria + Quebra-fortaleza ${u.levels.damage+u.levels.siege}/${B.legendary.swordLevels} · níveis totais ${totalLevels}/${B.legendary.swordTotalLevels}.`}</p><div class="attribute-grid">${Object.entries(B.upgrades).map(([key,d])=>{
     const level=u.levels[key],cost=trollCost(key,level);
     const capped=level>=(d.max??B.maxTier);
     return `<button class="shop-item" data-do="buy" data-key="${key}" ${capped||u.gold<cost?'disabled':''}><span><b>${d.name} <small>${capped?`Nv. ${level} · ÉPICO`:`Nv. ${level} → ${level+1}`}</small></b><small>${capped?'Nível máximo':upgradePreview(u,key)}</small></span><strong>${capped?'MAX':resource('gold',cost)}</strong></button>`;

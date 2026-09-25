@@ -161,8 +161,8 @@ export class Match {
       s.repairers[u.id]??={order:++this.repairSequence,until:this.time+1.25};s.repairers[u.id].until=this.time+1.25;
       const active=Object.entries(s.repairers).sort((a,b)=>a[1].order-b[1].order);contributors=active.length;contribution=(active.findIndex(([id])=>id===u.id)===0?1:.25)*(u.ghost?.5:1);
     }
-    const workshop=this.structures.find(a=>a.owner===u.id&&a.kind==='workshop'&&a.progress>=1&&a.hp>0);
-    const heal=Math.min(s.maxHp-s.hp,B.elf.repair*(1+(workshop?.tier||0)*B.economy.workshopRepair)*contribution);s.hp+=heal;if(!free){s.bounty+=B.elf.repairCost*.6;u.gold-=B.elf.repairCost;u.wood-=1;recordSpend(u,{gold:B.elf.repairCost,wood:1},structurePurpose(s.kind),'repair');}u.stats.healing+=heal;u.cooldowns.repair=this.time+1;u.action='repair';u.actionUntil=this.time+.8;this.emit('repair',{unit:u.id,entity:id,x:s.x,z:s.z,amount:heal,free,contribution,contributors});
+    const workshop=this.structures.find(a=>a.owner===u.id&&a.kind==='workshop'&&a.progress>=1&&a.hp>0),breach=this.breachMomentum(s),repairEfficiency=s.kind==='wall'?Math.max(0,1-breach.stacks*B.breachMomentum.repairPenaltyPerStack):1;
+    const heal=Math.min(s.maxHp-s.hp,B.elf.repair*(1+(workshop?.tier||0)*B.economy.workshopRepair)*contribution*repairEfficiency);s.hp+=heal;if(!free){s.bounty+=B.elf.repairCost*.6;u.gold-=B.elf.repairCost;u.wood-=1;recordSpend(u,{gold:B.elf.repairCost,wood:1},structurePurpose(s.kind),'repair');}u.stats.healing+=heal;u.cooldowns.repair=this.time+1;u.action='repair';u.actionUntil=this.time+.8;this.emit('repair',{unit:u.id,entity:id,x:s.x,z:s.z,amount:heal,free,contribution,contributors,repairEfficiency,breachStacks:breach.stacks});
   }
   demolish(u,id){
     const s=this.structures.find(s=>s.id===id),refund=s&&demolitionRefund(s);
@@ -196,6 +196,23 @@ export class Match {
     const stats=combatStats(u),lobby=Math.min(B.maxElves,this.units.filter(a=>a.role==='elf').length),siege=B.economy.trollLobbySiege[lobby]||1;
     return {...stats,siege:stats.siege*siege};
   }
+  breachMomentum(s){
+    if(!this.settings.breachEnabled||s?.kind!=='wall')return {stacks:0,multiplier:1};
+    s.breachStacks??=0;
+    while(s.breachStacks>0&&Number.isFinite(s.breachDecayAt)&&this.time>=s.breachDecayAt){s.breachStacks--;s.breachDecayAt+=B.breachMomentum.decaySeconds;}
+    return {stacks:s.breachStacks,multiplier:1+s.breachStacks*B.breachMomentum.damagePerStack};
+  }
+  addBreachMomentum(s,heavy,attacker=null){
+    if(!this.settings.breachEnabled)return {stacks:0,multiplier:1};
+    const committedBreach=attacker?.controller==='bot'&&this.controllers.get(attacker.id)?.brain?.state==='breach';
+    if(s?.kind!=='wall'||!committedBreach)return {stacks:0,multiplier:1};
+    const current=this.breachMomentum(s),continuous=Number.isFinite(s.breachLastHitAt)&&this.time-s.breachLastHitAt<=B.breachMomentum.decayDelay;
+    if(!continuous){s.breachPressureStartedAt=this.time;s.breachNextStackAt=this.time+B.breachMomentum.firstStackSeconds;}
+    s.breachLastHitAt=this.time;
+    if(this.time>=(s.breachNextStackAt??Infinity)){s.breachStacks=Math.min(B.breachMomentum.maxStacks,current.stacks+1);s.breachNextStackAt=this.time+B.breachMomentum.nextStackSeconds;}
+    s.breachDecayAt=this.time+B.breachMomentum.decayDelay+B.breachMomentum.decaySeconds;
+    return {stacks:s.breachStacks,multiplier:1+s.breachStacks*B.breachMomentum.damagePerStack};
+  }
   healTroll(u){
     if(u.role!=='troll')return 'Habilidade exclusiva do Troll.';
     if((u.healCharges||0)<1)return 'Cura sem cargas.';
@@ -205,7 +222,7 @@ export class Match {
     if(u.healCharges<B.troll.healCharges)u.healRechargeAt??=this.time+B.troll.healRecharge;
     u.action='heal';u.actionUntil=this.time+1;this.telemetry.healUse();this.emit('heal',{unit:u.id,x:u.x,z:u.z,amount:u.maxHp*B.troll.healPercent,duration:B.troll.healDuration,charges:u.healCharges});
   }
-  legendarySword(u){return u?.role==='troll'&&(u.levels.damage||0)+(u.levels.siege||0)>=B.legendary.swordLevels;}
+  legendarySword(u){const levels=Object.values(u?.levels||{}).reduce((sum,level)=>sum+level,0);return u?.role==='troll'&&(u.levels.damage||0)+(u.levels.siege||0)>=B.legendary.swordLevels&&levels>=B.legendary.swordTotalLevels;}
   equipItem(u,id,buy){
     if(u.role!=='troll'||!Object.hasOwn(ITEMS,id))return 'Equipamento inválido.';
     if(this.time-u.lastHit<5||(u.lastAttack>0&&this.time-u.lastAttack<5)||u.pendingStrike)return 'Equipe fora de combate: 5 s sem causar ou receber dano.';
@@ -244,12 +261,13 @@ export class Match {
     if(!target){u.combo=0;u.comboTarget=null;this.emit('miss',{unit:u.id,x:u.x,z:u.z});return;}
     const chain=u.comboTarget===target.id&&u.comboUntil>this.time?u.combo:0;
     const finisher=!heavy&&chain>=2,opening=u.openingUntil>this.time;
-    const damage=stats.damage*(heavy?stats.heavy:finisher?1+B.combat.comboBonus:1)*(opening?1+stats.opening:1)*(target.kind?stats.siege:1)*(target.kind&&this.time>B.finalAge&&u.levels.siege>=3?B.troll.finalSiege:1);
+    const breach=target.kind==='wall'?this.addBreachMomentum(target,heavy,u):{stacks:0,multiplier:1};
+    const damage=stats.damage*(heavy?stats.heavy:finisher?1+B.combat.comboBonus:1)*(opening?1+stats.opening:1)*(target.kind?stats.siege:1)*(target.kind&&this.time>B.finalAge&&u.levels.siege>=3?B.troll.finalSiege:1)*breach.multiplier;
     const actual=this.damage(target,damage,u,'melee');
     if(target.kind&&target.hp>0&&this.legendarySword(u)&&target.hp/target.maxHp<=B.legendary.executeThreshold){this.emit('legendary-execute',{unit:u.id,entity:target.id,x:target.x,z:target.z});this.damage(target,target.hp,u,'legendary-execute');}
     u.openingUntil=0;u.combo=heavy||finisher?0:chain+1;u.comboTarget=target.id;u.comboUntil=this.time+B.combat.comboWindow;
     if(stats.drain)u.hp=Math.min(u.maxHp,u.hp+Math.min(u.maxHp*.01,actual*stats.drain*(target.kind ? .375 : 1)));
-    this.emit('impact',{unit:u.id,entity:target.id,x:target.x,z:target.z,amount:Math.round(actual),heavy,finisher,opening,broken:target.hp<=0&&target.kind==='wall'});
+    this.emit('impact',{unit:u.id,entity:target.id,x:target.x,z:target.z,amount:Math.round(actual),heavy,finisher,opening,broken:target.hp<=0&&target.kind==='wall',breachStacks:breach.stacks});
   }
   roar(u){
     if(u.role!=='troll')return 'Habilidade exclusiva do Troll.';if((u.cooldowns.roar||0)>this.time)return 'Rugido recarregando.';
@@ -302,7 +320,7 @@ export class Match {
     if(target.hp<=0||amount<=0||!Number.isFinite(amount))return 0;
     const actual=Math.min(target.hp,amount);target.hp-=actual;
     this.telemetry.hit(this,target,actual,source,kind,sourceId);
-    if(source){const sourceType=kind==='tower'?'tower':source.role||source.kind||kind,targetType=target.role||target.kind,key=`${sourceType}->${targetType}`;let interaction=this.combatInteractions.get(key);if(!interaction){interaction={source:sourceType,target:targetType,startedAt:this.time,damage:0,attacks:0,finishedAt:null,targets:{}};this.combatInteractions.set(key,interaction);}interaction.damage+=actual;interaction.attacks++;interaction.lastHitAt=this.time;const contact=interaction.targets[target.id]??={first:this.time,death:null};if(target.hp<=0)contact.death=this.time;if(target.hp<=0&&interaction.finishedAt===null)interaction.finishedAt=this.time;target.stats&&(target.stats.damageReceived=(target.stats.damageReceived||0)+actual);}
+    if(source){const sourceType=['tower','legendary-beam'].includes(kind)?'tower':source.role||source.kind||kind,targetType=target.role||target.kind,key=`${sourceType}->${targetType}`;let interaction=this.combatInteractions.get(key);if(!interaction){interaction={source:sourceType,target:targetType,startedAt:this.time,damage:0,attacks:0,finishedAt:null,targets:{}};this.combatInteractions.set(key,interaction);}interaction.damage+=actual;interaction.attacks++;interaction.lastHitAt=this.time;const contact=interaction.targets[target.id]??={first:this.time,death:null};if(target.hp<=0)contact.death=this.time;if(target.hp<=0&&interaction.finishedAt===null)interaction.finishedAt=this.time;target.stats&&(target.stats.damageReceived=(target.stats.damageReceived||0)+actual);}
     // Hunger is attrition, not an enemy hit: do not renew threat, exposure or attack alerts.
     if(kind!=='hunger')target.lastHit=this.time;
     if(source?.role==='troll'){
@@ -310,7 +328,7 @@ export class Match {
       const gain=actual*B.troll.goldPerDamage*scaling(this.startingElfCount,total,economic.filter(s=>s.kind==='core').length,this.time);
       const budgeted=target.kind||target.role==='wisp',awarded=target.ghost?0:budgeted?Math.min(gain,target.bounty||0):gain;
       if(budgeted)target.bounty-=awarded;this.grantTrollGold(source,awarded,'damage');source.lastAttack=this.time;source.stats.damage+=actual;this.stats.trollDamage+=actual;
-    }else if(kind==='tower'){this.stats.towerDamage+=actual;if(source)source.stats.damage+=actual;}
+    }else if(['tower','legendary-beam'].includes(kind)){this.stats.towerDamage+=actual;if(source)source.stats.damage+=actual;}
     this.emit('damage',{entity:target.id,unit:source?.id,x:target.x,z:target.z,amount:Math.round(actual),kind});
     if(target.hp<=0){
       target.hp=0;

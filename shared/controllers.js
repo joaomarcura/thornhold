@@ -8,7 +8,8 @@ const shuffled=(values,rng)=>{const result=[...values];for(let i=result.length-1
 
 // Controllers only choose intentions. Every cost, hit, cooldown and collision goes through Match.
 export class AIController {
-  constructor(difficulty='normal'){this.profile=B.difficulty[difficulty]||B.difficulty.normal;this.difficulty=difficulty;this.nextThink=0;this.route=[];this.destination=null;this.routeAt=-100;this.explored=new Set();this.exploreTarget=null;this.exploreAt=0;this.discovered=new Map();this.retreating=false;this.navigationFailure=null;this.lastNavigationEntity=null;this.lastNavigationAt=-Infinity;this.metrics={idle:0,attacking:0,defending:0,retreating:0,failedNavigation:0,failedExploration:0,pathRecalculations:0,retreatAttempts:0,retreatSuccesses:0,targetChanges:0,stuckNavigation:0};}
+  constructor(difficulty='normal'){this.profile=B.difficulty[difficulty]||B.difficulty.normal;this.difficulty=difficulty;this.nextThink=0;this.route=[];this.destination=null;this.routeAt=-100;this.explored=new Set();this.exploreTarget=null;this.exploreAt=0;this.discovered=new Map();this.retreating=false;this.navigationFailure=null;this.lastNavigationEntity=null;this.lastNavigationAt=-Infinity;this.metrics={idle:0,attacking:0,defending:0,retreating:0,failedNavigation:0,failedExploration:0,pathRecalculations:0,retreatAttempts:0,retreatSuccesses:0,targetChanges:0,stuckNavigation:0,navigationFailureReasons:{stuck:0,noRoute:0},navigationFailureSamples:[]};}
+  recordNavigationFailure(match,target,reason){this.metrics.navigationFailureReasons[reason]=(this.metrics.navigationFailureReasons[reason]||0)+1;if(this.metrics.navigationFailureSamples.length<100){const entity=target.entityId?match.entity(target.entityId)||this.discovered.get(target.entityId):null;this.metrics.navigationFailureSamples.push({time:+match.time.toFixed(1),reason,state:this.brain?.state||null,targetId:target.entityId||null,targetKind:entity?.kind||entity?.role||null,baseId:entity?.baseId||null});}}
   tick(match,u,dt){
     if(match.time>=this.nextThink){const think=u.role==='elf'?Math.max(.7,this.profile.think):this.profile.think;this.nextThink=match.time+think;if(u.ghost)this.ghost(match,u);else if(u.role==='elf')this.elf(match,u);else this.troll(match,u);}
     // Brain decisions only update the intention. Apply movement once per tick;
@@ -16,7 +17,7 @@ export class AIController {
     if(this.destination)this.follow(match,u,dt);else u.input={x:0,z:0};
     // Once a target is chosen, hold the attack like a human holding the mouse.
     // Difficulty still controls when the bot reconsiders its target or retreat.
-    if(u.role==='troll'&&!this.retreating&&['siege','chase'].includes(this.brain?.state)){
+    if(u.role==='troll'&&!this.retreating&&['siege','breach','chase'].includes(this.brain?.state)){
       const target=match.entity(this.brain.targetId),stats=match.trollStats(u);
       if(target?.hp>0&&match.canSee(u,target)&&!match.wallBlocks(u,target)&&distance(u,target)<=stats.range+(target.kind?B.structures[target.kind].radius:0)-.1){
         u.yaw=Math.atan2(target.x-u.x,target.z-u.z);match.act(u.id,{type:'attack',heavy:!(u.cooldowns.heavy>match.time)});
@@ -24,7 +25,7 @@ export class AIController {
     }
     if(u.role==='troll'){
       const state=this.brain?.state||'idle';
-      const bucket=['chase','siege'].includes(state)?'attacking':['disengage','recover'].includes(state)?'retreating':['rotate','explore','hunt','probe','reposition'].includes(state)?'defending':'idle';
+      const bucket=['chase','siege','breach'].includes(state)?'attacking':['disengage','recover'].includes(state)?'retreating':['rotate','explore','hunt','probe','reposition','finisher'].includes(state)?'defending':'idle';
       this.metrics[bucket]+=dt;
     }
   }
@@ -43,7 +44,7 @@ export class AIController {
     const target=this.destination;if(!target)return;
     if(distance(u,target)<=target.reach&&lineOfSight(match.map,u,target)){this.stop(u);return;}
     if(this.progressProbe&&match.time-this.progressProbe.time>=3){
-      if(distance(u,this.progressProbe)<.3&&this.route.length){this.metrics.stuckNavigation++;this.route=[];this.routeAt=-100;this.navigationFailure=target.entityId||'point';this.navigationFailureTarget={...target};this.stop(u);this.progressProbe=null;return;}
+      if(distance(u,this.progressProbe)<.3&&this.route.length){this.metrics.stuckNavigation++;this.recordNavigationFailure(match,target,'stuck');this.route=[];this.routeAt=-100;this.navigationFailure=target.entityId||'point';this.navigationFailureTarget={...target};this.stop(u);this.progressProbe=null;return;}
       this.progressProbe=null;
     }
     this.progressProbe??={x:u.x,z:u.z,time:match.time};
@@ -73,7 +74,7 @@ export class AIController {
       // terrain LOS is blocked by the cell edge. They are already reached for
       // navigation purposes; keep the brain from oscillating on that point.
       if(!target.entityId&&distance(u,target)<=target.reach&&lineOfSight(match.map,u,target)){this.stop(u);return;}
-      if(target.entityId){if(this.lastNavigationEntity!==target.entityId||match.time-this.lastNavigationAt>15)this.metrics.failedNavigation++;this.lastNavigationEntity=target.entityId;this.lastNavigationAt=match.time;}else this.metrics.failedExploration++;this.navigationFailure=target.entityId||'point';this.navigationFailureTarget={...target};this.destination=null;this.route=[];this.routeAt=-100;u.input={x:0,z:0};return;
+      if(target.entityId){if(this.lastNavigationEntity!==target.entityId||match.time-this.lastNavigationAt>15){this.metrics.failedNavigation++;this.recordNavigationFailure(match,target,'noRoute');}this.lastNavigationEntity=target.entityId;this.lastNavigationAt=match.time;}else this.metrics.failedExploration++;this.navigationFailure=target.entityId||'point';this.navigationFailureTarget={...target};this.destination=null;this.route=[];this.routeAt=-100;u.input={x:0,z:0};return;
     }
     const traveling=u.role==='troll'&&!this.retreating&&['explore','hunt','rotate'].includes(this.brain?.state),travelFactor=traveling?B.troll.travelSpeed:1;
     const sprint=u.role==='elf'?B.movement.elfSprint:B.movement.sprint,d=distance(u,next),speed=(u.role==='elf'?B.elf.speed:match.trollStats(u).movement)*sprint*(u.dashUntil>match.time?B.troll.dashSpeed:1)*travelFactor,divisor=Math.max(.001,d,speed*dt);u.input={x:(next.x-u.x)/divisor,z:(next.z-u.z)/divisor,sprint:u.role==='elf'||this.retreating||this.brain?.state==='reposition',travel:traveling};u.yaw=Math.atan2(u.input.x,u.input.z);

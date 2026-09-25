@@ -265,3 +265,38 @@ Por decisão de balanceamento, o HP base de todas as Barricadas foi dobrado de 1
 Em 100 partidas pareadas 1×5 Normal, o experimento produziu 47 vitórias do Troll, 47 dos Elfos e 6 partidas ainda ativas aos 30 minutos. A mediana chegou a 15:34 e apenas 8% terminaram antes de 10 minutos. Entretanto, o sucesso de cerco caiu para 33,28%, 18% ultrapassaram 25 minutos e as falhas médias de navegação subiram para 47,55.
 
 A durabilidade dobrada permanece ativa, mas este lote não substitui o baseline aprovado da V2.11. A próxima etapa deve corrigir resolução e navegação em cercos longos sem desfazer silenciosamente a nova durabilidade. Artefato: `artifacts/barricade-double-hp-100.json`.
+
+## V2.13 — Risco unificado e aprendizado de cerco
+
+- seleção de alvo, combate, setores e fuga usam a mesma avaliação de ameaça;
+- recuo exige segurança, tendência de HP não negativa e recuperação real antes do retorno;
+- três falhas suprimem um alvo até mudança relevante de poder, defesa ou HP;
+- alvos internos sem rota transformam uma Barricada conhecida em pré-requisito;
+- memória estratégica invalida estruturas quando o Troll confirma visualmente que desapareceram;
+- `FINISHER` concentra seleção e rotação quando restam até dois Elfos e todas as bases relevantes foram descobertas;
+- adaptação preserva o arquétipo da build, aceita no máximo `×1,35` e só reavalia a cada 50 segundos;
+- Espada Lendária exige 10 níveis combinados em Fúria/Cerco e 16 níveis totais, sem bloqueio temporal;
+- telemetria schema 5 registra eficiência e causa de cada cerco, além de indicadores de snowball nos checkpoints.
+
+O `BREACH` restrito foi implementado como experimento (cinco stacks, máximo de +20% de cerco e −10% de reparo), mas permanece desligado por padrão. O A/B pareado mostrou que ele não resolveu o gargalo e prolongou uma fortaleza final com cinco Torres Lendárias. A variante candidata mantém apenas a adaptação limitada. Artefato resumido: `artifacts/v2-13-ab-final-summary.json`.
+
+### Validação V2.13
+
+O A/B curto utilizou as mesmas dez seeds em todas as variantes:
+
+| Variante | Troll WR | Elf WR | Mediana | P10 | P90 | <8 min | >25 min | Sucesso de cerco | Lendária Troll | Lendária Elfo |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| A — estrutural | 62,5% | 37,5% | 24:07 | 15:59 | 30:00 | 0% | 50% | 29,5% | 10:15 | 18:15 |
+| B — Breach | 50,0% | 50,0% | 24:08 | 13:12 | 30:00 | 0% | 50% | 30,3% | 10:15 | 17:07 |
+| C — adaptação limitada | 55,6% | 44,4% | 21:59 | 13:56 | 28:27 | 0% | 30% | 32,2% | 10:21 | 19:32 |
+| D — ambos | 44,4% | 55,6% | 22:25 | 13:12 | 28:27 | 0% | 30% | 32,7% | 10:21 | 17:07 |
+
+A variante C apresentou o comportamento mais saudável: resolveu mais partidas, reduziu a cauda longa e preservou melhor o contrajogo do que Breach. Ela foi escolhida por comportamento, não apenas por win rate.
+
+A validação ampliada de C em 100 seeds, após bloquear tentativas contra alvos internos de uma base cuja entrada não possui rota, produziu 31 vitórias do Troll, 32 dos Elfos e 37 partidas ainda ativas aos 30 minutos. Entre as partidas resolvidas, o resultado foi 49,2% Troll / 50,8% Elfos; a mediana foi 23:52, P10 12:05, P90 30:00, 1% abaixo de oito minutos, 49% acima de 25 minutos e 27,0% de sucesso de cerco. A Espada Lendária teve mediana de 10:08 e a primeira estrutura Lendária dos Elfos, 19:04.
+
+Esse lote é equilibrado em vitórias, mas foi **rejeitado como baseline candidato**: resolução, duração e navegação não atingiram os alvos. As partidas abertas não são simples ausência de combate; em geral contêm fortalezas tardias com múltiplas Torres Lendárias e Barricadas de tiers altos. Corrigir isso exige a etapa posterior de curvas de níveis 10–20 e encerramento de partida, explicitamente fora do escopo deste ciclo. O sistema não força um vencedor artificial.
+
+A regressão isolada `THORNHOLD` terminou com vitória dos Elfos em 28:04, zero falhas `noRoute`, 33,3% de sucesso de cerco, Espada Lendária em 14:01 e primeira Torre Lendária em 22:09. O resultado confirma que a seed não foi otimizada como caso especial. Artefatos: `artifacts/v2-13-candidate-C-base-block-100.json` e `artifacts/v2-13-thornhold-final.json`.
+
+O laboratório agora aceita `SIM_SEEDS=THORNHOLD` para regressões explícitas e resume também partidas abaixo de oito minutos, acima de 25 minutos, eficiência média de cerco e o checkpoint econômico de 20 minutos.

@@ -39,11 +39,11 @@ for(const scenario of [
   }finally{await Promise.all(clients.map(closeClient));await app.close();}
 });
 
-test('E + G: todos bots, fim real, retorno conjunto ao lobby e nova seed na revanche',async()=>{
+test('E + G: lobby padrão 1×5 só com bots, fim real, retorno conjunto e revanche',async()=>{
   const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false});let host,guest;
   try{
-    host=await client(app.port,'Observador');host.send('create',{role:'elf',fillBots:true,settings:{elfSlots:2,private:true,seed:'TEST-2'}});const {room}=await host.wait('lobby');
-    guest=await client(app.port,'Observador 2');guest.send('join',{code:room.id});await guest.wait('lobby');host.send('observe');await host.wait('lobby',m=>!m.room.slots.some(s=>s.occupant?.clientId===host.hello.id));host.send('slot',{slot:'e0',action:'bot'});await host.wait('lobby',m=>m.room.slots.filter(s=>s.occupant?.type==='bot').length===3);
+    host=await client(app.port,'Observador');host.send('create',{role:'elf',fillBots:true,settings:{elfSlots:5,private:true,seed:'THORNHOLD'}});const {room}=await host.wait('lobby');
+    guest=await client(app.port,'Observador 2');guest.send('join',{code:room.id});await guest.wait('lobby');host.send('observe');await host.wait('lobby',m=>!m.room.slots.some(s=>s.occupant?.clientId===host.hello.id));host.send('slot',{slot:'e0',action:'bot'});await host.wait('lobby',m=>m.room.slots.filter(s=>s.occupant?.type==='bot').length===6);
     host.send('ready',{ready:true});guest.send('ready',{ready:true});await host.wait('lobby',m=>m.room.errors.length===0);host.send('start');await host.wait('map');await guest.wait('map');
     const live=app.sessions.rooms.get(room.id);for(let i=0;i<18000&&live.match.state!==STATES.END;i++)live.match.step(.1);
     const results=await Promise.all([host.wait('result'),guest.wait('result')]);assert.deepEqual(results[0],results[1]);assert.ok(results[0].result.trollDamage>0);assert.ok(results[0].result.towerDamage>0);

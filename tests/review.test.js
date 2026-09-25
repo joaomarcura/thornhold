@@ -106,10 +106,13 @@ test('Telemetry distinguishes hunger, caps overkill, tracks tower count and earn
   m.telemetry.step(m,.1);assert.equal(m.telemetry.peakTowers,2);
   const before=t.gold;m.damage(e,20,t,'melee');assert.equal(t.stats.goldGenerated,t.gold-before);
   m.time=63;m.telemetry.step(m,.1);assert.equal(m.telemetry.hits.size,0);
-  m.damage(t,999999,e,'tower','a');const report=m.result();
+  m.damage(t,20,e,'legendary-beam','beam');m.damage(t,999999,e,'tower','a');const report=m.result();
   assert.equal(report.telemetry.death.time,63);assert.equal(report.telemetry.received.hunger,5);
-  assert.equal(report.telemetry.received.tower,B.troll.hp-5);assert.equal(report.telemetry.survivalCensored,false);
+  assert.equal(report.telemetry.received.tower,B.troll.hp-5);assert.equal(report.towerDamage,B.troll.hp-5);assert.equal(report.combatInteractions.find(row=>row.source==='tower').damage,B.troll.hp-5);assert.equal(report.combatInteractions.some(row=>row.source==='elf'),false);assert.equal(report.telemetry.survivalCensored,false);
   assert.ok(report.telemetry.timeline.length<=500);assert.equal(m.state,STATES.END);
+});
+test('Checkpoints econômicos cobrem partidas de até uma hora',()=>{
+  const m=create();m.state=STATES.ACTIVE;m.time=m.preparation+3038;m.telemetry.step(m,.1);const checkpoints=m.result().telemetry.v2.economyCheckpoints;assert.equal(checkpoints.at(-1).time,3000);assert.ok(checkpoints.some(row=>row.time===1800));assert.ok(checkpoints.some(row=>row.time===2700));
 });
 test('Match diagnostics do not alter deterministic gameplay',()=>{
   const a=create(),b=create();b.telemetry.detailed=false;

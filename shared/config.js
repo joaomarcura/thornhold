@@ -14,9 +14,10 @@ export const BALANCE = {
   progression:{structureGrowth:1.18,costGrowth:1.35,woodCostGrowth:1.25,trollDamageGrowth:1.12,healthGrowth:1.14},
   wisps:{gold:65,wood:15,hireGrowth:1.32,trainSeconds:6,income:1.4,incomeGrowth:1.25,upgradeGold:70,upgradeWood:20,costGrowth:1.5,seconds:4,hp:55,externalBonus:1.6,range:25,regrowSeconds:35},
   combat:{buffer:.18,lightWindup:.1,heavyWindup:.32,comboWindow:2.8,comboBonus:.25,openingSeconds:1.2,openingBonus:.2},
+  breachMomentum:{maxStacks:5,firstStackSeconds:3,nextStackSeconds:4,decayDelay:5,decaySeconds:3,damagePerStack:.04,repairPenaltyPerStack:.02},
   elf: { hp: 85, speed: 6.4, gold: 150, wood: 110, gather: 10, gatherInterval: 0.65, repair: 42, repairCost: 3, stunDuration:3, stunCooldown:60, stunRange:10, relocationSeconds:60 },
   ghost:{hp:55,vision:8,revealRadius:18,revealDuration:10,revealCooldown:60,goldReward:25},
-  legendary:{tier:10,coreIncome:2,wallHealth:4,towerDps:325,rampPerSecond:.35,maxRamp:4,swordLevels:10,executeThreshold:.15},
+  legendary:{tier:10,coreIncome:2,wallHealth:4,towerDps:325,rampPerSecond:.35,maxRamp:4,swordLevels:10,swordTotalLevels:16,executeThreshold:.15},
   epic:{tier:20},
   tower:{specializations:false,standard:{damage:1.45,interval:1,range:0,armorPierce:0}},
   troll: { hp: 2200, speed: 5.8, travelSpeed:1.05, damage: 24, interval: 1.05, range: 3.6, armor: 1, gold: 0, goldPerDamage: 0.42, combatRegenRate:.001,restRegenRate:.003,combatRegenPerLevel:.0005,restRegenPerLevel:.001,regenLevelCap:10,sanctuaryRadius:6,sanctuaryRegenRate:.005,damageGrowth:1.18,speedFactor:.88,healthPerLevel:320,armorPerLevel:3,movementPerLevel:.08,siegePerLevel:.18,finalSiege:1.35,regenDelay:4,healPercent:.2,healCharges:2,healRecharge:180,healCooldown:75,healDuration:6,exposureGrace:9,exposureRate:.035,heavy: 2.25,heavyRecovery:1.3, heavyCooldown: 4, dashCooldown: 7,dashDuration:.4,dashSpeed:2.5, roarCooldown: 18,roarRange:9,roarDuration:2 },
@@ -50,7 +51,7 @@ export const MATCH_MODES=Object.freeze({
   normal:{name:'Normal',description:'Regras oficiais sem pontuação ranqueada.',preset:{elfSlots:5,difficulty:'normal',mapSize:'compact',preparation:50,takeover:true,allowRoles:true}},
   ranked:{name:'Ranqueado',description:'Preset competitivo; MMR será ativado na etapa de filas.',preset:{elfSlots:5,difficulty:'normal',mapSize:'compact',preparation:50,takeover:true,allowRoles:false,private:false,local:false}}
 });
-export const DEFAULT_SETTINGS = { mode:'custom',elfSlots:5, difficulty:'normal', seed:'THORNHOLD', mapSize:'compact', preparation:50, private:true, local:false, region:'SA', takeover:true, allowRoles:true };
+export const DEFAULT_SETTINGS = { mode:'custom',elfSlots:5, difficulty:'normal', seed:'THORNHOLD', mapSize:'compact', preparation:50, private:true, local:false, region:'SA', takeover:true, allowRoles:true, breachEnabled:false, adaptiveBuildEnabled:true };
 export const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 export const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 export const mitigation=armor=>1/(1+0.055*Math.max(0,armor));

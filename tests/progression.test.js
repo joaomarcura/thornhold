@@ -29,6 +29,14 @@ test('Todas as Barricadas herdam o dobro do HP base em cada nível',()=>{
   assert.equal(B.structures.wall.hp,2310);assert.equal(structureHP('wall',1),2310);
   for(let tier=1;tier<=B.maxTier;tier++){const legendary=tier>=B.legendary.tier?B.legendary.wallHealth:1;assert.equal(structureHP('wall',tier),2310*tierScale(B.structures.wall.growth,tier)*legendary);}
 });
+test('Breach Momentum aumenta dano contínuo e reduz reparo da Barricada',()=>{
+  const m=match(),t=m.unit('t'),e=m.unit('e'),wall={id:'breach-wall',kind:'wall',owner:e.id,baseId:'breach-base',x:t.x,z:t.z+2,hp:231000,maxHp:231000,tier:B.legendary.tier,progress:1,bounty:500,lastHit:-100};m.settings.breachEnabled=true;m.state=STATES.ACTIVE;m.time=80;m.structures.push(wall);Object.assign(e,m.map.bases[0]);Object.assign(m.unit('ally'),m.map.bases[1]);t.yaw=0;
+  m.setController(t.id,'bot');m.controllers.get(t.id).brain={state:'breach'};
+  assert.equal(m.addBreachMomentum(wall,true,t).stacks,0);m.time+=3.1;assert.equal(m.addBreachMomentum(wall,true,t).stacks,1,'heavy não pula múltiplos stacks');
+  const before=wall.hp,base=m.trollStats(t).damage*m.trollStats(t).siege;m.damage(wall,base*1.04,t,'melee');assert.ok(Math.abs((before-wall.hp)-base*1.04)<.01);
+  wall.hp-=100;Object.assign(e,{x:wall.x,z:wall.z});const damaged=wall.hp;m.act(e.id,{type:'repair',target:wall.id});assert.ok(Math.abs((wall.hp-damaged)-B.elf.repair*.98)<.01);
+  m.time+=B.breachMomentum.decayDelay+B.breachMomentum.decaySeconds+.01;assert.equal(m.breachMomentum(wall).stacks,0);
+});
 
 test('Melhorias são compromissos; apenas obra e formação podem ser canceladas',()=>{
   const m=match(),{e,core}=baseFixture(m),upgradePrice=upgradeCost(core);m.act('e',{type:'upgrade',target:core.id});advance(m,1);
@@ -215,7 +223,7 @@ test('Defesa de torres mata Troll exposto e encerra partida com vitória dos Elf
   const end=m.time;advance(m,2);assert.equal(m.time,end);
 });
 test('Progressão lendária resolve estruturas e aumenta o raio enquanto mantém contato',()=>{
-  const sword=arena(),{m,t,e}=sword,structure={id:'execute-me',kind:'core',owner:'e',baseId:'base-x',x:t.x,z:t.z+2,tier:1,hp:140,maxHp:1000,progress:1,bounty:100,lastHit:-100};Object.assign(e,{x:t.x+20,z:t.z+20});m.structures.push(structure);t.yaw=0;t.levels.damage=5;t.levels.siege=5;
+  const sword=arena(),{m,t,e}=sword,structure={id:'execute-me',kind:'core',owner:'e',baseId:'base-x',x:t.x,z:t.z+2,tier:1,hp:140,maxHp:1000,progress:1,bounty:100,lastHit:-100};Object.assign(e,{x:t.x+20,z:t.z+20});m.structures.push(structure);t.yaw=0;t.levels.damage=5;t.levels.siege=5;t.levels.health=6;
   assert.equal(m.legendarySword(t),true);m.act(t.id,{type:'attack'});m.time=t.pendingStrike.at;m.resolveStrike(t);assert.equal(structure.hp,0);assert.ok(m.events.some(e=>e.type==='legendary-execute'));
 
   const beam=match(),troll=beam.unit('t'),elf=beam.unit('e');beam.state=STATES.ACTIVE;beam.time=80;troll.hp=troll.maxHp=10000;Object.assign(elf,{x:troll.x+8,z:troll.z+8});
