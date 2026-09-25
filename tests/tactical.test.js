@@ -6,7 +6,7 @@ import { toCell, index } from '../shared/map.js';
 import { AIController } from '../shared/controllers.js';
 import { TacticalMap } from '../client/tactical-map.js';
 import { StrategicMap } from '../shared/strategic-map.js';
-import { TROLL_STATES } from '../shared/troll-brain.js';
+import { TROLL_STATES, TrollBrain } from '../shared/troll-brain.js';
 const match=()=>new Match({seed:'TACTICS'},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},...['e0','e1'].map(id=>({id,role:'elf',occupant:{type:'human',name:id}}))]);
 
 test('Seed varia patrulha do Troll, refúgios e planos de construção sem perder reprodutibilidade',()=>{
@@ -24,6 +24,15 @@ test('Troll reinicia patrulha quando todo o mapa conhecido fica sem alvo',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=1200;c.searchStarted=true;c.searchBases=[...m.map.bases];c.searchBaseIndex=c.searchBases.length;
   for(let z=0;z<m.map.size;z++)for(let x=0;x<m.map.size;x++)c.explored.add(index(m.map,x,z));
   c.explore(m,u);assert.ok(c.destination);assert.equal(c.searchBaseIndex,1);assert.equal(c.metrics.patrolCycles,1);
+});
+test('Custo de tempo reduz prioridade de viagens enquanto cinco economias continuam crescendo',()=>{
+  const m=match(),u=m.unit('t'),brain=new TrollBrain(),target={id:'far-elf',role:'elf',ghost:false,x:u.x+20,z:u.z,hp:85,maxHp:85,seenAt:m.time},core={id:'known-core',kind:'core',x:u.x+4,z:u.z,tier:5,hp:1000,maxHp:1000,progress:1,seenAt:m.time},stats=m.trollStats(u);
+  const without=brain.targetScore(m,u,target,[],stats),withEconomy=brain.targetScore(m,u,target,[core],stats);assert.ok(withEconomy.opportunityCost>0);assert.ok(withEconomy.score<without.score);
+});
+test('CHASE usa orçamento dinâmico e estagnação troca caça improdutiva por raid',()=>{
+  const m=match(),u=m.unit('t'),c=new AIController('normal'),brain=new TrollBrain(),elf=m.unit('e0');m.state=STATES.ACTIVE;
+  Object.assign(elf,{x:u.x+6,z:u.z,hp:10});assert.equal(brain.chaseBudget(m,u,elf,{danger:{towers:0}}),20);elf.hp=elf.maxHp;elf.x=u.x+16;assert.equal(brain.chaseBudget(m,u,elf,{danger:{towers:1}}),9);
+  brain.strategy='hunter';brain.lastProgressAt=0;m.time=100;brain.updateDirector(c,m,u,[]);assert.equal(brain.strategy,'raider');assert.equal(brain.stagnationEvents,1);assert.equal(brain.director.stagnant,true);
 });
 
 test('Pings validam coordenadas, respeitam equipe, cooldown e expiração',()=>{

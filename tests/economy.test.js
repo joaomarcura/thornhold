@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { recordRefund, recordSpend, structurePurpose } from '../shared/economy.js';
 import { analyzeEconomy } from '../scripts/economy-audit.js';
-import { compareVariant } from '../scripts/sensitivity.js';
+import { ABLATIONS, compareVariant } from '../scripts/sensitivity.js';
+import { balanceQuality } from '../scripts/arena.js';
+import { SKILL_SCENARIOS, slotsForProfile } from '../scripts/profile-lab.js';
 
 test('Contabilidade econômica separa propósito, ação, gasto bruto e reembolso',()=>{
   const unit={stats:{goldSpent:0,woodSpent:0,goldRefunded:0,woodRefunded:0,spendByPurpose:{},spendByAction:{}}};
@@ -21,4 +23,13 @@ test('Auditoria econômica encontra saturação e preserva cortes por perfil',()
 test('Sensibilidade pareada mede delta, fragilidade e mudanças de vencedor',()=>{
   const baseline=[{seed:'A',difficulty:'normal',winner:'elves',duration:800,completed:true},{seed:'B',difficulty:'hard',winner:'troll',duration:600,completed:true}],variant=[{seed:'A',difficulty:'normal',winner:'troll',duration:650,completed:true},{seed:'B',difficulty:'hard',winner:'troll',duration:500,completed:true}];
   const row=compareVariant('towerDamage',5,variant,baseline);assert.equal(row.deltaWinRate,50);assert.equal(row.fragility,10);assert.equal(row.winnerFlips,1);assert.equal(row.deltaMedianDuration,-100);
+});
+
+test('Balance Lab pontua equilíbrio, duração, resolução e comportamento separadamente',()=>{
+  const healthy=Array.from({length:20},(_,i)=>({completed:true,winner:i%2?'troll':'elves',duration:840,ai:[{failedNavigation:5}]})),poor=healthy.map((row,i)=>({...row,winner:'troll',duration:i<10?360:1800,completed:i<15,ai:[{failedNavigation:80}]}));
+  const good=balanceQuality(healthy),bad=balanceQuality(poor);assert.equal(good.score,100);assert.ok(bad.score<good.score);assert.equal(bad.components.resolution,0);assert.equal(bad.components.navigation,10);
+});
+test('Balance Lab cobre ablações e perfis artificiais sem alterar atributos',()=>{
+  assert.deepEqual(ABLATIONS.map(item=>item.name),['exposure-off','sanctuary-off','healing-off','threat-income-off','legendary-off']);assert.equal(SKILL_SCENARIOS.length,6);
+  const expert=slotsForProfile(SKILL_SCENARIOS.find(item=>item.name==='expert-troll')),afk=slotsForProfile(SKILL_SCENARIOS.find(item=>item.name==='one-afk-elf'));assert.equal(expert[0].occupant.difficulty,'hard');assert.equal(afk.filter(slot=>slot.occupant.type==='human').length,1);assert.equal(afk.length,6);
 });

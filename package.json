@@ -21,6 +21,7 @@
     "audit:combat": "node scripts/combat-audit.js",
     "audit:economy": "node scripts/economy-audit.js",
     "audit:sensitivity": "node scripts/sensitivity.js",
+    "audit:profiles": "node scripts/profile-lab.js",
     "audit:progression": "node scripts/progression-audit.js",
     "audit:compare": "node scripts/compare-progression.js"
   },

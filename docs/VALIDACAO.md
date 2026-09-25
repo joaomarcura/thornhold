@@ -2,6 +2,16 @@
 
 Os testes exercitam o código real, não telas simuladas. As conexões chamadas de “humanas” nos testes automáticos são clientes de rede sintéticos, sem controlador IA do servidor. Isso valida protocolo e ocupação dos slots; não substitui sessões de usabilidade com pessoas.
 
+## Diretor estratégico e Balance Lab — 25/09/2026
+
+- O Troll considera custo de viagem, custo de oportunidade das economias conhecidas e um Chase Budget de 4–20 segundos; nenhuma decisão consulta unidades ou estruturas ocultas.
+- Após 90 segundos ativos sem progresso, o diretor troca prioridade para economia e reinicia exploração. Ele não concede atributos, recursos, posição inimiga ou condição de vitória.
+- O Balance Lab passou a produzir score 0–100 e componentes de vitória, duração, resolução, early/long game e navegação. Há modos de ablação e perfis artificiais, sempre preservando 1×5.
+- Amostra de segurança de 30 seeds: 17 Troll–13 Elfos, zero abertas, mediana 11:36, nenhuma abaixo de oito minutos e qualidade 90,5. Artefato: `artifacts/v2-strategic-director-corrected-30.json`.
+- A primeira rodada de 100 foi rejeitada em 57–43. A causa foi isolada no Chase Budget curto; os atributos permaneceram intactos.
+- Rodada aprovada, pareada com o baseline: 51 Troll–49 Elfos, 100/100 resolvidas, mediana 11:11, 4% abaixo de oito minutos e qualidade 91,7. Falhas médias de navegação 22,63 → 20,97; travamentos 31,13 → 25,79; exploração 10,26 → 8,44. Artefato: `artifacts/v2-strategic-director-calibrated-100.json`.
+- O bloco estratégico foi aprovado, mas não fecha `GAME-116`: a mediana ainda não está na faixa de 13–15 minutos.
+
 ## Auditoria de progressão do GAME-116 — 25/09/2026
 
 - A telemetria registra marcos Lendário/Épico, níveis finais do Troll e maior tier final por tipo de estrutura; o agregador apresenta frequência, média, mediana, P10 e P90.

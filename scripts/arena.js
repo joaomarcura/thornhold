@@ -6,6 +6,15 @@ import { Match } from '../shared/simulation.js';
 import { BALANCE, DEFAULT_SETTINGS, STATES } from '../shared/config.js';
 import { RELEASE } from '../shared/version.js';
 
+const clampScore=value=>Math.max(0,Math.min(100,value));
+export function balanceQuality(rows){
+  const completed=rows.filter(row=>row.completed&&row.winner),median=values=>{const sorted=[...values].sort((a,b)=>a-b);return sorted[Math.floor((sorted.length-1)*.5)]??0;},rate=count=>count/Math.max(1,rows.length)*100;
+  const trollRate=completed.filter(row=>row.winner==='troll').length/Math.max(1,completed.length)*100,duration=median(rows.map(row=>row.duration)),earlyRate=rate(rows.filter(row=>row.duration<480).length),longRate=rate(rows.filter(row=>row.duration>1500).length),unfinishedRate=rate(rows.filter(row=>!row.completed).length),failedNavigation=rows.reduce((sum,row)=>sum+(row.ai||[]).reduce((n,ai)=>n+(ai.failedNavigation||0),0),0)/Math.max(1,rows.length);
+  const components={winRate:clampScore(100-Math.max(0,Math.abs(trollRate-50)-5)*4),duration:duration>=780&&duration<=900?100:clampScore(100-Math.min(Math.abs(duration-780),Math.abs(duration-900))*.3),resolution:clampScore(100-unfinishedRate*10),earlyGame:clampScore(100-Math.max(0,earlyRate-10)*5),longGame:clampScore(100-Math.max(0,longRate-10)*5),navigation:clampScore(100-Math.max(0,failedNavigation-20)*1.5)};
+  const score=components.winRate*.3+components.duration*.25+components.resolution*.2+components.earlyGame*.1+components.longGame*.05+components.navigation*.1;
+  return {score:+score.toFixed(1),components:Object.fromEntries(Object.entries(components).map(([key,value])=>[key,+value.toFixed(1)])),observed:{trollWinRate:+trollRate.toFixed(1),medianDuration:duration,earlyRate:+earlyRate.toFixed(1),longRate:+longRate.toFixed(1),unfinishedRate:+unfinishedRate.toFixed(1),failedNavigation:+failedNavigation.toFixed(1)}};
+}
+
 export function aggregate(rows){
   const mean=v=>v.length?v.reduce((a,b)=>a+b,0)/v.length:0;
   const distribution=v=>{const s=[...v].sort((a,b)=>a-b),p=n=>s[Math.floor((s.length-1)*n)]??null;return {mean:mean(s),median:p(.5),p10:p(.1),p90:p(.9)};};
@@ -14,7 +23,7 @@ export function aggregate(rows){
   const trollEconomy=rows.map(r=>{const p=trollPlayer(r),damage=p.goldFromDamage||0,objectives=p.goldFromObjectives||0,threat=p.goldFromThreat||0,total=damage+objectives+threat;return {damage,objectives,threat,total,damageShare:total?damage/total:0,objectiveShare:total?objectives/total:0,threatShare:total?threat/total:0};});
   const v2=rows.map(r=>r.telemetry?.v2).filter(Boolean),sieges=v2.flatMap(v=>v.sieges||[]),states=[...new Set(v2.flatMap(v=>Object.keys(v.stateSeconds||{})))],milestone=name=>v2.map(v=>v.progression?.milestones?.[name]).filter(Number.isFinite);
   const checkpoints=[180,300,480,600,720,900].map(time=>{const samples=v2.flatMap(v=>v.economyCheckpoints||[]).filter(c=>c.time===time);return samples.length?{time,samples:samples.length,elfGoldIncomePerSecond:mean(samples.map(c=>c.elves.goldIncomePerSecond)),elfWoodIncomePerSecond:mean(samples.map(c=>c.elves.woodIncomePerSecond)),elfGeneratedGold:mean(samples.map(c=>c.elves.generatedGold)),elfSpentGold:mean(samples.map(c=>c.elves.spentGold)),elfNetSpentGold:mean(samples.map(c=>c.elves.netSpentGold||0)),elfStoredGold:mean(samples.map(c=>c.elves.storedGold)),elfGoldUtilization:mean(samples.map(c=>c.elves.goldUtilization||0)),elfWoodUtilization:mean(samples.map(c=>c.elves.woodUtilization||0)),elfEconomyInvestmentGold:mean(samples.map(c=>c.elves.spendByPurpose?.economy?.gold||0)),elfDefenseInvestmentGold:mean(samples.map(c=>c.elves.spendByPurpose?.defense?.gold||0)),elfUpgradeInvestmentGold:mean(samples.map(c=>c.elves.spendByAction?.upgrade?.gold||0)),elfUpgrades:mean(samples.map(c=>c.elves.upgrades)),trollGeneratedGold:mean(samples.map(c=>c.troll?.generatedGold||0)),trollSpentGold:mean(samples.map(c=>c.troll?.spentGold||0))}:null;}).filter(Boolean);
-  return {runs:rows.length,duration:distribution(rows.map(r=>r.duration)),trollWins:rows.filter(r=>r.winner==='troll').length,
+  return {runs:rows.length,quality:balanceQuality(rows),duration:distribution(rows.map(r=>r.duration)),trollWins:rows.filter(r=>r.winner==='troll').length,
     elfWins:rows.filter(r=>r.winner==='elves').length,timeLimit:rows.filter(r=>r.endReason==='time-limit-objective').length,
     unfinished:rows.filter(r=>!r.completed).length,under4Minutes:rows.filter(r=>r.duration<240).length,
     under10Minutes:rows.filter(r=>r.duration<600).length,
@@ -35,7 +44,7 @@ export function aggregate(rows){
     meanWoodPerMinute:mean(rows.map(r=>r.players.filter(p=>p.role==='elf').reduce((n,p)=>n+p.woodPerMinute,0)/r.elves)),
     v2:{observedRuns:v2.length,stateSeconds:Object.fromEntries(states.map(state=>[state,mean(v2.map(v=>v.stateSeconds?.[state]||0))])),sieges:{count:sieges.length,perMatch:mean(v2.map(v=>v.siegeSummary?.count||0)),successRate:sieges.length?sieges.filter(s=>s.successful).length/sieges.length*100:0,averageSeconds:mean(sieges.map(s=>s.duration)),averageHpLossPercent:mean(sieges.map(s=>s.hpLossPercent)),averageTradeScore:mean(sieges.map(s=>s.tradeScore))},progression:{firstLegendaryStructure:distribution(milestone('firstLegendaryStructureAt')),firstLegendaryTower:distribution(milestone('firstLegendaryTowerAt')),firstEpicStructure:distribution(milestone('firstEpicStructureAt')),trollLegendarySword:distribution(milestone('trollLegendarySwordAt')),matchesWithLegendaryStructure:milestone('firstLegendaryStructureAt').length,matchesWithLegendaryTower:milestone('firstLegendaryTowerAt').length,matchesWithEpicStructure:milestone('firstEpicStructureAt').length,matchesWithTrollLegendarySword:milestone('trollLegendarySwordAt').length},economyCheckpoints:checkpoints,meanVisitedSectors:mean(v2.map(v=>v.sectors?.filter(s=>s.visits>0).length||0)),meanPressureGap:mean(v2.flatMap(v=>v.pressureWindows||[]).map(w=>w.pressureGap))}};
 }
-if(!isMainThread){
+if(!isMainThread&&workerData?.indices){
   for(const i of workerData.indices){
     const difficulties=workerData.difficulties,scenarioCount=workerData.elfCounts.length*difficulties.length*workerData.mapSizes.length,scenario=i%scenarioCount,replicate=Math.floor(i/scenarioCount);
     const elves=workerData.elfCounts[scenario%workerData.elfCounts.length],difficulty=difficulties[Math.floor(scenario/workerData.elfCounts.length)%difficulties.length],mapSize=workerData.mapSizes[Math.floor(scenario/(workerData.elfCounts.length*difficulties.length))];

@@ -240,4 +240,20 @@ O artefato agrega:
 - pressure gap;
 - checkpoints econômicos.
 
+O laboratório também calcula um `Balance Quality Score` de 0–100, decomposto em taxa de vitória, duração, resolução, early game, long game e navegação. O score não altera a partida; ele torna explícito por que um lote foi aprovado ou rejeitado.
+
+`SENS_MODE=ablation npm run audit:sensitivity -- N CAMINHO` desliga isoladamente Exposure, Santuário, cura, Threat Income e progressão Lendária. `npm run audit:profiles -- N CAMINHO` mantém o lobby 1×5 e compara inteligência Novata, Média e Experiente, além de um cenário com um Elfo inativo. Os perfis usam as mesmas seeds entre cenários e não substituem o baseline Normal.
+
 Win rate permanece uma métrica de validação, não o algoritmo do jogo.
+
+## V2.11 — Custo de tempo, Chase Budget e diretor de estagnação
+
+A seleção de alvo agora contabiliza o custo de viagem enquanto as economias élficas conhecidas continuam produzindo. Esse conhecimento continua imperfeito: somente estruturas vistas entram na estimativa e seu valor decai com a idade da observação.
+
+Perseguições possuem orçamento explícito. Um alvo isolado e vulnerável pode justificar até 20 segundos; um alvo distante, protegido ou de baixa prioridade recebe uma janela menor. A IA registra fracasso somente quando o orçamento acaba sem abate, penaliza temporariamente a última posição observada e, após falhas repetidas, troca caça improdutiva por ataque à economia.
+
+O diretor detecta 90 segundos de jogo ativo sem dano, destruição, abate ou nova descoberta. Ele não concede atributos nem revela inimigos: muda a estratégia para `Raider`, abandona o alvo improdutivo e reinicia a exploração. Telemetria de perseguições, estagnação e estratégia final é exportada por partida.
+
+A amostra diagnóstica corrigida de 30 seeds 1×5 Normal terminou 17–13, sem partidas abertas ou abaixo de oito minutos, com mediana 11:36 e Balance Quality 90,5. A primeira rodada de 100 expôs uma janela de perseguição excessivamente curta e foi rejeitada em 57–43. Depois de calibrar somente o Chase Budget e a memória de abandono, sem alterar atributos, a repetição pareada terminou 51–49, com 100/100 resolvidas, mediana 11:11, 4% abaixo de oito minutos e qualidade 91,7 contra 91,4 do baseline.
+
+As falhas médias de navegação caíram de 22,63 para 20,97, os travamentos de 31,13 para 25,79 e as falhas de exploração de 10,26 para 8,44. O bloco estratégico foi aprovado, mas não alongou a mediana; `GAME-116` segue aberto até alcançar 13–15 minutos sem romper 45–55% ou a resolução. Artefato aprovado: `artifacts/v2-strategic-director-calibrated-100.json`.

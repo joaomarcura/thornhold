@@ -1,4 +1,4 @@
-import { BALANCE as B, distance, mitigation, trollCost, towerDamage, towerProfile } from './config.js';
+import { BALANCE as B, distance, income, mitigation, trollCost, towerDamage, towerProfile } from './config.js';
 import { ITEMS, BUILDS } from './equipment.js';
 import { combatRisk } from './combat-risk.js';
 import { lineOfSight, pathfind, toCell, walkable, index } from './map.js';
@@ -8,13 +8,31 @@ export const TROLL_STATES=Object.freeze(['explore','hunt','probe','siege','chase
 
 // Decisions use own state, visible opponents and dated observations only.
 export class TrollBrain {
-  constructor(){this.state='explore';this.targetId=null;this.committedUntil=0;this.avoid=[];this.safePoint=null;this.lastHp=null;this.lastTime=0;this.damageRate=0;this.engagedAt=0;this.recoveryUntil=0;this.reengageAfter=0;this.lastReceived=0;this.strategicMap=new StrategicMap();this.probedBases=new Map();this.probe=null;this.siege=null;this.siegeDecision=null;this.reposition=null;this.repositionReadyAt=0;this.strategy=null;this.failedSieges=0;this.strategyChanges=0;}
+  constructor(){this.state='explore';this.targetId=null;this.committedUntil=0;this.avoid=[];this.safePoint=null;this.lastHp=null;this.lastTime=0;this.damageRate=0;this.engagedAt=0;this.recoveryUntil=0;this.reengageAfter=0;this.lastReceived=0;this.strategicMap=new StrategicMap();this.probedBases=new Map();this.probe=null;this.siege=null;this.siegeDecision=null;this.reposition=null;this.repositionReadyAt=0;this.strategy=null;this.failedSieges=0;this.failedChases=0;this.strategyChanges=0;this.chase=null;this.observedIds=new Set();this.lastProgressValue=0;this.lastProgressAt=null;this.stagnationEvents=0;this.lastStagnationAt=-Infinity;this.director=null;}
   phase(m){const elapsed=Math.max(0,m.time-m.preparation);return elapsed<180?'hunt':elapsed<420?'pressure':elapsed<720?'siege':'endgame';}
+  knownEconomy(m,known){return known.filter(e=>['core','mine'].includes(e.kind)&&e.progress===1).reduce((total,e)=>total+income(e)*Math.exp(-Math.max(0,m.time-(e.seenAt||m.time))/120),0);}
+  updateDirector(c,m,u,visible){
+    this.lastProgressAt??=m.time;
+    for(const entity of visible)this.observedIds.add(entity.id);
+    const progress=(u.stats.damage||0)+(u.stats.structuresDestroyed||0)*100+(u.stats.kills||0)*200+this.observedIds.size*20;
+    if(progress>this.lastProgressValue+.01){this.lastProgressValue=progress;this.lastProgressAt=m.time;}
+    const stagnantFor=Math.max(0,m.time-this.lastProgressAt),stagnant=stagnantFor>=90;
+    if(stagnant&&m.time-this.lastStagnationAt>=60){
+      this.lastStagnationAt=m.time;this.stagnationEvents++;if(this.strategy!=='raider'){this.strategy='raider';this.strategyChanges++;}
+      const target=m.entity(this.targetId);if(target)this.avoid.push({id:null,x:target.x,z:target.z,until:m.time+20});
+      this.targetId=null;this.probe=null;c.exploreTarget=null;
+    }
+    this.director={phase:this.phase(m),stagnant,stagnantFor:+stagnantFor.toFixed(1),strategy:this.strategy,failedSieges:this.failedSieges,failedChases:this.failedChases,stagnationEvents:this.stagnationEvents};
+  }
+  chaseBudget(m,u,target,evaluation){
+    const d=distance(u,target),easy=target.role==='elf'&&!target.ghost&&(target.hp<m.trollStats(u).damage*2||d<8),danger=evaluation?.danger;
+    return target.ghost?4:easy?20:(danger?.towers>0||d>12?9:15);
+  }
   targetScore(m,u,target,known,stats){
     const phase=this.phase(m),weights={hunt:{economy:.7,kill:1.5,siege:.7,denial:.7,vulnerability:1.2},pressure:{economy:1.1,kill:1.25,siege:1.1,denial:1,vulnerability:1.3},siege:{economy:1.4,kill:1,siege:1.3,denial:1.2,vulnerability:1.25},endgame:{economy:1.15,kill:1.4,siege:1.25,denial:1.6,vulnerability:1.35}}[phase],strategyWeights={hunter:{economy:.8,kill:1.45,siege:.85},siegebreaker:{economy:.9,kill:.8,siege:1.4},raider:{economy:1.45,kill:.9,siege:.9},adaptive:{economy:1,kill:1,siege:1}}[this.strategy||'adaptive'];
-    const d=Math.max(.01,distance(u,target)),reach=stats.range+(target.kind?B.structures[target.kind].radius:0)-.35,approach={x:target.x+(u.x-target.x)/d*Math.min(d,reach),z:target.z+(u.z-target.z)/d*Math.min(d,reach)},danger=combatRisk(m,u,known,approach,target),hpRatio=target.hp/Math.max(1,target.maxHp),economicValue=target.kind==='mine'?70+(target.tier||1)*8:target.kind==='core'?65+(target.tier||1)*10:target.role==='wisp'?25:0,easyKill=target.role==='elf'&&!target.ghost&&(d<8||target.hp<stats.damage*2),killValue=target.role==='elf'&&!target.ghost?(easyKill?150:45):target.ghost?5:0,siegeValue={tower:200,wall:160,core:130,mine:65,workshop:45}[target.kind]||0,progressionDenial=(target.tier||0)*7+(target.legendary?100:0)+(target.kind==='tower'?danger.dps*5:0),vulnerability=(1-hpRatio)*100+100/(1+danger.killSeconds),opportunity=1/(1+danger.riskScore*2+danger.killSeconds/25),sector=this.strategicMap.report(m,u).find(s=>s.id===this.strategicMap.idAt(m,target)),failurePenalty=sector?.failedSieges||0,travelCost=d/Math.max(1,stats.movement);
+    const d=Math.max(.01,distance(u,target)),reach=stats.range+(target.kind?B.structures[target.kind].radius:0)-.35,approach={x:target.x+(u.x-target.x)/d*Math.min(d,reach),z:target.z+(u.z-target.z)/d*Math.min(d,reach)},danger=combatRisk(m,u,known,approach,target),hpRatio=target.hp/Math.max(1,target.maxHp),economicValue=target.kind==='mine'?70+(target.tier||1)*8:target.kind==='core'?65+(target.tier||1)*10:target.role==='wisp'?25:0,easyKill=target.role==='elf'&&!target.ghost&&(d<8||target.hp<stats.damage*2),killValue=target.role==='elf'&&!target.ghost?(easyKill?150:45):target.ghost?5:0,siegeValue={tower:200,wall:160,core:130,mine:65,workshop:45}[target.kind]||0,progressionDenial=(target.tier||0)*7+(target.legendary?100:0)+(target.kind==='tower'?danger.dps*5:0),vulnerability=(1-hpRatio)*100+100/(1+danger.killSeconds),opportunity=1/(1+danger.riskScore*2+danger.killSeconds/25),sector=this.strategicMap.report(m,u).find(s=>s.id===this.strategicMap.idAt(m,target)),failurePenalty=sector?.failedSieges||0,travelCost=d/Math.max(1,stats.movement),opportunityCost=this.knownEconomy(m,known)*travelCost;
     const strategicNumerator=economicValue*weights.economy*strategyWeights.economy+killValue*weights.kill*strategyWeights.kill+siegeValue*weights.siege*strategyWeights.siege+progressionDenial*weights.denial+vulnerability*weights.vulnerability;
-    return {score:strategicNumerator*opportunity/(1+travelCost*.05+failurePenalty*.4),danger,opportunity,economicValue,killValue,siegeValue,progressionDenial,vulnerability,phase,strategy:this.strategy};
+    return {score:strategicNumerator*opportunity/(1+travelCost*.05+failurePenalty*.4+opportunityCost*.002),danger,opportunity,economicValue,killValue,siegeValue,progressionDenial,vulnerability,travelCost,opportunityCost,phase,strategy:this.strategy};
   }
   beginSiege(m,u,target,evaluation){
     if(this.siege?.targetId===target.id)return;
@@ -46,6 +64,7 @@ export class TrollBrain {
     this.lastHp=u.hp;this.lastTime=now;
     for(const e of visible)c.discovered.set(e.id,{id:e.id,x:e.x,z:e.z,kind:e.kind,role:e.role,hp:e.hp,maxHp:e.maxHp,tier:e.tier,branch:e.branch,progress:e.progress,disabledUntil:e.disabledUntil,baseId:e.baseId,seenAt:now});
     for(const[id,e]of c.discovered)if((m.canSee(u,e)&&!visible.some(a=>a.id===id))||now-e.seenAt>(e.role?8:100))c.discovered.delete(id);
+    this.updateDirector(c,m,u,visible);
     this.avoid=this.avoid.filter(a=>a.until>now);
     const knownTowers=[...c.discovered.values()].filter(e=>e.kind==='tower'&&e.progress===1);
     const threatened=now-u.lastHit<3,stats=m.trollStats(u),legendaryAssault=m.legendarySword(u)&&now>B.finalAge;
@@ -65,7 +84,12 @@ export class TrollBrain {
     candidates.sort((a,b)=>score(b)-score(a));this.candidateEvaluations=candidates.slice(0,8).map(e=>({id:e.id,...evaluations.get(e.id)}));
     let target=candidates[0];
     const current=candidates.find(e=>e.id===this.targetId);
+    if(this.chase&&current)this.chase.lastSeen={x:current.x,z:current.z};
     if(current&&now<this.committedUntil&&(!target||score(current)>=score(target)*.8))target=current;
+    if(this.chase&&this.chase.targetId===this.targetId&&now-this.chase.startedAt>=this.chase.budget){
+      const escaped=this.chase.lastSeen,failed=(u.stats.kills||0)<=this.chase.killsAtStart;if(failed)this.failedChases++;if(failed&&escaped)this.avoid.push({id:this.chase.targetId,x:escaped.x,z:escaped.z,until:now+8});if(failed&&this.failedChases%3===0&&this.strategy!=='raider'){this.strategy='raider';this.strategyChanges++;}
+      this.chase=null;this.targetId=null;target=candidates.find(e=>!this.avoid.some(a=>a.id===e.id))||null;c.exploreTarget=null;
+    }
     const inRange=target&&distance(u,target)<=stats.range+(target.kind?B.structures[target.kind].radius:0);
     // A cheap worker is not worth ignoring lethal tower fire. Account for the real heavy cooldown.
     const targetRisk=target?combatRisk(m,u,known,u,target):localRisk;
@@ -135,7 +159,7 @@ export class TrollBrain {
         if(unsafe){this.avoid.push({id:null,x:target.x,z:target.z,until:now+25});this.strategicMap.recordSiege(m,target,false);this.targetId=null;this.state='rotate';c.exploreTarget=null;c.stop(u);return;}
       }
       this.targetEvaluation={id:target.id,...evaluations.get(target.id)};this.state=['elf','wisp'].includes(target.role)?'chase':'siege';
-      if(this.state==='siege')this.beginSiege(m,u,target,evaluations.get(target.id));else if(this.siege)this.finishSiegeMemory(m,u,false);
+      if(this.state==='siege'){this.chase=null;this.beginSiege(m,u,target,evaluations.get(target.id));}else{if(!this.chase||this.chase.targetId!==target.id)this.chase={targetId:target.id,startedAt:now,budget:this.chaseBudget(m,u,target,evaluations.get(target.id)),knownEconomy:+this.knownEconomy(m,known).toFixed(2),killsAtStart:u.stats.kills||0,lastSeen:{x:target.x,z:target.z}};if(this.siege)this.finishSiegeMemory(m,u,false);}
       const reach=stats.range+(target.kind?B.structures[target.kind].radius:0)-.35;
       if(c.go(m,u,target,reach)){
         u.yaw=Math.atan2(target.x-u.x,target.z-u.z);
