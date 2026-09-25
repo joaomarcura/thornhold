@@ -124,6 +124,8 @@ test('V2.1 registra estado, setores, cercos, trade, pressão e economia sem diri
   assert.equal(v2.observational,true);assert.equal(v2.matchState.phase,'SIEGE');assert.ok(v2.sectors.some(s=>s.visits>0));
   assert.equal(v2.siegeSummary.count,1);assert.equal(v2.siegeSummary.successful,1);assert.ok(v2.sieges[0].tradeScore>0);assert.equal(v2.sieges[0].structuresDestroyed.wall,1);
   assert.ok(v2.pressureWindows.length>=1);assert.ok(v2.economyCheckpoints.some(c=>c.time===180));assert.ok(v2.stateSeconds.SIEGE>0);assert.ok(v2.stateSeconds.ROTATE>0);
+  const economy=v2.economyCheckpoints.find(c=>c.time===180).elves;assert.ok(Object.hasOwn(economy,'netSpentGold'));assert.ok(Object.hasOwn(economy,'goldUtilization'));assert.ok(economy.spendByPurpose.economy);assert.ok(economy.spendByPurpose.defense);assert.ok(Array.isArray(economy.players));
+  const frozen=economy.players[0].spendByPurpose;m.unit('e').stats.spendByPurpose.economy={gold:999,wood:999};assert.notDeepEqual(frozen,m.unit('e').stats.spendByPurpose);
   assert.equal(Object.hasOwn(v2.matchState,'elfPower'),true);assert.equal(Object.hasOwn(v2.matchState,'volatility'),true);
 });
 test('Stun defensivo só funciona na própria base rompida e bloqueia o Troll por 3s',()=>{

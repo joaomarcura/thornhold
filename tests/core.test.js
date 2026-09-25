@@ -27,6 +27,7 @@ test('Pathfinding conecta o spawn a cada interior pelo portão',()=>{
 test('Construção consome recursos, é progressiva e gera renda real',()=>{
   const m=match(),u=m.unit('e0'),b=m.map.bases[0];u.x=b.x+4.4;u.z=b.z;
   assert.equal(m.act(u.id,{type:'build',kind:'core',x:b.x,z:b.z}),undefined);const s=m.structures[0];assert.equal(u.gold,85);assert.equal(u.wood,85);assert.equal(s.progress,0);assert.equal(s.hp,s.maxHp*.15);
+  assert.deepEqual(u.stats.spendByPurpose.economy,{gold:65,wood:25});assert.deepEqual(u.stats.spendByAction.construction,{gold:65,wood:25});
   for(let i=0;i<100;i++)m.step(.05);assert.equal(s.progress,1);assert.equal(s.hp,s.maxHp);assert.ok(u.gold>85);
   assert.match(m.act(u.id,{type:'build',kind:'core',x:b.x,z:b.z+4.4}),/já possui/);
 });

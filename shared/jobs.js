@@ -1,4 +1,5 @@
 import { BALANCE as B, distance } from './config.js';
+import { recordRefund } from './economy.js';
 
 export function jobRefund(entity,time){
   const job=entity.job;if(!job)return null;
@@ -27,6 +28,6 @@ export function cancelJob(m,u,id){
   if(type==='build'){e.hp=0;if(e.kind==='core')u.baseId=null;}
   else if(type==='train')e.alive=false;
   else return 'Upgrades iniciados não podem ser cancelados.';
-  delete e.job;u.gold+=refund.gold;u.wood+=refund.wood;u.action='idle';u.actionUntil=m.time;
+  delete e.job;u.gold+=refund.gold;u.wood+=refund.wood;recordRefund(u,refund);u.action='idle';u.actionUntil=m.time;
   m.emit('cancel',{unit:u.id,entity:e.id,x:e.x,z:e.z,...refund});
 }

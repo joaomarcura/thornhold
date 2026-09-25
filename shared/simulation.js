@@ -8,6 +8,7 @@ import { ITEMS, combatStats } from './equipment.js';
 import { commandWisp, stepWisps, wispActive } from './wisps.js';
 import { upgradeStatus } from './upgrade-rules.js';
 import { cancelJob, demolitionRefund, jobRefund } from './jobs.js';
+import { recordRefund, recordSpend, structurePurpose } from './economy.js';
 
 export class Match {
   constructor(settings,slots) {
@@ -19,7 +20,7 @@ export class Match {
     let elfIndex=0;
     for(const slot of slots.filter(s=>s.occupant)){
       const troll=slot.role==='troll',spawn=troll?this.map.trollSpawn:this.map.elfSpawn;
-      const u={id:slot.id,name:slot.occupant.name,role:slot.role,controller:slot.occupant.type,clientId:slot.occupant.clientId||null,difficulty:slot.occupant.difficulty||this.settings.difficulty,x:spawn.x+(troll?0:(elfIndex++%3-1)*1.5),z:spawn.z+(troll?0:Math.floor(elfIndex/3)*1.5),yaw:0,hp:troll?B.troll.hp:B.elf.hp,maxHp:troll?B.troll.hp:B.elf.hp,gold:troll?B.troll.gold:B.elf.gold,wood:troll?0:B.elf.wood,alive:true,ghost:false,observer:false,levels:Object.fromEntries(Object.keys(B.upgrades).map(k=>[k,0])),cooldowns:{},input:{x:0,z:0},lastInput:0,lastHit:-100,lastAttack:0,slowUntil:0,exposure:0,baseId:null,relocationUntil:0,relocationVouchers:troll?0:1,action:'idle',actionUntil:0,stats:{damage:0,produced:0,kills:0,ghostsDestroyed:0,reveals:0,upgrades:0,goldGenerated:0,goldFromDamage:0,goldFromObjectives:0,goldFromThreat:0,goldSpent:0,woodGenerated:0,woodSpent:0,unitsCreated:0,unitsLost:0,structuresBuilt:0,structuresDestroyed:0,healing:0,stuns:0,relocations:0},pingUntil:0};
+      const u={id:slot.id,name:slot.occupant.name,role:slot.role,controller:slot.occupant.type,clientId:slot.occupant.clientId||null,difficulty:slot.occupant.difficulty||this.settings.difficulty,x:spawn.x+(troll?0:(elfIndex++%3-1)*1.5),z:spawn.z+(troll?0:Math.floor(elfIndex/3)*1.5),yaw:0,hp:troll?B.troll.hp:B.elf.hp,maxHp:troll?B.troll.hp:B.elf.hp,gold:troll?B.troll.gold:B.elf.gold,wood:troll?0:B.elf.wood,alive:true,ghost:false,observer:false,levels:Object.fromEntries(Object.keys(B.upgrades).map(k=>[k,0])),cooldowns:{},input:{x:0,z:0},lastInput:0,lastHit:-100,lastAttack:0,slowUntil:0,exposure:0,baseId:null,relocationUntil:0,relocationVouchers:troll?0:1,action:'idle',actionUntil:0,stats:{damage:0,produced:0,kills:0,ghostsDestroyed:0,reveals:0,upgrades:0,goldGenerated:0,goldFromDamage:0,goldFromObjectives:0,goldFromThreat:0,goldSpent:0,woodGenerated:0,woodSpent:0,goldRefunded:0,woodRefunded:0,spendByPurpose:{},spendByAction:{},unitsCreated:0,unitsLost:0,structuresBuilt:0,structuresDestroyed:0,healing:0,stuns:0,relocations:0},pingUntil:0};
       u.inventory=[];u.equipment={weapon:null,body:null,relic:null};u.combo=0;u.comboUntil=0;
       if(troll){u.healCharges=B.troll.healCharges;u.healRechargeAt=null;u.healingUntil=0;u.healingRemaining=0;}
       this.units.push(u);if(u.controller==='bot')this.controllers.set(u.id,new AIController(u.difficulty));
@@ -132,7 +133,7 @@ export class Match {
   build(u,cmd){
     const x=Number(cmd.x),z=Number(cmd.z),kind=cmd.kind,error=this.placement(u,kind,x,z);if(error)return error;
     const def=B.structures[kind],b=kind==='wall'?this.map.bases.find(b=>distance(b.gate,{x,z})<.45):baseAt(this.map,{x,z}),cost=this.buildCost(u,kind,b.id);
-    u.gold-=cost.gold;u.wood-=cost.wood;u.stats.goldSpent+=cost.gold;u.stats.woodSpent+=cost.wood;u.stats.structuresBuilt++;this.stats.buildingsCreated++;const hp=structureHP(kind,1);
+    u.gold-=cost.gold;u.wood-=cost.wood;recordSpend(u,cost,structurePurpose(kind),'construction');u.stats.structuresBuilt++;this.stats.buildingsCreated++;const hp=structureHP(kind,1);
     const elfCount=this.units.filter(a=>a.role==='elf').length,lobby=Math.min(B.maxElves,elfCount),bountyFactor=(B.economy.trollBountyFactor[lobby]||1.3)*(B.economy.trollMapBounty[this.settings.mapSize]||1)*(B.economy.trollScenarioBounty[this.settings.mapSize]?.[this.settings.difficulty]?.[lobby]||1);
     const s={id:'s'+this.nextId++,kind,owner:u.id,baseId:b.id,x,z,rotation:Number.isFinite(cmd.rotation)?cmd.rotation:0,tier:1,hp:hp*B.construction.initialHealth,maxHp:hp,progress:0,healthProgress:0,builder:u.id,branch:'power',lastHit:-100,lastShot:-100,upgrading:0,bountyFactor,bounty:hp*B.troll.goldPerDamage*bountyFactor,constructionCost:{gold:cost.gold,wood:cost.wood},...(kind==='mine'?{coreTier:this.structures.find(a=>a.kind==='core'&&a.baseId===b.id&&a.hp>0)?.tier||0}:{})};
     s.job={type:'build',gold:cost.gold,wood:cost.wood};this.structures.push(s);if(kind==='core'){this.elfBasesClaimed.add(b.id);if(cost.relocation){u.relocationVouchers--;u.stats.relocations++;}u.relocationUntil=0;u.baseId=b.id;}u.action='build';u.actionUntil=this.time+def.seconds;this.emit('build',{unit:u.id,entity:s.id,x,z,kind,relocation:cost.relocation});
@@ -161,7 +162,7 @@ export class Match {
       const active=Object.entries(s.repairers).sort((a,b)=>a[1].order-b[1].order);contributors=active.length;contribution=(active.findIndex(([id])=>id===u.id)===0?1:.25)*(u.ghost?.5:1);
     }
     const workshop=this.structures.find(a=>a.owner===u.id&&a.kind==='workshop'&&a.progress>=1&&a.hp>0);
-    const heal=Math.min(s.maxHp-s.hp,B.elf.repair*(1+(workshop?.tier||0)*B.economy.workshopRepair)*contribution);s.hp+=heal;if(!free){s.bounty+=B.elf.repairCost*.6;u.gold-=B.elf.repairCost;u.wood-=1;}u.stats.healing+=heal;u.cooldowns.repair=this.time+1;u.action='repair';u.actionUntil=this.time+.8;this.emit('repair',{unit:u.id,entity:id,x:s.x,z:s.z,amount:heal,free,contribution,contributors});
+    const heal=Math.min(s.maxHp-s.hp,B.elf.repair*(1+(workshop?.tier||0)*B.economy.workshopRepair)*contribution);s.hp+=heal;if(!free){s.bounty+=B.elf.repairCost*.6;u.gold-=B.elf.repairCost;u.wood-=1;recordSpend(u,{gold:B.elf.repairCost,wood:1},structurePurpose(s.kind),'repair');}u.stats.healing+=heal;u.cooldowns.repair=this.time+1;u.action='repair';u.actionUntil=this.time+.8;this.emit('repair',{unit:u.id,entity:id,x:s.x,z:s.z,amount:heal,free,contribution,contributors});
   }
   demolish(u,id){
     const s=this.structures.find(s=>s.id===id),refund=s&&demolitionRefund(s);
@@ -169,7 +170,7 @@ export class Match {
     if(s.job||s.upgrading)return 'Aguarde a melhoria em andamento antes de demolir.';
     if(this.time-s.lastHit<5)return 'Aguarde 5 s sem dano para demolir.';
     if(distance(u,s)>B.interactRange||!this.canSee(u,s))return 'Aproxime-se para demolir.';
-    u.gold+=refund.gold;u.wood+=refund.wood;s.hp=0;this.stats.destroyed++;
+    u.gold+=refund.gold;u.wood+=refund.wood;recordRefund(u,refund);s.hp=0;this.stats.destroyed++;
     if(s.kind==='wall'){this.brokenBases.add(s.baseId);this.stats.basesDestroyed=this.brokenBases.size;this.breachUntil.set(s.baseId,this.time+B.construction.breachCooldown);}
     if(s.kind==='core')u.baseId=null;
     this.emit('destroy',{unit:u.id,entity:s.id,x:s.x,z:s.z,kind:s.kind,cause:'demolition',refund});
@@ -181,7 +182,7 @@ export class Match {
     if(!status.allowed)return status.reasons.map(r=>r.message).join(' ');
     const cost=status.cost;
     if(B.tower.specializations&&branch!==undefined&&!Object.hasOwn(B.branches,branch))return 'Especialização inválida.';
-    u.gold-=cost.gold;u.wood-=cost.wood;u.stats.goldSpent+=cost.gold;u.stats.woodSpent+=cost.wood;s.upgrading=B.construction.upgradeSeconds+Math.min(7,s.tier);s.upgradeDuration=s.upgrading;s.job={type:'upgrade',...cost,duration:s.upgrading};s.nextBranch=B.tower.specializations?(branch||s.branch):'power';u.stats.upgrades++;this.stats.upgrades++;this.emit('upgrade',{unit:u.id,entity:id,x:s.x,z:s.z});
+    u.gold-=cost.gold;u.wood-=cost.wood;recordSpend(u,cost,structurePurpose(s.kind),'upgrade');s.upgrading=B.construction.upgradeSeconds+Math.min(7,s.tier);s.upgradeDuration=s.upgrading;s.job={type:'upgrade',...cost,duration:s.upgrading};s.nextBranch=B.tower.specializations?(branch||s.branch):'power';u.stats.upgrades++;this.stats.upgrades++;this.emit('upgrade',{unit:u.id,entity:id,x:s.x,z:s.z});
   }
   buy(u,key){
     if(u.role!=='troll'||!Object.hasOwn(B.upgrades,key))return 'Melhoria inválida.';

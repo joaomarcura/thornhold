@@ -159,6 +159,22 @@ Eliminar um Elfo nunca reduz o multiplicador de renda por dano. O scaling usa a 
 
 Na primeira amostra de 20 seeds 1×5 a composição média foi 79,1% dano, 5,3% objetivos e 15,6% ameaça. O resultado foi 10 vitórias do Troll, 6 dos Elfos e 4 partidas ainda ativas aos 20 minutos. A mediana foi 10:15. Essa amostra valida a faixa pretendida da economia híbrida, mas não é baseline final: os quatro casos longos apresentaram cercos reais e crescimento econômico, não ausência de alvo, e serão tratados pela análise econômica V2.7 e pela calibração V2.8.
 
+## V2.7 — Análise da economia dos Elfos
+
+Toda despesa é classificada simultaneamente por propósito (`economy`, `defense`, `other`) e ação (`construction`, `upgrade`, `training`, `repair`). Formação e evolução de Wisps e reparos pagos, que antes não apareciam no total gasto, agora entram na contabilidade. Cancelamentos e demolições possuem ledger de reembolso separado; os snapshots guardam cópias imutáveis dos ledgers.
+
+Os checkpoints incluem geração, gasto bruto, reembolso, gasto líquido, estoque, utilização de ouro/madeira e detalhes por perfil de bot. `npm run audit:economy -- <artefato>` produz cortes por tempo, perfil e resultado.
+
+Na amostra determinística de 20 seeds, sem nenhuma mudança de gameplay:
+
+- uso de ouro: 89,9% aos 3 min, 90,3% aos 5 min e 89,2% aos 8 min;
+- saturação: 74,5% aos 10 min, 60,6% aos 12 min e 47,7% aos 15 min;
+- estoque médio aos 15 min: 45.329 de ouro;
+- investimento agregado em ouro favoreceu economia sobre defesa em 2,82×;
+- o perfil econômico teve a menor utilização média de ouro (74,4%) e apenas 436 de investimento defensivo médio, contra 4.213 em economia.
+
+O diagnóstico é saturação de decisões no late game, não escassez. Portanto a V2.7 não reduz renda: esses dados serão usados na V2.8 para calibrar prioridades e curvas sem mascarar a causa.
+
 ## Balance Lab
 
 `npm run simulate:arena` usa 1×5 por padrão. Para uma análise secundária explícita, `SIM_ELF_COUNTS` pode fornecer outros tamanhos.

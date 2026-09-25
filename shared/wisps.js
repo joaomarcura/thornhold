@@ -1,5 +1,6 @@
 import { BALANCE as B, distance, wispCost, wispIncome, wispUpgradeCost } from './config.js';
 import { baseAt } from './map.js';
+import { recordSpend } from './economy.js';
 
 export function availableTrees(m,u,core){
   return m.trees.filter(t=>t.amount>0&&distance(t,core)<=B.wisps.range&&
@@ -17,7 +18,7 @@ export function commandWisp(m,u,cmd){
     if(!tree)return 'Nenhuma árvore livre no alcance do núcleo. Evolua seus Wisps ou aguarde o rebrote.';
     const cost=wispCost(m.wisps.filter(w=>w.owner===u.id&&w.alive).length);
     if(u.gold<cost.gold||u.wood<cost.wood)return 'Recursos insuficientes para formar Wisp.';
-    u.gold-=cost.gold;u.wood-=cost.wood;
+    u.gold-=cost.gold;u.wood-=cost.wood;recordSpend(u,cost,'economy','training');
     const w={id:'w'+m.nextId++,role:'wisp',name:'Wisp',owner:u.id,treeId:tree.id,rich:tree.rich,x:tree.x,z:tree.z,
       level:1,hp:B.wisps.hp,maxHp:B.wisps.hp,alive:true,readyAt:m.time+B.wisps.trainSeconds,upgradingUntil:0,lastHit:-100,bounty:cost.gold*.3};
     w.job={type:'train',...cost,duration:B.wisps.trainSeconds,until:w.readyAt};m.wisps.push(w);m.emit('wisp-trained',{entity:w.id,unit:u.id,x:w.x,z:w.z});return;
@@ -29,7 +30,7 @@ export function commandWisp(m,u,cmd){
     let upgraded=0;
     for(const w of eligible){
       const cost=wispUpgradeCost(w.level);if(u.gold<cost.gold||u.wood<cost.wood)continue;
-      u.gold-=cost.gold;u.wood-=cost.wood;w.upgradingUntil=m.time+B.wisps.seconds;w.job={type:'wisp-upgrade',...cost,duration:B.wisps.seconds,until:w.upgradingUntil};upgraded++;
+      u.gold-=cost.gold;u.wood-=cost.wood;recordSpend(u,cost,'economy','upgrade');w.upgradingUntil=m.time+B.wisps.seconds;w.job={type:'wisp-upgrade',...cost,duration:B.wisps.seconds,until:w.upgradingUntil};upgraded++;
       m.emit('upgrade',{unit:u.id,entity:w.id,x:w.x,z:w.z});
     }
     if(!upgraded)return 'Nenhum Wisp elegível pôde ser evoluído com os recursos atuais.';
@@ -43,7 +44,7 @@ export function commandWisp(m,u,cmd){
   if(cmd.type==='upgradeWisp'){
     if(w.level>=B.maxTier)return 'Wisp no nível Épico máximo.';
     const cost=wispUpgradeCost(w.level);if(u.gold<cost.gold||u.wood<cost.wood)return 'Recursos insuficientes para evoluir Wisp.';
-    u.gold-=cost.gold;u.wood-=cost.wood;w.upgradingUntil=m.time+B.wisps.seconds;w.job={type:'wisp-upgrade',...cost,duration:B.wisps.seconds,until:w.upgradingUntil};u.stats.upgrades++;m.stats.upgrades++;
+    u.gold-=cost.gold;u.wood-=cost.wood;recordSpend(u,cost,'economy','upgrade');w.upgradingUntil=m.time+B.wisps.seconds;w.job={type:'wisp-upgrade',...cost,duration:B.wisps.seconds,until:w.upgradingUntil};u.stats.upgrades++;m.stats.upgrades++;
     m.emit('upgrade',{unit:u.id,entity:w.id,x:w.x,z:w.z});return;
   }
 }
