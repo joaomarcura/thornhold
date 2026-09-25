@@ -25,9 +25,9 @@ export class SessionService {
     if(this.room(client))reject('Saia da sala atual primeiro.');
     if(this.queued(client))reject('Cancele a fila ranqueada primeiro.');
     let code;do{code=randomBytes(4).toString('hex').slice(0,6).toUpperCase();}while(this.rooms.has(code));
-    const settings=this.settings(input.settings);if(settings.mode==='ranked'&&!input.matchmade)reject('Use a fila ranqueada para iniciar este modo.');const salt=randomBytes(16).toString('hex');if(settings.mode==='ranked')settings.seed='RANK-'+randomBytes(8).toString('hex').toUpperCase();
+    const settings=this.settings(input.settings),observer=input.role==='observer';if(settings.mode==='ranked'&&!input.matchmade)reject('Use a fila ranqueada para iniciar este modo.');if(observer&&!settings.local)reject('A simulação somente com bots está disponível em partidas locais.');if(observer&&!input.fillBots)reject('A simulação observada precisa preencher todos os slots com bots.');const salt=randomBytes(16).toString('hex');if(settings.mode==='ranked')settings.seed='RANK-'+randomBytes(8).toString('hex').toUpperCase();
     const room={id:code,name:cleanText(input.name,`${client.name} · Clareira`),hostId:client.id,state:STATES.LOBBY,settings,members:new Map([[client.id,{...client,ready:false,connected:true}]]),slots:[{id:'t0',role:'troll',closed:false,occupant:null},...Array.from({length:BALANCE.maxElves},(_,i)=>({id:'e'+i,role:'elf',closed:i>=settings.elfSlots,occupant:null}))],match:null,matchmade:input.matchmade===true,surrenderVotes:new Set(),created:Date.now(),updated:Date.now(),salt,password:input.password?scryptSync(String(input.password).slice(0,64),salt,32):null};
-    client.roomId=code;room.slots.find(s=>s.role===(input.role==='troll'?'troll':'elf')).occupant={type:'human',clientId:client.id,name:client.name};this.rooms.set(code,room);
+    client.roomId=code;if(!observer)room.slots.find(s=>s.role===(input.role==='troll'?'troll':'elf')).occupant={type:'human',clientId:client.id,name:client.name};this.rooms.set(code,room);
     if(input.fillBots)for(const s of room.slots)if(!s.closed&&!s.occupant)this.addBot(room,s.id);
     return room;
   }

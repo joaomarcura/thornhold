@@ -118,6 +118,7 @@ npm run audit:combat
 npm run audit:economy -- artifacts/arena.json
 npm run audit:sensitivity -- 12 artifacts/sensitivity.json
 npm run audit:profiles -- 10 artifacts/profile-lab.json
+npm run test:spectator:browser
 npm run audit:progression -- 6 artifacts/progression-current-20hz.json
 ```
 
@@ -132,10 +133,11 @@ npm run audit:progression -- 6 artifacts/progression-current-20hz.json
 - `npm run audit:economy -- CAMINHO`: separa geração, estoque e investimento dos Elfos por checkpoint, perfil e resultado.
 - `npm run audit:sensitivity -- N CAMINHO`: executa seeds 1×5 Normal pareadas com variações de ±5% e ±10%, calcula fragilidade e inclui o Balance Quality Score. Use `SENS_MODE=candidates` para comparar pacotes declarados, `SENS_CANDIDATES=nome-a,nome-b` para filtrá-los ou `SENS_MODE=ablation` para desligar isoladamente Exposure, Santuário, cura, Threat Income e Lendários.
 - `npm run audit:profiles -- N CAMINHO`: compara nas mesmas seeds os perfis artificiais Novato, Médio, Experiente e um Elfo inativo. É diagnóstico secundário; o baseline oficial continua exclusivamente 1 Troll × 5 Elfos Normal.
+- `npm run test:spectator:browser`: abre uma partida local 1×5 apenas com bots, acompanha como observador, valida resultado natural e inicia uma revanche com outra seed.
 - `npm run audit:progression -- 6 CAMINHO`: 72 partidas pareadas a 20 Hz, dificuldade separada por papel, compras, economia, comandos rejeitados e duração. Partidas sem vencedor em 25 min são registradas e fazem o comando retornar código 1.
 - [Progressão infinita, Wisps e combate](docs/PROGRESSAO-INFINITA-E-COMBATE.md): regras implementadas, builds, custos, testes e próximos ajustes. O lote atual terminou com 38 vitórias do Troll, 32 dos Elfos e duas partidas sem vencedor aos 25 minutos; apenas oito das 72 ficaram na meta de **12–18 minutos**.
 - [Auditoria anterior](docs/BALANCEAMENTO-E-PROGRESSAO.md): pesquisa das variantes e diagnóstico antes da progressão infinita; mantida como histórico.
-- `scripts/browser-check.js`, `scripts/browser-gameplay.js`, `scripts/browser-lifecycle.js`, `scripts/browser-controls.js`, `scripts/browser-progression.js` e `scripts/browser-hud.js` verificam a interface, construção, resultado, revanche, câmera, loja, Wisps, combate e cancelamento em uma sessão Chrome isolada via CDP. Consulte `docs/VALIDACAO.md`.
+- `scripts/browser-check.js`, `scripts/browser-gameplay.js`, `scripts/browser-lifecycle.js`, `scripts/browser-controls.js`, `scripts/browser-progression.js` e `scripts/browser-hud.js` verificam a interface, construção, observação, resultado, revanche, câmera, loja, Wisps, combate e cancelamento em sessões isoladas de navegador. Consulte `docs/VALIDACAO.md`.
 
 Balanceamento principal em `shared/config.js`. Os relatórios são uma linha de base de bots, **não uma comprovação de equilíbrio competitivo humano**. O único lobby de referência é 1×5; variações históricas permanecem documentadas, mas não orientam novos ajustes.
 

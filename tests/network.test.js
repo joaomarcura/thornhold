@@ -52,6 +52,16 @@ test('E + G: todos bots, fim real, retorno conjunto ao lobby e nova seed na reva
   }finally{if(host)await closeClient(host);if(guest)await closeClient(guest);await app.close();}
 });
 
+test('Partida local permite host observador com lobby padrão 1×5 somente de bots',async()=>{
+  const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false,devMode:true});let host;
+  try{
+    host=await client(app.port,'Observador');host.send('create',{role:'observer',fillBots:true,settings:{mode:'custom',local:true,private:true,elfSlots:5,seed:'BOT-WATCH'}});const {room}=await host.wait('lobby');const live=app.sessions.rooms.get(room.id);
+    assert.equal(live.slots.filter(s=>s.occupant?.type==='human').length,0);assert.equal(live.slots.filter(s=>s.occupant?.type==='bot').length,6);assert.ok(!live.slots.some(s=>s.occupant?.clientId===host.hello.id));
+    host.send('ready',{ready:true});await host.wait('lobby',m=>m.room.errors.length===0);host.send('start');const map=await host.wait('map');assert.equal(map.viewerId,null);assert.equal(live.match.units.length,6);assert.ok(live.match.units.every(unit=>unit.controller==='bot'));
+    const snapshot=await host.wait('snapshot',m=>m.snapshot.units.length===6);assert.equal(snapshot.snapshot.viewerId,null);assert.equal(snapshot.snapshot.units.length,6);host.send('dev',{command:'speed',speed:8});await host.wait('dev',m=>m.speed===8);assert.equal(live.devSpeed,8);host.send('dev',{command:'grant',gold:100});assert.match((await host.wait('error')).message,/não controla/);
+  }finally{if(host)await closeClient(host);await app.close();}
+});
+
 test('F: desconexão, host migrado, IA no mesmo personagem e retomada por token',async()=>{
   const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false});let host,guest,resumed;
   try{

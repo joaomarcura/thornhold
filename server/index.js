@@ -80,12 +80,14 @@ export async function createGameServer({port=Number(process.env.PORT)||3000,host
           case 'dev':{
             if(!devMode)throw new Error('Modo dev desativado neste servidor.');
             if(!room.match)throw new Error('A partida ainda não começou.');
-            const slot=room.slots.find(s=>s.occupant?.clientId===client.id);if(!slot)throw new Error('Você não controla um personagem.');
+            const slot=room.slots.find(s=>s.occupant?.clientId===client.id);
             room.devSpeed??=1;
             if(msg.command==='grant'){
+              if(!slot)throw new Error('Você não controla um personagem.');
               const error=room.match.devGrant(slot.id,{gold:msg.gold,wood:msg.wood});if(error)throw new Error(error);
               send(ws,'dev',{speed:room.devSpeed,granted:{gold:Number(msg.gold)||0,wood:Number(msg.wood)||0}});
             }else if(msg.command==='speed'){
+              if(!slot)sessions.requireHost(room,client);
               const speed=Number(msg.speed);if(![1,2,4,8].includes(speed))throw new Error('Velocidade dev inválida.');
               room.devSpeed=speed;room.match.devSpeed=speed;broadcast(room,'dev',{speed});
             }else throw new Error('Comando dev desconhecido.');

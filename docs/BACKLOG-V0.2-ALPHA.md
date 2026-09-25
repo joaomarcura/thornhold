@@ -127,6 +127,7 @@ Critério: zero estados sem saída, zero partidas automatizadas inacabadas, 1v5 
 - [x] `UX-202` Remapeamento, escala de UI e redução de movimento. Modo daltônico foi retirado deste ciclo por decisão de produto.
 - [x] `UX-202B` Fixar a altura da câmera de acompanhamento durante o zoom e restaurar o servidor local dev com recursos e velocidades 1×/2×/4×/8×.
 - [x] `UX-203` Mira central permanentemente travada, câmera 20% mais baixa, colocação a 9,75 m, fechamento contextual e arsenal operado por teclado.
+- [x] `UX-204` Partida local observável somente com bots no lobby padrão 1×5, com visão integral, velocidade dev, resultado e revanche.
 - [x] `MODE-203` Separar Normal, Personalizado e Ranqueado no lobby, com presets autoritativos e identificação pública.
 - [x] `MODE-204` Filas por papel, grupos élficos sem separação, composição 1×5, preenchimento temporário por bots para playtest, rendição aos 10 minutos e revanche ranqueada preservando papéis.
 - [ ] `MODE-205` MMR separado, colocações, divisões, temporada e decaimento.

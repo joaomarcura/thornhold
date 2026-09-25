@@ -8,6 +8,7 @@ const steps=[
   ['Troll sanctuary UI',['scripts/browser-sanctuary.js']],
   ['Upgrade and resource UI',['scripts/browser-review.js']],
   ['Stun, relocation and score UI',['scripts/browser-stun-scoreboard.js']],
+  ['All-bot spectator UI',['scripts/browser-lifecycle.js']],
   ['Portuguese and English UI',['scripts/browser-i18n.js']],
   ['Accessibility preferences and remapped controls',['scripts/browser-accessibility.js']]
 ];

@@ -2,6 +2,13 @@
 
 Os testes exercitam o código real, não telas simuladas. As conexões chamadas de “humanas” nos testes automáticos são clientes de rede sintéticos, sem controlador IA do servidor. Isso valida protocolo e ocupação dos slots; não substitui sessões de usabilidade com pessoas.
 
+## Observação local somente com bots — 25/09/2026
+
+- A criação local oferece `Observador · Apenas bots`; o host não ocupa personagem e o servidor preenche 1 Troll × 5 Elfos com IA.
+- O modo é recusado em salas públicas, privadas de rede e ranqueadas para evitar observação integral indevida.
+- O observador recebe o mundo completo, alterna o personagem acompanhado com a hotkey de espectador e pode usar F10 para 1×/2×/4×/8× quando o servidor foi iniciado com `npm run start:dev`.
+- `browser-lifecycle.js` validou interface, seis controladores IA, vitória natural, resultado, retorno ao mesmo lobby e revanche com outra seed, sem exceções JavaScript.
+
 ## Diretor estratégico e Balance Lab — 25/09/2026
 
 - O Troll considera custo de viagem, custo de oportunidade das economias conhecidas e um Chase Budget de 4–20 segundos; nenhuma decisão consulta unidades ou estruturas ocultas.

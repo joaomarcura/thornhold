@@ -25,7 +25,7 @@ const EN=new Map(Object.entries({
   'Bots usam os mesmos personagens, custos e habilidades.':'Bots use the same characters, costs, and abilities.','Observar partida':'Spectate match',
   'Ocupar':'Take slot','Slot fechado':'Closed slot','Slot disponível':'Available slot','VOCÊ':'YOU','IA · MESMAS REGRAS':'AI · SAME RULES',
   'PRONTO PARA JOGAR':'READY TO PLAY','AGUARDANDO READY':'NOT READY','Não entra na partida':'Will not join the match','O caçador da floresta':'The forest hunter',
-  'Convide um amigo ou adicione IA':'Invite a friend or add AI','Pronto':'Ready','Não pronto':'Not ready','Remover bot':'Remove bot','Mover…':'Move…',
+  'Convide um amigo ou adicione IA':'Invite a friend or add AI','Pronto':'Ready','Não pronto':'Not ready','Remover bot':'Remove bot','Mover…':'Move…','Observador · Apenas bots':'Observer · Bots only','Observador inicia 1 Troll e os Elfos selecionados somente com IA. Use F10 no servidor dev para acelerar.':'Observer starts 1 Troll and the selected Elves using AI only. Use F10 on the dev server to speed up.',
   'Normal':'Normal','Personalizado':'Custom','Ranqueado':'Ranked','Fácil':'Easy','Difícil':'Hard','Compacto':'Compact','Amplo':'Large',
   'EXPEDIÇÕES EM REDE':'ONLINE EXPEDITIONS','Encontre sua clareira.':'Find your clearing.','Salas públicas deste servidor. Convites privados entram pelo código.':'Public rooms on this server. Join private invitations with their code.',
   'Jogar online · Normal →':'Play online · Normal →','REGIÃO':'REGION','Todas':'All','PING MÁXIMO':'MAXIMUM PING','Qualquer':'Any',
