@@ -199,7 +199,7 @@ test('Terceiro acerto no mesmo alvo finaliza combo; alvo atrás não recebe dano
 test('Ruptura confirma dano real, libera passagem e impede reconstrução imediata',()=>{
   const {m,t}=arena(),base=m.map.bases[0];Object.assign(t,{x:base.gate.x,z:base.gate.z});m.map.grid.fill(0);
   const wall={id:'gate',kind:'wall',owner:'e',baseId:base.id,x:t.x,z:t.z+2,hp:10,maxHp:850,tier:1,bounty:3,progress:1,healthProgress:1};m.structures.push(wall);
-  m.act('t',{type:'attack'});advance(m,.15);assert.equal(wall.hp,0);assert.equal(t.gold,3);assert.equal(m.breachUntil.get(base.id)>m.time,true);
+  m.act('t',{type:'attack'});advance(m,.15);assert.equal(wall.hp,0);assert.equal(t.stats.goldFromDamage,3);assert.equal(t.stats.goldFromObjectives,B.economy.trollObjective.discovery+B.economy.trollObjective.wall);assert.equal(m.breachUntil.get(base.id)>m.time,true);
   const impact=m.events.find(e=>e.type==='impact');assert.equal(impact.amount,10);assert.equal(impact.broken,true);
 });
 

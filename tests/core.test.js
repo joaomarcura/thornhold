@@ -103,8 +103,26 @@ test('Barricada é reparada sem recursos e ajudantes simultâneos contribuem 25%
 test('Dano econômico limitado ao HP aplicado, sem overkill ou alvo já morto',()=>{
   const m=match(),t=m.unit('t'),e=m.unit('e0');const before=t.gold;
   assert.equal(m.damage(e,9999,t,'melee'),B.elf.hp);assert.equal(e.ghost,true);const afterElf=t.gold;
-  assert.equal(m.damage(e,9999,t,'melee'),B.ghost.hp);assert.equal(t.gold,afterElf+B.ghost.goldReward);assert.equal(m.damage(e,9999,t,'melee'),0);assert.ok(t.gold>before&&t.gold<100);
+  assert.equal(t.stats.goldFromObjectives,B.economy.trollObjective.elf);assert.equal(m.damage(e,9999,t,'melee'),B.ghost.hp);assert.equal(t.gold,afterElf+B.ghost.goldReward);assert.equal(m.damage(e,9999,t,'melee'),0);assert.ok(t.gold>before);
+  assert.equal(t.stats.goldFromObjectives,B.economy.trollObjective.elf+B.ghost.goldReward);assert.equal(t.stats.goldGenerated,t.stats.goldFromDamage+t.stats.goldFromObjectives+t.stats.goldFromThreat);
   assert.equal(m.damage(m.unit('e1'),Infinity,t,'melee'),0);
+});
+test('Economia Troll V2 separa objetivos e mantém scaling pelo lobby inicial',()=>{
+  const m=match(2),t=m.unit('t'),a=m.unit('e0'),b=m.unit('e1');m.state=STATES.ACTIVE;
+  const start=t.gold;m.damage(a,10,t,'melee');const first=t.gold-start;a.alive=false;
+  m.damage(b,10,t,'melee');const second=t.gold-start-first;
+  assert.ok(Math.abs(first-second)<1e-9,'Eliminar um Elfo não pode reduzir o ouro por dano');
+  const wall={id:'objective-wall',kind:'wall',owner:b.id,baseId:'objective-base',x:t.x,z:t.z,hp:1,maxHp:1100,tier:1,progress:1,bounty:100};m.structures.push(wall);
+  const objectiveBefore=t.stats.goldFromObjectives;m.damage(wall,1,t,'melee');
+  assert.equal(t.stats.goldFromObjectives-objectiveBefore,B.economy.trollObjective.wall);
+});
+test('Descoberta é paga uma vez e ameaça acompanha economia Elfa visível ou não',()=>{
+  const m=match(2),t=m.unit('t'),owner=m.unit('e0');m.state=STATES.ACTIVE;
+  for(const elf of m.units.filter(u=>u.role==='elf'))Object.assign(elf,{x:t.x+80,z:t.z+80});
+  const core={id:'threat-core',kind:'core',owner:owner.id,baseId:'threat-base',x:t.x+1,z:t.z,hp:360,maxHp:360,tier:1,progress:1,bounty:100};m.structures.push(core);
+  m.step(.1);assert.equal(t.stats.goldFromObjectives,B.economy.trollObjective.discovery);assert.ok(t.stats.goldFromThreat>0);
+  const objective=t.stats.goldFromObjectives,threat=t.stats.goldFromThreat;m.step(.1);
+  assert.equal(t.stats.goldFromObjectives,objective);assert.ok(t.stats.goldFromThreat>threat);
 });
 test('Cooldowns, preparação e bloqueio físico não dependem do cliente',()=>{
   const m=match(),t=m.unit('t'),start={x:t.x,z:t.z};m.input(t.id,{x:1,z:0,sprint:true});m.step(.1);assert.equal(t.x,start.x);assert.match(m.act(t.id,{type:'attack'}),/selo/);

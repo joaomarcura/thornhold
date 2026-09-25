@@ -10,6 +10,8 @@ export function aggregate(rows){
   const mean=v=>v.length?v.reduce((a,b)=>a+b,0)/v.length:0;
   const distribution=v=>{const s=[...v].sort((a,b)=>a-b),p=n=>s[Math.floor((s.length-1)*n)]??null;return {mean:mean(s),median:p(.5),p10:p(.1),p90:p(.9)};};
   const troll=r=>r.ai.find(a=>a.role==='troll')||{};
+  const trollPlayer=r=>r.players.find(p=>p.role==='troll')||{};
+  const trollEconomy=rows.map(r=>{const p=trollPlayer(r),damage=p.goldFromDamage||0,objectives=p.goldFromObjectives||0,threat=p.goldFromThreat||0,total=damage+objectives+threat;return {damage,objectives,threat,total,damageShare:total?damage/total:0,objectiveShare:total?objectives/total:0,threatShare:total?threat/total:0};});
   const v2=rows.map(r=>r.telemetry?.v2).filter(Boolean),sieges=v2.flatMap(v=>v.sieges||[]),states=[...new Set(v2.flatMap(v=>Object.keys(v.stateSeconds||{})))];
   const checkpoints=[180,300,480,600,720,900].map(time=>{const samples=v2.flatMap(v=>v.economyCheckpoints||[]).filter(c=>c.time===time);return samples.length?{time,samples:samples.length,elfGoldIncomePerSecond:mean(samples.map(c=>c.elves.goldIncomePerSecond)),elfWoodIncomePerSecond:mean(samples.map(c=>c.elves.woodIncomePerSecond)),elfGeneratedGold:mean(samples.map(c=>c.elves.generatedGold)),elfSpentGold:mean(samples.map(c=>c.elves.spentGold)),elfUpgrades:mean(samples.map(c=>c.elves.upgrades)),trollGeneratedGold:mean(samples.map(c=>c.troll?.generatedGold||0)),trollSpentGold:mean(samples.map(c=>c.troll?.spentGold||0))}:null;}).filter(Boolean);
   return {runs:rows.length,duration:distribution(rows.map(r=>r.duration)),trollWins:rows.filter(r=>r.winner==='troll').length,
@@ -28,6 +30,7 @@ export function aggregate(rows){
     meanFailedExploration:mean(rows.map(r=>r.ai.reduce((n,a)=>n+(a.failedExploration||0),0))),
     meanPathRecalculations:mean(rows.map(r=>r.ai.reduce((n,a)=>n+(a.pathRecalculations||0),0))),
     meanTrollFailedNavigation:mean(rows.map(r=>troll(r).failedNavigation||0)),
+    trollEconomy:{damage:mean(trollEconomy.map(e=>e.damage)),objectives:mean(trollEconomy.map(e=>e.objectives)),threat:mean(trollEconomy.map(e=>e.threat)),damageShare:mean(trollEconomy.map(e=>e.damageShare))*100,objectiveShare:mean(trollEconomy.map(e=>e.objectiveShare))*100,threatShare:mean(trollEconomy.map(e=>e.threatShare))*100},
     meanGoldPerMinute:mean(rows.map(r=>r.players.filter(p=>p.role==='elf').reduce((n,p)=>n+p.goldPerMinute,0)/r.elves)),
     meanWoodPerMinute:mean(rows.map(r=>r.players.filter(p=>p.role==='elf').reduce((n,p)=>n+p.woodPerMinute,0)/r.elves)),
     v2:{observedRuns:v2.length,stateSeconds:Object.fromEntries(states.map(state=>[state,mean(v2.map(v=>v.stateSeconds?.[state]||0))])),sieges:{count:sieges.length,perMatch:mean(v2.map(v=>v.siegeSummary?.count||0)),successRate:sieges.length?sieges.filter(s=>s.successful).length/sieges.length*100:0,averageSeconds:mean(sieges.map(s=>s.duration)),averageHpLossPercent:mean(sieges.map(s=>s.hpLossPercent)),averageTradeScore:mean(sieges.map(s=>s.tradeScore))},economyCheckpoints:checkpoints,meanVisitedSectors:mean(v2.map(v=>v.sectors?.filter(s=>s.visits>0).length||0)),meanPressureGap:mean(v2.flatMap(v=>v.pressureWindows||[]).map(w=>w.pressureGap))}};

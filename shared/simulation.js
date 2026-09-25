@@ -12,14 +12,14 @@ import { cancelJob, demolitionRefund, jobRefund } from './jobs.js';
 export class Match {
   constructor(settings,slots) {
     this.settings={...DEFAULT_SETTINGS,...settings};this.map=generateMap(this.settings.seed,this.settings.mapSize);
-    this.time=0;this.devSpeed=1;this.state=STATES.PREP;this.structures=[];this.units=[];this.wisps=[];this.reveals=[];this.controllers=new Map();this.nextId=1;this.repairSequence=0;this.events=[];this.pings=[];this.eventId=0;this.winner=null;this.elfStunReadyAt=0;this.brokenBases=new Set();this.breachUntil=new Map();this.reclaimUntil=new Map();this.elfBasesClaimed=new Set();
+    this.time=0;this.devSpeed=1;this.state=STATES.PREP;this.structures=[];this.units=[];this.wisps=[];this.reveals=[];this.controllers=new Map();this.nextId=1;this.repairSequence=0;this.events=[];this.pings=[];this.eventId=0;this.winner=null;this.elfStunReadyAt=0;this.brokenBases=new Set();this.breachUntil=new Map();this.reclaimUntil=new Map();this.elfBasesClaimed=new Set();this.trollDiscoveredBases=new Set();this.startingElfCount=slots.filter(s=>s.role==='elf'&&s.occupant).length;
     this.stats={trollDamage:0,towerDamage:0,produced:0,destroyed:0,basesDestroyed:0,kills:0,ghostsDestroyed:0,upgrades:0,highestIncome:0,attacks:0,firstBaseFall:null,buildingsCreated:0,unitsLost:0,combatInteractions:{}};
     this.combatInteractions=new Map();this.telemetry=new CombatTelemetry(this.settings.diagnostics===true);
     this.trees=this.map.trees.map(t=>({...t}));this.preparation=this.settings.preparation+Math.max(0,slots.filter(s=>s.role==='elf'&&s.occupant).length-2)*2;
     let elfIndex=0;
     for(const slot of slots.filter(s=>s.occupant)){
       const troll=slot.role==='troll',spawn=troll?this.map.trollSpawn:this.map.elfSpawn;
-      const u={id:slot.id,name:slot.occupant.name,role:slot.role,controller:slot.occupant.type,clientId:slot.occupant.clientId||null,difficulty:slot.occupant.difficulty||this.settings.difficulty,x:spawn.x+(troll?0:(elfIndex++%3-1)*1.5),z:spawn.z+(troll?0:Math.floor(elfIndex/3)*1.5),yaw:0,hp:troll?B.troll.hp:B.elf.hp,maxHp:troll?B.troll.hp:B.elf.hp,gold:troll?B.troll.gold:B.elf.gold,wood:troll?0:B.elf.wood,alive:true,ghost:false,observer:false,levels:Object.fromEntries(Object.keys(B.upgrades).map(k=>[k,0])),cooldowns:{},input:{x:0,z:0},lastInput:0,lastHit:-100,lastAttack:0,slowUntil:0,exposure:0,baseId:null,relocationUntil:0,relocationVouchers:troll?0:1,action:'idle',actionUntil:0,stats:{damage:0,produced:0,kills:0,ghostsDestroyed:0,reveals:0,upgrades:0,goldGenerated:0,goldSpent:0,woodGenerated:0,woodSpent:0,unitsCreated:0,unitsLost:0,structuresBuilt:0,structuresDestroyed:0,healing:0,stuns:0,relocations:0},pingUntil:0};
+      const u={id:slot.id,name:slot.occupant.name,role:slot.role,controller:slot.occupant.type,clientId:slot.occupant.clientId||null,difficulty:slot.occupant.difficulty||this.settings.difficulty,x:spawn.x+(troll?0:(elfIndex++%3-1)*1.5),z:spawn.z+(troll?0:Math.floor(elfIndex/3)*1.5),yaw:0,hp:troll?B.troll.hp:B.elf.hp,maxHp:troll?B.troll.hp:B.elf.hp,gold:troll?B.troll.gold:B.elf.gold,wood:troll?0:B.elf.wood,alive:true,ghost:false,observer:false,levels:Object.fromEntries(Object.keys(B.upgrades).map(k=>[k,0])),cooldowns:{},input:{x:0,z:0},lastInput:0,lastHit:-100,lastAttack:0,slowUntil:0,exposure:0,baseId:null,relocationUntil:0,relocationVouchers:troll?0:1,action:'idle',actionUntil:0,stats:{damage:0,produced:0,kills:0,ghostsDestroyed:0,reveals:0,upgrades:0,goldGenerated:0,goldFromDamage:0,goldFromObjectives:0,goldFromThreat:0,goldSpent:0,woodGenerated:0,woodSpent:0,unitsCreated:0,unitsLost:0,structuresBuilt:0,structuresDestroyed:0,healing:0,stuns:0,relocations:0},pingUntil:0};
       u.inventory=[];u.equipment={weapon:null,body:null,relic:null};u.combo=0;u.comboUntil=0;
       if(troll){u.healCharges=B.troll.healCharges;u.healRechargeAt=null;u.healingUntil=0;u.healingRemaining=0;}
       this.units.push(u);if(u.controller==='bot')this.controllers.set(u.id,new AIController(u.difficulty));
@@ -29,6 +29,8 @@ export class Match {
   emit(type,data={}){this.events.push({id:++this.eventId,type,time:this.time,...data});if(this.events.length>120)this.events.splice(0,this.events.length-120);}
   unit(id){return this.units.find(u=>u.id===id);}
   entity(id){return this.unit(id)||this.structures.find(s=>s.id===id)||this.wisps.find(w=>w.id===id)||this.trees.find(t=>t.id===id);}
+  grantTrollGold(troll,amount,source){if(!troll?.alive||amount<=0)return;troll.gold+=amount;troll.stats.goldGenerated+=amount;const key=source==='damage'?'goldFromDamage':source==='threat'?'goldFromThreat':'goldFromObjectives';troll.stats[key]=(troll.stats[key]||0)+amount;}
+  objectiveReward(troll,target){const rewards=B.economy.trollObjective,base=target.kind?rewards[target.kind]||0:target.role==='elf'&&!target.ghost?rewards.elf:target.role==='wisp'?rewards.wisp:0,amount=base+(target.legendary?rewards.legendary:0);this.grantTrollGold(troll,amount,'objective');if(amount)this.emit('troll-objective',{unit:troll.id,entity:target.id,x:target.x,z:target.z,kind:target.kind||target.role,amount});}
   canSee(u,target){return !!u&&distance(u,target)<=(u.ghost?B.ghost.vision:B.vision[u.role])&&lineOfSight(this.map,u,target);}
   teamSee(u,target){return this.units.some(a=>(a.alive||a.ghost)&&a.role===u.role&&this.canSee(a,target))||(u.role==='elf'&&(this.structures.some(s=>s.hp>0&&s.progress>=1&&distance(s,target)<B.vision.elf&&lineOfSight(this.map,s,target))||this.reveals.some(r=>r.until>this.time&&distance(r,target)<=r.radius)));}
   visibleEnemies(u){return [...this.units.filter(a=>(a.alive||a.ghost)&&a.role!==u.role),...this.structures.filter(s=>s.hp>0&&u.role==='troll'),...this.wisps.filter(w=>w.alive&&u.role==='troll')].filter(e=>this.canSee(u,e));}
@@ -280,7 +282,7 @@ export class Match {
   }
   collapseElf(u,killer){
     const owned=this.structures.filter(s=>s.owner===u.id&&s.hp>0),homeBases=new Set(owned.filter(s=>s.kind==='core').map(s=>s.baseId));
-    const economic=this.structures.filter(s=>s.hp>0&&s.progress===1),total=economic.reduce((sum,s)=>sum+income(s),0),scale=scaling(this.units.filter(a=>a.role==='elf'&&a.alive).length,total,economic.filter(s=>s.kind==='core').length,this.time);
+    const economic=this.structures.filter(s=>s.hp>0&&s.progress===1),total=economic.reduce((sum,s)=>sum+income(s),0),scale=scaling(this.startingElfCount,total,economic.filter(s=>s.kind==='core').length,this.time);
     let reward=0;
     for(const s of owned){
       if(killer?.role==='troll')reward+=Math.min(s.hp*B.troll.goldPerDamage*scale,s.bounty||0)*.25;
@@ -291,7 +293,7 @@ export class Match {
     }
     for(const w of this.wisps.filter(w=>w.owner===u.id&&w.alive)){w.alive=false;this.emit('wisp-death',{entity:w.id,x:w.x,z:w.z,cause:'owner-collapse'});}
     for(const baseId of homeBases)this.reclaimUntil.set(baseId,this.time+15);
-    if(killer?.role==='troll'&&reward>0){killer.gold+=reward;killer.stats.goldGenerated+=reward;}
+    if(killer?.role==='troll'&&reward>0)this.grantTrollGold(killer,reward,'damage');
     this.stats.basesDestroyed=this.brokenBases.size;u.gold=0;u.wood=0;u.baseId=null;u.relocationUntil=0;
     this.emit('collapse',{unit:u.id,x:u.x,z:u.z,reward,structures:owned.length,reclaimAt:homeBases.size?this.time+15:null});
   }
@@ -304,13 +306,14 @@ export class Match {
     if(kind!=='hunger')target.lastHit=this.time;
     if(source?.role==='troll'){
       const economic=this.structures.filter(s=>s.hp>0&&s.progress===1),total=economic.reduce((sum,s)=>sum+income(s),0);
-      const gain=actual*B.troll.goldPerDamage*scaling(this.units.filter(u=>u.role==='elf'&&u.alive).length,total,economic.filter(s=>s.kind==='core').length,this.time);
+      const gain=actual*B.troll.goldPerDamage*scaling(this.startingElfCount,total,economic.filter(s=>s.kind==='core').length,this.time);
       const budgeted=target.kind||target.role==='wisp',awarded=target.ghost?0:budgeted?Math.min(gain,target.bounty||0):gain;
-      if(budgeted)target.bounty-=awarded;source.gold+=awarded;source.stats.goldGenerated+=awarded;source.lastAttack=this.time;source.stats.damage+=actual;this.stats.trollDamage+=actual;
+      if(budgeted)target.bounty-=awarded;this.grantTrollGold(source,awarded,'damage');source.lastAttack=this.time;source.stats.damage+=actual;this.stats.trollDamage+=actual;
     }else if(kind==='tower'){this.stats.towerDamage+=actual;if(source)source.stats.damage+=actual;}
     this.emit('damage',{entity:target.id,unit:source?.id,x:target.x,z:target.z,amount:Math.round(actual),kind});
     if(target.hp<=0){
       target.hp=0;
+      if(source?.role==='troll')this.objectiveReward(source,target);
       if(target.kind){
         this.stats.destroyed++;if(source?.role==='troll')source.stats.structuresDestroyed++;
         if(target.kind==='wall'){this.brokenBases.add(target.baseId);this.stats.basesDestroyed=this.brokenBases.size;this.breachUntil.set(target.baseId,this.time+B.construction.breachCooldown);this.stats.firstBaseFall??=this.time;}
@@ -322,7 +325,7 @@ export class Match {
         this.emit('destroy',{entity:target.id,x:target.x,z:target.z,kind:target.kind});
       }
       else if(target.role==='wisp'){target.alive=false;this.emit('wisp-death',{entity:target.id,x:target.x,z:target.z});}
-      else if(target.ghost){target.ghost=false;target.observer=true;target.input={x:0,z:0};if(source?.role==='troll'){source.gold+=B.ghost.goldReward;source.stats.goldGenerated+=B.ghost.goldReward;source.stats.ghostsDestroyed++;this.stats.ghostsDestroyed++;}this.emit('ghost-death',{entity:target.id,unit:source?.id,x:target.x,z:target.z,reward:source?.role==='troll'?B.ghost.goldReward:0});}
+      else if(target.ghost){target.ghost=false;target.observer=true;target.input={x:0,z:0};if(source?.role==='troll'){this.grantTrollGold(source,B.ghost.goldReward,'objective');source.stats.ghostsDestroyed++;this.stats.ghostsDestroyed++;}this.emit('ghost-death',{entity:target.id,unit:source?.id,x:target.x,z:target.z,reward:source?.role==='troll'?B.ghost.goldReward:0});}
       else {target.alive=false;target.input={x:0,z:0};target.pendingStrike=null;target.queuedStrike=null;this.stats.kills++;this.stats.unitsLost++;target.stats.unitsLost++;if(source)source.stats.kills++;if(target.role==='elf'){this.collapseElf(target,source);target.ghost=true;target.observer=false;target.hp=B.ghost.hp;target.maxHp=B.ghost.hp;target.action='idle';target.lastHit=-100;this.emit('ghost-spawn',{entity:target.id,x:target.x,z:target.z});}this.emit('death',{entity:target.id,x:target.x,z:target.z,name:target.name});}
       this.checkEndState();
     }return actual;
@@ -406,6 +409,7 @@ export class Match {
       }
       if(u.role==='elf')this.stats.highestIncome=Math.max(this.stats.highestIncome,this.structures.filter(s=>s.owner===u.id&&s.hp>0&&s.progress>=1).reduce((a,s)=>a+income(s),0));
     }
+    if(this.state===STATES.ACTIVE){const troll=this.units.find(u=>u.role==='troll'&&u.alive);if(troll){for(const entity of this.visibleEnemies(troll)){if(entity.baseId&&!this.trollDiscoveredBases.has(entity.baseId)){this.trollDiscoveredBases.add(entity.baseId);this.grantTrollGold(troll,B.economy.trollObjective.discovery,'objective');this.emit('base-discovered',{unit:troll.id,baseId:entity.baseId,x:entity.x,z:entity.z,amount:B.economy.trollObjective.discovery});}}const activeStructures=this.structures.filter(s=>s.hp>0&&s.progress>=1),teamIncome=activeStructures.reduce((n,s)=>n+income(s),0),mines=activeStructures.filter(s=>s.kind==='mine').length,legendary=activeStructures.filter(s=>s.legendary).length,threatRate=Math.min(B.economy.trollThreatCap,teamIncome*B.economy.trollThreatRate+mines*.035+legendary*.12);this.grantTrollGold(troll,threatRate*dt,'threat');}}
     stepWisps(this,dt);
     const troll=this.units.find(u=>u.role==='troll'),elves=this.units.filter(u=>u.role==='elf');
     this.checkEndState();this.telemetry.step(this,dt);

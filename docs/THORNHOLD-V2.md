@@ -147,6 +147,18 @@ Cinco cercos globais fracassados mudam a estratégia entre Hunter, Raider e Sieg
 
 A primeira amostra isolada de 20 seeds terminou 18 partidas e deu 30% de vitórias ao Troll. É um resultado intermediário esperado: a autopreservação deixou explícito o custo econômico do tempo de recuperação. A V2.6 deve corrigir essa dependência sem reintroduzir comportamento suicida.
 
+## V2.6 — Economia do Troll
+
+A renda do Troll passa a ter três fontes auditáveis:
+
+- `damage` — continua sendo a fonte principal e usa o número inicial de Elfos no scaling;
+- `objectives` — descoberta de bases, eliminações e destruição de estruturas;
+- `threat` — uma renda pequena, limitada, proporcional à economia e às estruturas avançadas dos Elfos.
+
+Eliminar um Elfo nunca reduz o multiplicador de renda por dano. O scaling usa a população inicial da partida, enquanto o componente de ameaça acompanha a força econômica atual. Todas as fontes aparecem em `players[].goldFromDamage`, `goldFromObjectives` e `goldFromThreat`, e o Balance Lab agrega valores e percentuais em `summary.trollEconomy`.
+
+Na primeira amostra de 20 seeds 1×5 a composição média foi 79,1% dano, 5,3% objetivos e 15,6% ameaça. O resultado foi 10 vitórias do Troll, 6 dos Elfos e 4 partidas ainda ativas aos 20 minutos. A mediana foi 10:15. Essa amostra valida a faixa pretendida da economia híbrida, mas não é baseline final: os quatro casos longos apresentaram cercos reais e crescimento econômico, não ausência de alvo, e serão tratados pela análise econômica V2.7 e pela calibração V2.8.
+
 ## Balance Lab
 
 `npm run simulate:arena` usa 1×5 por padrão. Para uma análise secundária explícita, `SIM_ELF_COUNTS` pode fornecer outros tamanhos.
