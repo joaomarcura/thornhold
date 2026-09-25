@@ -257,3 +257,11 @@ O diretor detecta 90 segundos de jogo ativo sem dano, destruição, abate ou nov
 A amostra diagnóstica corrigida de 30 seeds 1×5 Normal terminou 17–13, sem partidas abertas ou abaixo de oito minutos, com mediana 11:36 e Balance Quality 90,5. A primeira rodada de 100 expôs uma janela de perseguição excessivamente curta e foi rejeitada em 57–43. Depois de calibrar somente o Chase Budget e a memória de abandono, sem alterar atributos, a repetição pareada terminou 51–49, com 100/100 resolvidas, mediana 11:11, 4% abaixo de oito minutos e qualidade 91,7 contra 91,4 do baseline.
 
 As falhas médias de navegação caíram de 22,63 para 20,97, os travamentos de 31,13 para 25,79 e as falhas de exploração de 10,26 para 8,44. O bloco estratégico foi aprovado, mas não alongou a mediana; `GAME-116` segue aberto até alcançar 13–15 minutos sem romper 45–55% ou a resolução. Artefato aprovado: `artifacts/v2-strategic-director-calibrated-100.json`.
+
+## V2.12 — Experimento de durabilidade das Barricadas
+
+Por decisão de balanceamento, o HP base de todas as Barricadas foi dobrado de 1.155 para 2.310. O aumento se propaga pela curva de níveis e preserva os multiplicadores Lendário e Épico existentes.
+
+Em 100 partidas pareadas 1×5 Normal, o experimento produziu 47 vitórias do Troll, 47 dos Elfos e 6 partidas ainda ativas aos 30 minutos. A mediana chegou a 15:34 e apenas 8% terminaram antes de 10 minutos. Entretanto, o sucesso de cerco caiu para 33,28%, 18% ultrapassaram 25 minutos e as falhas médias de navegação subiram para 47,55.
+
+A durabilidade dobrada permanece ativa, mas este lote não substitui o baseline aprovado da V2.11. A próxima etapa deve corrigir resolução e navegação em cercos longos sem desfazer silenciosamente a nova durabilidade. Artefato: `artifacts/barricade-double-hp-100.json`.

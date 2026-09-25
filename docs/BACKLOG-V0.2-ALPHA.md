@@ -118,6 +118,7 @@ Regra de medição: todo baseline e toda rodada de balanceamento usam exclusivam
 - [ ] `GAME-116` Alongar a mediana sem multiplicadores globais de dano/recompensa: projetar um objetivo intermediário ou curva contínua de compras, preservando 45–55% e zero partidas sem resolução.
 - [x] `GAME-117` Garantir Barricada 2 na abertura dos bots, impedir reconstrução infinita de Torres durante cerco, reiniciar patrulhas esgotadas e tornar descoberta de base um objetivo econômico explícito. Baseline 1×5 Normal: 47–53, mediana 11:11 e zero partidas abertas em 100 seeds.
 - [x] `GAME-118` Implementar custo de oportunidade de viagem, Chase Budget, adaptação por perseguições fracassadas, diretor de estagnação sem buffs e Balance Lab com score, ablações e perfis artificiais 1×5. Validação pareada: 51–49, zero abertas, mediana 11:11 e qualidade 91,7.
+- [x] `GAME-119` Dobrar o HP base da Barricada de 1.155 para 2.310, propagando a mudança por toda a progressão até o nível 20 e preservando os multiplicadores Lendário/Épico existentes.
 
 Critério: zero estados sem saída, zero partidas automatizadas inacabadas, 1v5 próximo da meta e nenhuma configuração principal acima de 65% para um lado sem diagnóstico explícito.
 

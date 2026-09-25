@@ -180,3 +180,14 @@ Relatórios e capturas ficam em `artifacts/`. Os scripts fecham somente seus con
 - Após recarregar o servidor sem salas ativas, `browser-check.js` passou: menu, sala privada, dois clientes, Ready, HUDs, projeto, loja, ajuda e reconexão; nenhuma exceção JavaScript. A sessão isolada do navegador foi fechada.
 
 Diagnóstico, fontes, metas de fases, comandos e trabalho restante: [BALANCEAMENTO-E-PROGRESSAO.md](BALANCEAMENTO-E-PROGRESSAO.md). A meta de 12–18 minutos não está validada como comportamento atual.
+
+## Barricadas com durabilidade dobrada — 25/09/2026
+
+- O HP base da Barricada passou de 1.155 para 2.310. A progressão até o nível 20 e o multiplicador Lendário continuam usando a mesma fórmula, agora sobre a nova base.
+- Os testes direcionados de progressão, regras centrais e IA tática passaram: 87/87.
+- A rodada pareada de 100 partidas 1×5 Normal terminou em 47 vitórias do Troll, 47 dos Elfos e 6 partidas ainda ativas aos 30 minutos. Entre as partidas concluídas, o resultado foi exatamente 50–50.
+- A mediana subiu de 11:11 para 15:34; 8 partidas terminaram abaixo de 10 minutos, contra 36 no baseline; 18% ultrapassaram 25 minutos.
+- O sucesso dos cercos caiu de 51,54% para 33,28%. As falhas médias de navegação subiram de 20,97 para 47,55, principalmente pelo aumento de tentativas do Troll ao redor de cercos prolongados.
+- A mudança atende à faixa desejada de duração, mas ainda não é um baseline aprovado: seis partidas não resolveram e a navegação regrediu. O estado fica preservado como decisão explícita de balanceamento para a próxima correção de IA.
+
+Artefato: `artifacts/barricade-double-hp-100.json`.

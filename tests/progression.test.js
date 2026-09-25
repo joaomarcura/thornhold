@@ -25,6 +25,11 @@ function arena(){
 }
 function ready(m,t){advance(m,Math.max(0,(t.cooldowns.attack||0)-m.time)+.05);}
 
+test('Todas as Barricadas herdam o dobro do HP base em cada nível',()=>{
+  assert.equal(B.structures.wall.hp,2310);assert.equal(structureHP('wall',1),2310);
+  for(let tier=1;tier<=B.maxTier;tier++){const legendary=tier>=B.legendary.tier?B.legendary.wallHealth:1;assert.equal(structureHP('wall',tier),2310*tierScale(B.structures.wall.growth,tier)*legendary);}
+});
+
 test('Melhorias são compromissos; apenas obra e formação podem ser canceladas',()=>{
   const m=match(),{e,core}=baseFixture(m),upgradePrice=upgradeCost(core);m.act('e',{type:'upgrade',target:core.id});advance(m,1);
   const refund=jobRefund(core,m.time),gold=e.gold,wood=e.wood,hp=core.hp;
