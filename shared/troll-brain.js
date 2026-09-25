@@ -2,13 +2,14 @@ import { BALANCE as B, distance, mitigation, trollCost, towerDamage, towerProfil
 import { ITEMS, BUILDS } from './equipment.js';
 import { combatRisk } from './combat-risk.js';
 import { lineOfSight, pathfind, toCell, walkable, index } from './map.js';
+import { StrategicMap } from './strategic-map.js';
 
 // Decisions use own state, visible opponents and dated observations only.
 export class TrollBrain {
-  constructor(){this.state='scout';this.targetId=null;this.committedUntil=0;this.avoid=[];this.safePoint=null;this.lastHp=null;this.lastTime=0;this.damageRate=0;this.engagedAt=0;this.recoveryUntil=0;this.reengageAfter=0;this.lastReceived=0;}
+  constructor(){this.state='scout';this.targetId=null;this.committedUntil=0;this.avoid=[];this.safePoint=null;this.lastHp=null;this.lastTime=0;this.damageRate=0;this.engagedAt=0;this.recoveryUntil=0;this.reengageAfter=0;this.lastReceived=0;this.strategicMap=new StrategicMap();}
   tick(c,m,u){
     if(m.state!=='MATCH_ACTIVE'){c.stop(u);return;}
-    const now=m.time,visible=m.visibleEnemies(u),elapsed=Math.max(.1,now-this.lastTime);
+    const now=m.time,visible=m.visibleEnemies(u),elapsed=Math.max(.1,now-this.lastTime);this.strategicMap.update(m,u,visible);
     if(c.navigationFailure){
       const failed=c.navigationFailure==='point'?null:visible.find(e=>e.id===c.navigationFailure)||c.discovered.get(c.navigationFailure);
       if(failed)this.avoid.push({id:failed.id,x:failed.x,z:failed.z,until:now+12});

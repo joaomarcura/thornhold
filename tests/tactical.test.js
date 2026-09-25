@@ -5,6 +5,7 @@ import { STATES, BALANCE as B, distance } from '../shared/config.js';
 import { toCell, index } from '../shared/map.js';
 import { AIController } from '../shared/controllers.js';
 import { TacticalMap } from '../client/tactical-map.js';
+import { StrategicMap } from '../shared/strategic-map.js';
 const match=()=>new Match({seed:'TACTICS'},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},...['e0','e1'].map(id=>({id,role:'elf',occupant:{type:'human',name:id}}))]);
 
 test('Seed varia patrulha do Troll, refúgios e planos de construção sem perder reprodutibilidade',()=>{
@@ -47,6 +48,12 @@ test('Mapa conserva apenas última posição observada e não acompanha Troll oc
 test('IA não memoriza nem contorna estruturas que ainda não avistou',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('hard'),b=m.map.bases[0];m.state=STATES.ACTIVE;m.time=60;
   m.structures.push({id:'hidden',kind:'wall',x:b.gate.x,z:b.gate.z,hp:1000,maxHp:1000,progress:1});assert.equal(m.canSee(u,m.structures[0]),false);c.troll(m,u);assert.equal(c.discovered.has('hidden'),false);assert.equal(c.navigationBlocks(m,u).size,0);
+});
+test('Memória estratégica V2 persiste com confiança decrescente sem conhecer alvos ocultos',()=>{
+  const m=match(),t=m.unit('t'),memory=new StrategicMap(),visible={id:'seen-tower',kind:'tower',x:t.x+4,z:t.z,hp:360,maxHp:360,tier:2,branch:'power',progress:1,baseId:'known'};
+  const hidden={id:'hidden-mine',kind:'mine',x:t.x+40,z:t.z+40,hp:200,maxHp:200,tier:7,coreTier:7,progress:1,baseId:'hidden'};m.structures.push(visible,hidden);m.state=STATES.ACTIVE;m.time=60;
+  memory.update(m,t,[visible]);let report=memory.report(m,t),known=report.find(s=>s.knownStructures>0);assert.equal(known.knownStructures,1);assert.ok(known.estimatedTowerDps>0);assert.equal(memory.observations.has(hidden.id),false);
+  const initial=known.confidence;m.time=240;memory.update(m,t,[]);report=memory.report(m,t);known=report.find(s=>s.knownStructures>0);assert.ok(known.confidence<initial);assert.equal(known.knownStructures,1);
 });
 test('Navegação do Troll não trata a própria estrutura-alvo como obstáculo',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('hard'),tower={id:'tower-target',kind:'tower',x:u.x+6,z:u.z,hp:400,maxHp:400,tier:1,branch:'power',progress:1};

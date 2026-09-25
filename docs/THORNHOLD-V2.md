@@ -72,6 +72,24 @@ Snapshots são registrados em 3, 5, 8, 10, 12 e 15 minutos, contendo geração, 
 
 O relatório contabiliza os estados atuais (`SCOUT`, `PURSUE`, `SIEGE`, `RETREAT`, `RECOVER`, `ROTATE` e outros) e suas transições. Os estados novos da V2 só serão introduzidos na V2.3.
 
+## V2.2 — Strategic Memory
+
+Cada cérebro de Troll possui agora uma memória estratégica persistente 6×6. Ela recebe somente entidades realmente visíveis ao Troll e mantém estruturas antigas como lembranças incertas; unidades expiram rapidamente.
+
+Por setor são calculados:
+
+- última visita e último inimigo visto;
+- Elfos e estruturas conhecidos;
+- DPS estimado de torres;
+- HP estrutural e economia estimados;
+- risco e valor estratégico;
+- custo de viagem;
+- cercos anteriores, sucessos e falhas;
+- dano recebido e causado;
+- confiança exponencialmente decrescente.
+
+A memória aparece em `result.ai[].strategicMemory`. Nesta etapa ela ainda não substitui a seleção de alvo existente; isso evita misturar a criação do modelo com a mudança comportamental da V2.3.
+
 ## Balance Lab
 
 `npm run simulate:arena` usa 1×5 por padrão. Para uma análise secundária explícita, `SIM_ELF_COUNTS` pode fornecer outros tamanhos.
