@@ -16,15 +16,16 @@ export class AIController {
     if(this.destination)this.follow(match,u,dt);else u.input={x:0,z:0};
     // Once a target is chosen, hold the attack like a human holding the mouse.
     // Difficulty still controls when the bot reconsiders its target or retreat.
-    if(u.role==='troll'&&!this.retreating&&['siege','pursue'].includes(this.brain?.state)){
+    if(u.role==='troll'&&!this.retreating&&['siege','chase'].includes(this.brain?.state)){
       const target=match.entity(this.brain.targetId),stats=match.trollStats(u);
       if(target?.hp>0&&match.canSee(u,target)&&!match.wallBlocks(u,target)&&distance(u,target)<=stats.range+(target.kind?B.structures[target.kind].radius:0)-.1){
         u.yaw=Math.atan2(target.x-u.x,target.z-u.z);match.act(u.id,{type:'attack',heavy:!(u.cooldowns.heavy>match.time)});
       }
     }
     if(u.role==='troll'){
-      const state=this.retreating?'retreat':this.brain?.state||'idle';
-      this.metrics[state==='pursue'||state==='siege'?'attacking':state==='retreat'||state==='recover'?'retreating':state==='rotate'||state==='scout'?'defending':'idle']+=dt;
+      const state=this.brain?.state||'idle';
+      const bucket=['chase','siege'].includes(state)?'attacking':['disengage','recover'].includes(state)?'retreating':['rotate','explore','hunt','probe','reposition'].includes(state)?'defending':'idle';
+      this.metrics[bucket]+=dt;
     }
   }
   stop(u){this.destination=null;this.route=[];u.input={x:0,z:0};}
@@ -74,7 +75,7 @@ export class AIController {
       if(!target.entityId&&distance(u,target)<=target.reach&&lineOfSight(match.map,u,target)){this.stop(u);return;}
       if(target.entityId){if(this.lastNavigationEntity!==target.entityId||match.time-this.lastNavigationAt>15)this.metrics.failedNavigation++;this.lastNavigationEntity=target.entityId;this.lastNavigationAt=match.time;}else this.metrics.failedExploration++;this.navigationFailure=target.entityId||'point';this.navigationFailureTarget={...target};this.destination=null;this.route=[];this.routeAt=-100;u.input={x:0,z:0};return;
     }
-    const traveling=u.role==='troll'&&!this.retreating&&['scout','rotate'].includes(this.brain?.state),travelFactor=traveling?B.troll.travelSpeed:1;
+    const traveling=u.role==='troll'&&!this.retreating&&['explore','hunt','rotate'].includes(this.brain?.state),travelFactor=traveling?B.troll.travelSpeed:1;
     const sprint=u.role==='elf'?B.movement.elfSprint:B.movement.sprint,d=distance(u,next),speed=(u.role==='elf'?B.elf.speed:match.trollStats(u).movement)*sprint*(u.dashUntil>match.time?B.troll.dashSpeed:1)*travelFactor,divisor=Math.max(.001,d,speed*dt);u.input={x:(next.x-u.x)/divisor,z:(next.z-u.z)/divisor,sprint:u.role==='elf'||this.retreating,travel:traveling};u.yaw=Math.atan2(u.input.x,u.input.z);
   }
   actNear(match,u,target,cmd,reach=B.interactRange){

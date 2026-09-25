@@ -90,6 +90,28 @@ Por setor são calculados:
 
 A memória aparece em `result.ai[].strategicMemory`. Nesta etapa ela ainda não substitui a seleção de alvo existente; isso evita misturar a criação do modelo com a mudança comportamental da V2.3.
 
+## V2.3 — Troll State Machine
+
+O cérebro trabalha agora com os estados explícitos:
+
+- `EXPLORE` — procurar novas regiões;
+- `HUNT` — aproximar-se de uma lembrança ou alvo distante;
+- `PROBE` — observar uma defesa desconhecida durante três segundos;
+- `SIEGE` — atacar uma estrutura escolhida;
+- `CHASE` — perseguir uma unidade;
+- `REPOSITION` — reservado para a separação tática da V2.5;
+- `DISENGAGE` — sair efetivamente do combate;
+- `RECOVER` — recuperar vida em segurança;
+- `ROTATE` — abandonar um setor/estratégia local.
+
+As fases `HUNT`, `PRESSURE`, `SIEGE` e `ENDGAME` mudam somente os pesos de prioridade. Não concedem atributos.
+
+Todos os alvos visíveis passam pela mesma avaliação de economia, kill, cerco, negação de progressão, vulnerabilidade, oportunidade, risco, viagem e falhas recentes. Torres recebem valor adicional proporcional ao risco que será removido ao destruí-las.
+
+Antes de um cerco desconhecido, o Troll observa de uma distância mais segura. Ele mede dano realmente recebido e usa apenas torres conhecidas. Uma ameaça extrema gera `ROTATE`; informação oculta não participa da decisão. O diagnóstico da avaliação é exportado em `targetEvaluation` e `candidateEvaluations`.
+
+Primeira amostra de 50 seeds, sem mudanças de atributos: 42% de vitórias do Troll, mediana de 10:26, zero partidas inacabadas. Esse resultado ainda não é baseline final; V2.4 e V2.5 precisam reduzir cercos ruins e tempo excessivo de retirada antes da rodada oficial de 100 partidas.
+
 ## Balance Lab
 
 `npm run simulate:arena` usa 1×5 por padrão. Para uma análise secundária explícita, `SIM_ELF_COUNTS` pode fornecer outros tamanhos.
