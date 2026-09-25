@@ -116,6 +116,7 @@ Regra de medição: todo baseline e toda rodada de balanceamento usam exclusivam
 - [x] `GAME-114` Variar por seed a patrulha do Troll, os refúgios, perfis e layouts dos bots Elfos; recalibrar 300 partidas 1×5 em 144–156, sem timeout.
 - [x] `GAME-115` Progressão até nível 20, Épico no 20, Torre Lendária 5×, Wisp automático, prioridade econômica/Barricada 2 dos bots e baseline pareado 1×5 em 50–50 sem timeout.
 - [ ] `GAME-116` Alongar a mediana sem multiplicadores globais de dano/recompensa: projetar um objetivo intermediário ou curva contínua de compras, preservando 45–55% e zero partidas sem resolução.
+- [x] `GAME-117` Garantir Barricada 2 na abertura dos bots, impedir reconstrução infinita de Torres durante cerco, reiniciar patrulhas esgotadas e tornar descoberta de base um objetivo econômico explícito. Baseline 1×5 Normal: 47–53, mediana 11:11 e zero partidas abertas em 100 seeds.
 
 Critério: zero estados sem saída, zero partidas automatizadas inacabadas, 1v5 próximo da meta e nenhuma configuração principal acima de 65% para um lado sem diagnóstico explícito.
 

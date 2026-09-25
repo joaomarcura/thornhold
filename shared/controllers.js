@@ -145,11 +145,15 @@ export class AIController {
     const buildTower=()=>{const p=towerPosition;if(p)return this.actNear(match,u,p,{type:'build',kind:'tower',...p});return 'no-position';};
     const utilityPositions=[];for(const radius of [4.4,6.6,8.8])for(let step=0;step<8;step++){const i=(this.buildPlan.utilityOffset+this.buildPlan.utilityDirection*step+8)%8;utilityPositions.push({x:base.x+Math.sin(i*Math.PI/4)*radius,z:base.z+Math.cos(i*Math.PI/4)*radius});}
     const buildUtility=kind=>{const def=B.structures[kind],p=utilityPositions.find(p=>!avoidedPoint(p)&&baseAt(match.map,p)?.id===base.id&&match.positionValid(u,p.x,p.z)&&!match.structures.some(s=>s.hp>0&&distance(s,p)<placementRadius(s.kind)+placementRadius(kind)+B.construction.placementGap)&&!match.trees.some(t=>t.amount>0&&distance(t,p)<def.radius+.55));if(p)return this.actNear(match,u,p,{type:'build',kind,...p});return 'no-position';};
+    const upgrade=s=>this.actNear(match,u,s,{type:'upgrade',target:s.id});
+    // Distance is an execution requirement, not a strategic blocker. Treat a
+    // sole distance reason as a valid plan so actNear can walk to the target.
+    const affordable=s=>{if(!s||avoidedEntity(s)||s.upgrading)return false;const status=upgradeStatus(u,s,match.time,match.state,match.structures);return status.allowed||status.reasons.every(reason=>reason.code==='distance');};
     if(wall&&!avoidedEntity(wall)&&wall.hp/wall.maxHp<this.profile.repair){this.actNear(match,u,wall,{type:'repair',target:wall.id});return;}
     if(u.wood<45){this.gather(match,u,base);return;}
     // The first defensive tower is the bot's opening combat insurance. Building
     // the wall first leaves no reaction window when the Troll arrives early.
-    if(!towers.length&&u.gold>=B.structures.tower.gold&&u.wood>=B.structures.tower.wood){if(buildTower()!=='no-position')return;}
+    if(!threat&&!towers.length&&u.gold>=B.structures.tower.gold&&u.wood>=B.structures.tower.wood){if(buildTower()!=='no-position')return;}
     if(!wall){
       if((match.breachUntil.get(base.id)||0)>match.time||(threat&&distance(threat,base.gate)<B.construction.enemyClearance)){
         // Survive the breach instead of repeatedly issuing a rejected rebuild.
@@ -158,19 +162,18 @@ export class AIController {
       }
       if(u.gold>=B.structures.wall.gold&&u.wood>=B.structures.wall.wood)this.actNear(match,u,base.gate,{type:'build',kind:'wall',x:base.gate.x,z:base.gate.z});else this.gather(match,u,base);return;
     }
+    // Tier 2 is the minimum viable gate for every bot opening. Waiting for
+    // Core 2 plus a Mine left the first refuge discovered with a tier-1 wall,
+    // and an incoming Troll could then keep the bot trapped in a repair loop.
+    // Repair still wins at critical health; otherwise commit the affordable
+    // upgrade before ordinary siege maintenance.
+    if(wall.tier<2&&!wall.upgrading&&affordable(wall)){upgrade(wall);return;}
     if(threat&&!avoidedEntity(wall)&&wall.hp<wall.maxHp*.95){this.actNear(match,u,wall,{type:'repair',target:wall.id});return;}
-    const upgrade=s=>this.actNear(match,u,s,{type:'upgrade',target:s.id});
-    // Distance is an execution requirement, not a strategic blocker. Treat a
-    // sole distance reason as a valid plan so actNear can walk to the target.
-    const affordable=s=>{if(!s||avoidedEntity(s)||s.upgrading)return false;const status=upgradeStatus(u,s,match.time,match.state,match.structures);return status.allowed||status.reasons.every(reason=>reason.code==='distance');};
     const mineRules=mineEconomy(core.tier),desiredMines=Math.min(mineRules.capacity,Math.max(1,Math.ceil(mineRules.capacity*strategy.mineRatio)));
     // Every profile establishes income before multiplying defences. The profile
     // controls how far it pushes that economy, not whether it understands it.
     if(!threat&&core.tier===1&&affordable(core)){upgrade(core);return;}
     if(!threat&&core.tier>=2&&!mines.length&&u.gold>=mineRules.cost.gold&&u.wood>=mineRules.cost.wood){if(buildUtility('mine')!=='no-position')return;}
-    // Every bot must establish a real second defensive tier after its first
-    // income source, before spending its reserve on workers or extra mines.
-    if(!threat&&core.tier>=2&&mines.length&&wall.tier<2){const cost=upgradeCost(wall);if(u.gold>=cost.gold&&u.wood>=cost.wood)upgrade(wall);else this.gather(match,u,base);return;}
     const wisps=match.wisps.filter(w=>w.owner===u.id&&w.alive),training=wisps.some(w=>w.readyAt>match.time),hire=wispCost(wisps.length);
     if(!threat&&!training&&towers.length&&wisps.length<Math.min(strategy.wispTarget,core.tier+1)&&u.gold>=hire.gold+35&&u.wood>=hire.wood&&availableTrees(match,u,core).length){this.actNear(match,u,core,{type:'trainWisp',target:core.id});return;}
     if(!threat&&core.tier>=2&&mines.length<desiredMines&&u.gold>=mineRules.cost.gold&&u.wood>=mineRules.cost.wood){if(buildUtility('mine')!=='no-position')return;}
@@ -179,7 +182,7 @@ export class AIController {
     if(!threat&&affordable(core)){upgrade(core);return;}
     if(affordable(wall)&&threat){upgrade(wall);return;}
     const desiredTowers=Math.min(B.construction.limits.tower,Math.max(1,Math.floor(strategy.towerBase+core.tier*strategy.towerGrowth)));
-    if(towers.length<desiredTowers&&u.gold>=B.structures.tower.gold+35&&u.wood>=B.structures.tower.wood){if(buildTower()!=='no-position')return;}
+    if(!threat&&towers.length<desiredTowers&&u.gold>=B.structures.tower.gold+35&&u.wood>=B.structures.tower.wood){if(buildTower()!=='no-position')return;}
     const towerTierCeiling=Math.max(1,core.tier+strategy.towerTierOffset),tower=towers.sort((a,b)=>a.tier-b.tier).find(s=>s.tier<towerTierCeiling&&affordable(s));if(tower){upgrade(tower);return;}
     if(!own.some(s=>s.kind==='workshop')&&core.tier>=3&&u.gold>300&&u.wood>=B.structures.workshop.wood){if(buildUtility('workshop')!=='no-position')return;}
     const worker=wisps.filter(w=>w.readyAt<=match.time&&!w.upgradingUntil&&w.level<core.tier+1).sort((a,b)=>a.level-b.level).find(w=>u.gold>=wispUpgradeCost(w.level).gold&&u.wood>=wispUpgradeCost(w.level).wood);
@@ -222,6 +225,13 @@ export class AIController {
       if(!this.explored.has(k)){const frontier={x:x*map.cell,z:z*map.cell};if(!this.brain?.avoid.some(a=>distance(a,frontier)<24)){target=frontier;break;}continue;}
       if(!seen.has(k)){seen.add(k);queue.push({x,z});}
     }}
-    this.exploreTarget=target;this.exploreAt=match.time;if(target)this.go(match,u,target,.8);else this.stop(u);
+    this.exploreTarget=target;this.exploreAt=match.time;
+    if(target){this.go(match,u,target,.8);return;}
+    // Once every frontier cell has been seen, keep revisiting the public
+    // refuge landmarks. Enemy observations intentionally expire, so stopping
+    // here could strand the Troll forever while a surviving Elf continued to
+    // grow in a previously visited base.
+    if(this.searchBases?.length){const shift=1+((this.searchCycle||0)%Math.max(1,this.searchBases.length-1));this.searchCycle=(this.searchCycle||0)+1;this.searchBases=[...this.searchBases.slice(shift),...this.searchBases.slice(0,shift)];this.searchBaseIndex=1;this.metrics.patrolCycles=(this.metrics.patrolCycles||0)+1;this.go(match,u,this.searchBases[0].outside,3);return;}
+    this.stop(u);
   }
 }

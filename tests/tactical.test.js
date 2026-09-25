@@ -20,6 +20,11 @@ test('Seed varia patrulha do Troll, refúgios e planos de construção sem perde
   const variants=Array.from({length:8},(_,i)=>JSON.stringify(plan(`DYNAMIC-${i}`)));
   assert.ok(new Set(variants).size>=6,JSON.stringify(variants));
 });
+test('Troll reinicia patrulha quando todo o mapa conhecido fica sem alvo',()=>{
+  const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=1200;c.searchStarted=true;c.searchBases=[...m.map.bases];c.searchBaseIndex=c.searchBases.length;
+  for(let z=0;z<m.map.size;z++)for(let x=0;x<m.map.size;x++)c.explored.add(index(m.map,x,z));
+  c.explore(m,u);assert.ok(c.destination);assert.equal(c.searchBaseIndex,1);assert.equal(c.metrics.patrolCycles,1);
+});
 
 test('Pings validam coordenadas, respeitam equipe, cooldown e expiração',()=>{
   const m=match();assert.match(m.act('e0',{type:'ping',x:NaN,z:1}),/inválida/);assert.match(m.act('e0',{type:'ping',x:-1,z:1}),/inválida/);assert.match(m.act('e0',{type:'ping',x:99999,z:1}),/inválida/);
@@ -52,8 +57,23 @@ test('IA não memoriza nem contorna estruturas que ainda não avistou',()=>{
 });
 test('IA Elfa planeja upgrade distante e caminha até a estrutura',()=>{
   const m=match(),u=m.unit('e0'),t=m.unit('t'),c=new AIController('normal'),base=m.map.bases[0];m.state=STATES.ACTIVE;m.time=80;Object.assign(t,{x:0,z:0});Object.assign(u,{x:base.outside.x,z:base.outside.z,gold:10000,wood:10000,baseId:base.id});
-  const core={id:'remote-core',kind:'core',owner:u.id,baseId:base.id,x:base.x,z:base.z,hp:360,maxHp:360,tier:1,progress:1,upgrading:0},wall={id:'remote-wall',kind:'wall',owner:u.id,baseId:base.id,x:base.gate.x,z:base.gate.z,hp:1100,maxHp:1100,tier:1,progress:1,upgrading:0},tower={id:'remote-tower',kind:'tower',owner:u.id,baseId:base.id,x:base.x+3,z:base.z,hp:360,maxHp:360,tier:1,progress:1,upgrading:0};m.structures.push(core,wall,tower);
+  const core={id:'remote-core',kind:'core',owner:u.id,baseId:base.id,x:base.x,z:base.z,hp:360,maxHp:360,tier:1,progress:1,upgrading:0},wall={id:'remote-wall',kind:'wall',owner:u.id,baseId:base.id,x:base.gate.x,z:base.gate.z,hp:2035,maxHp:2035,tier:2,progress:1,upgrading:0},tower={id:'remote-tower',kind:'tower',owner:u.id,baseId:base.id,x:base.x+3,z:base.z,hp:360,maxHp:360,tier:1,progress:1,upgrading:0};m.structures.push(core,wall,tower);
   assert.ok(distance(u,core)>B.interactRange);c.elf(m,u);assert.equal(c.destination?.entityId,core.id);
+});
+test('IA Elfa prioriza Barricada 2 antes da expansão econômica',()=>{
+  const m=match(),u=m.unit('e0'),t=m.unit('t'),c=new AIController('normal'),base=m.map.bases[0];m.state=STATES.ACTIVE;m.time=80;Object.assign(t,{x:0,z:0});Object.assign(u,{x:base.gate.x,z:base.gate.z,gold:10000,wood:10000,baseId:base.id});
+  const core={id:'opening-core',kind:'core',owner:u.id,baseId:base.id,x:base.x,z:base.z,hp:360,maxHp:360,tier:1,progress:1,upgrading:0},wall={id:'opening-wall',kind:'wall',owner:u.id,baseId:base.id,x:base.gate.x,z:base.gate.z,hp:1155,maxHp:1155,tier:1,progress:1,upgrading:0},tower={id:'opening-tower',kind:'tower',owner:u.id,baseId:base.id,x:base.x+3,z:base.z,hp:360,maxHp:360,tier:1,progress:1,upgrading:0};m.structures.push(core,wall,tower);
+  c.elf(m,u);assert.ok(wall.upgrading>0);assert.equal(core.upgrading,0);assert.equal(m.structures.some(s=>s.kind==='mine'),false);
+});
+test('IA Elfa melhora Barricada viável sob pressão em vez de reparar para sempre',()=>{
+  const m=match(),u=m.unit('e0'),t=m.unit('t'),c=new AIController('normal'),base=m.map.bases[0];m.state=STATES.ACTIVE;m.time=80;Object.assign(u,{x:base.gate.x,z:base.gate.z,gold:10000,wood:10000,baseId:base.id});Object.assign(t,{x:base.gate.x+5,z:base.gate.z});
+  const core={id:'siege-core',kind:'core',owner:u.id,baseId:base.id,x:base.x,z:base.z,hp:360,maxHp:360,tier:1,progress:1,upgrading:0},wall={id:'siege-wall',kind:'wall',owner:u.id,baseId:base.id,x:base.gate.x,z:base.gate.z,hp:924,maxHp:1155,tier:1,progress:1,upgrading:0},tower={id:'siege-tower',kind:'tower',owner:u.id,baseId:base.id,x:base.x+3,z:base.z,hp:360,maxHp:360,tier:1,progress:1,upgrading:0};m.structures.push(core,wall,tower);
+  c.elf(m,u);assert.ok(wall.upgrading>0);assert.notEqual(u.action,'repair');
+});
+test('IA Elfa não repõe Torre durante cerco ativo',()=>{
+  const m=match(),u=m.unit('e0'),t=m.unit('t'),c=new AIController('normal'),base=m.map.bases[0];m.state=STATES.ACTIVE;m.time=180;Object.assign(u,{x:base.x,z:base.z,gold:100000,wood:100000,baseId:base.id});Object.assign(t,{x:base.x+5,z:base.z});
+  const core={id:'sieged-core',kind:'core',owner:u.id,baseId:base.id,x:base.x,z:base.z,hp:980,maxHp:980,tier:3,progress:1,upgrading:0},wall={id:'sieged-wall',kind:'wall',owner:u.id,baseId:base.id,x:base.gate.x,z:base.gate.z,hp:4170,maxHp:4170,tier:3,progress:1,upgrading:0};m.structures.push(core,wall);
+  c.elf(m,u);assert.equal(m.structures.some(s=>s.kind==='tower'),false);assert.notEqual(u.action,'build');
 });
 test('Memória estratégica V2 persiste com confiança decrescente sem conhecer alvos ocultos',()=>{
   const m=match(),t=m.unit('t'),memory=new StrategicMap(),visible={id:'seen-tower',kind:'tower',x:t.x+4,z:t.z,hp:360,maxHp:360,tier:2,branch:'power',progress:1,baseId:'known'};

@@ -2,6 +2,15 @@
 
 Os testes exercitam o código real, não telas simuladas. As conexões chamadas de “humanas” nos testes automáticos são clientes de rede sintéticos, sem controlador IA do servidor. Isso valida protocolo e ocupação dos slots; não substitui sessões de usabilidade com pessoas.
 
+## IA de abertura e baseline 1×5 Normal — 25/09/2026
+
+- Bots evoluem a Barricada para nível 2 antes de Núcleo 2/Mina; sob pressão, uma evolução viável não é sufocada por reparo ordinário.
+- Bots não iniciam Torres novas enquanto enxergam o Troll, eliminando o loop de centenas de reconstruções durante um único cerco.
+- O Troll reinicia a patrulha de marcos públicos quando toda a fronteira já foi explorada; `SIM-1` deixou de ficar 925 segundos sem combate e terminou aos 27:48.
+- Descoberta visual de uma base concede 75 de ouro, promovendo exploração sem buff de combate ou atributo temporal.
+- Baseline final: 100 partidas 1×5 Normal, 47 Troll–53 Elfos, zero abertas, mediana 11:11, P90 22:06 e uma partida abaixo de quatro minutos. Artefato: `artifacts/wall-tier2-final-patrol-100.json`.
+- `scripts/arena.js` e `scripts/sensitivity.js` agora usam dificuldade Normal por padrão; outras dificuldades precisam ser solicitadas explicitamente.
+
 ## Sustain, progressão Lendária e UX de upgrades — 24/09/2026
 
 Regra vigente: simulações de balanceamento usam exclusivamente o lobby padrão 1 Troll × 5 Elfos, dificuldade Normal. Matrizes antigas com outras composições são mantidas apenas como diagnóstico histórico.
@@ -9,7 +18,7 @@ Regra vigente: simulações de balanceamento usam exclusivamente o lobby padrão
 - A câmera de acompanhamento mantém cerca de 5,69 m de altura relativa ao alvo em qualquer nível de zoom; a roda altera somente a distância horizontal. A visão tática continua usando sua câmera elevada independente.
 - `npm run start:dev` inicia o servidor local com o menu F10, concessão de recursos, debug de combate e velocidades 1×/2×/4×/8×. `npm start` mantém as ferramentas desativadas.
 
-- 102 testes de regras, física, IA e rede aprovados; 56 arquivos JavaScript passaram em `node --check`.
+- 120 testes de regras, física, IA e rede aprovados; 61 arquivos JavaScript passaram em `node --check`.
 - Fluxos reais de navegador aprovados para upgrade por Q, custo insuficiente em vermelho, Torre padrão sem especializações, upgrade sem cancelamento, stun, placar/MVP, PT-BR/EN e preferências.
 - Cura do Troll: duas cargas, 20% do HP máximo em 6 segundos, cooldown de 75 s e uma carga recuperada a cada 180 s. Dano não interrompe o efeito.
 - Regeneração: 0,10% do HP máximo/s em combate e 0,30%/s após quatro segundos sem dano; Vigor escala ambas e tem limite 10.

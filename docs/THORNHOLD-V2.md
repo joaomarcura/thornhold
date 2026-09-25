@@ -200,9 +200,27 @@ Baseline calibrado de 100 partidas com teto diagnóstico de 30 minutos:
 
 A meta de vitória está atendida no limite superior. A duração melhorou, mas ainda está abaixo da mediana aspiracional de 13–15 minutos; novos aumentos simples de HP elevaram partidas abertas e não serão aplicados sem playtest humano.
 
+## V2.9 — Abertura defensiva e patrulha contínua
+
+A IA Elfa agora trata Barricada 2 como parte obrigatória da abertura, antes de Núcleo 2 e da primeira Mina. Dano crítico ainda prioriza reparo, mas uma Barricada saudável e com recursos disponíveis não fica presa no loop de reparo quando pode evoluir. Durante um cerco visível, bots não iniciam novas Torres; reparo e upgrades existentes continuam permitidos. Isso eliminou partidas com mais de 450 fundações refeitas no mesmo ataque.
+
+Descobrir uma base pela visão real passou a conceder 75 de ouro ao Troll. A recompensa transforma exploração em progressão sem alterar dano, HP ou atributos por relógio. Quando todo o mapa já foi explorado e as observações expiraram, o Troll reinicia a ronda pelos marcos públicos dos refúgios; ele não recebe a posição do inimigo. A seed `SIM-1`, que antes ficou 925 segundos sem combate, voltou a encontrar a última base e terminou normalmente.
+
+O laboratório também foi corrigido: `scripts/arena.js` usa exclusivamente dificuldade Normal por padrão, conforme a regra do produto. Outras dificuldades exigem `SIM_DIFFICULTIES` explícito. O laboratório de sensibilidade recebeu o mesmo padrão e filtros para candidatos específicos.
+
+Baseline de 100 partidas 1×5 Normal, teto diagnóstico de 30 minutos:
+
+- 47 vitórias do Troll e 53 dos Elfos;
+- zero partidas abertas;
+- mediana 11:11, P90 22:06;
+- uma partida abaixo de quatro minutos e 33 abaixo de dez minutos;
+- 48,9% de sucesso em cercos e 14,94 cercos por partida.
+
+`GAME-116` permanece aberto: o equilíbrio e a resolução estão corretos, mas a mediana ainda não atingiu 13–15 minutos.
+
 ## Balance Lab
 
-`npm run simulate:arena` usa 1×5 por padrão. Para uma análise secundária explícita, `SIM_ELF_COUNTS` pode fornecer outros tamanhos.
+`npm run simulate:arena` usa 1×5 Normal por padrão. Para uma análise secundária explícita, `SIM_ELF_COUNTS` e `SIM_DIFFICULTIES` podem fornecer outros tamanhos e dificuldades.
 
 O artefato agrega:
 

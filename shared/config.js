@@ -7,7 +7,7 @@ export const BALANCE = {
   vision: { troll: 30, elf: 24 }, interactRange: 6.5,
   movement:{sprint:1.25,elfSprint:1.4375,trollRadius:.64,elfRadius:.37},
   construction:{range:9.75,initialHealth:.15,breachCooldown:45,enemyClearance:5,gateClearance:2.3,placementGap:.5,placementRadius:{wall:.95},limits:{core:1,wall:1,tower:5,mine:5,workshop:1},upgradeSeconds:3},
-  economy:{treeStock:1000,richWood:1.65,finalRichWood:2.5,workshopGather:.3,workshopRepair:.2,trollThreatRate:.022,trollThreatCap:2.2,trollObjective:{discovery:20,elf:75,wisp:5,wall:15,tower:30,mine:25,core:60,workshop:20,legendary:80},trollLobbyBonus:[0,0,.08,.12,.16,.2,.2,.2,.18],trollBountyFactor:[0,1.3,1.5,1.45,1.45,1.41,1.4,1.25,1.1],trollMapBounty:{compact:.9,large:1.1},trollLobbySiege:[1,1.15,1,1,1,1.1,1,1,1],trollScenarioBounty:{
+  economy:{treeStock:1000,richWood:1.65,finalRichWood:2.5,workshopGather:.3,workshopRepair:.2,trollThreatRate:.022,trollThreatCap:2.2,trollObjective:{discovery:75,elf:75,wisp:5,wall:15,tower:30,mine:25,core:60,workshop:20,legendary:80},trollLobbyBonus:[0,0,.08,.12,.16,.2,.2,.2,.18],trollBountyFactor:[0,1.3,1.5,1.45,1.45,1.41,1.4,1.25,1.1],trollMapBounty:{compact:.9,large:1.1},trollLobbySiege:[1,1.15,1,1,1,1.1,1,1,1],trollScenarioBounty:{
     compact:{normal:[1,1,1,1,1,.94,1,1,1.06],hard:[1,1,1,1,1,1,1,1,1.06]},
     large:{}
   }},
