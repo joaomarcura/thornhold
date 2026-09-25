@@ -128,16 +128,15 @@ test('Janela de recuperação começa somente quando o Troll sai do fogo das tor
   assert.equal(c.brain.recoveryUntil,0);assert.equal(c.destination.x,m.map.trollSpawn.x);
   Object.assign(u,m.map.trollSpawn);c.troll(m,u);assert.ok(c.brain.recoveryUntil>=m.time+17.9);assert.equal(c.retreating,true);
 });
-test('Após cinco recuos o Troll encerra o ciclo, mas ainda foge com vida crítica',()=>{
+test('Recuos repetidos nunca desativam autopreservação do Troll',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=B.finalAge+50;u.lastHit=m.time;c.metrics.retreatAttempts=5;
   const tower={id:'late-danger',kind:'tower',x:u.x+5,z:u.z,hp:400,maxHp:400,tier:3,branch:'power',progress:1,disabledUntil:0};m.structures.push(tower);
-  u.hp=u.maxHp*.2;c.troll(m,u);assert.equal(c.retreating,false);
-  u.hp=u.maxHp*.1;c.troll(m,u);assert.equal(c.retreating,true);assert.equal(c.brain.state,'disengage');
+  u.hp=u.maxHp*.2;c.troll(m,u);assert.equal(c.retreating,true);assert.equal(c.brain.state,'disengage');
 });
-test('Após dez recuos tardios o Troll faz um último assalto sem novo ciclo',()=>{
+test('Dez recuos não ativam Last Stand suicida',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=B.finalAge+50;u.lastHit=m.time;u.hp=u.maxHp*.05;c.metrics.retreatAttempts=10;
   m.structures.push({id:'last-stand-danger',kind:'tower',x:u.x+5,z:u.z,hp:400,maxHp:400,tier:5,branch:'power',progress:1,disabledUntil:0});c.troll(m,u);
-  assert.equal(c.retreating,false);assert.ok(['probe','siege','chase'].includes(c.brain.state));
+  assert.equal(c.retreating,true);assert.equal(c.brain.state,'disengage');
 });
 test('Troll preserva ouro para completar a espada após o selo lendário',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('hard');m.state=STATES.ACTIVE;m.time=B.finalAge+1;u.levels.damage=4;u.levels.siege=3;u.gold=100;

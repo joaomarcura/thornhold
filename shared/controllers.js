@@ -76,7 +76,7 @@ export class AIController {
       if(target.entityId){if(this.lastNavigationEntity!==target.entityId||match.time-this.lastNavigationAt>15)this.metrics.failedNavigation++;this.lastNavigationEntity=target.entityId;this.lastNavigationAt=match.time;}else this.metrics.failedExploration++;this.navigationFailure=target.entityId||'point';this.navigationFailureTarget={...target};this.destination=null;this.route=[];this.routeAt=-100;u.input={x:0,z:0};return;
     }
     const traveling=u.role==='troll'&&!this.retreating&&['explore','hunt','rotate'].includes(this.brain?.state),travelFactor=traveling?B.troll.travelSpeed:1;
-    const sprint=u.role==='elf'?B.movement.elfSprint:B.movement.sprint,d=distance(u,next),speed=(u.role==='elf'?B.elf.speed:match.trollStats(u).movement)*sprint*(u.dashUntil>match.time?B.troll.dashSpeed:1)*travelFactor,divisor=Math.max(.001,d,speed*dt);u.input={x:(next.x-u.x)/divisor,z:(next.z-u.z)/divisor,sprint:u.role==='elf'||this.retreating,travel:traveling};u.yaw=Math.atan2(u.input.x,u.input.z);
+    const sprint=u.role==='elf'?B.movement.elfSprint:B.movement.sprint,d=distance(u,next),speed=(u.role==='elf'?B.elf.speed:match.trollStats(u).movement)*sprint*(u.dashUntil>match.time?B.troll.dashSpeed:1)*travelFactor,divisor=Math.max(.001,d,speed*dt);u.input={x:(next.x-u.x)/divisor,z:(next.z-u.z)/divisor,sprint:u.role==='elf'||this.retreating||this.brain?.state==='reposition',travel:traveling};u.yaw=Math.atan2(u.input.x,u.input.z);
   }
   actNear(match,u,target,cmd,reach=B.interactRange){
     if(cmd.type==='build'&&cmd.kind!=='wall'&&distance(u,target)<B.structures[cmd.kind].radius+.5){

@@ -8,12 +8,13 @@ export const TROLL_STATES=Object.freeze(['explore','hunt','probe','siege','chase
 
 // Decisions use own state, visible opponents and dated observations only.
 export class TrollBrain {
-  constructor(){this.state='explore';this.targetId=null;this.committedUntil=0;this.avoid=[];this.safePoint=null;this.lastHp=null;this.lastTime=0;this.damageRate=0;this.engagedAt=0;this.recoveryUntil=0;this.reengageAfter=0;this.lastReceived=0;this.strategicMap=new StrategicMap();this.probedBases=new Map();this.probe=null;this.siege=null;this.siegeDecision=null;}
+  constructor(){this.state='explore';this.targetId=null;this.committedUntil=0;this.avoid=[];this.safePoint=null;this.lastHp=null;this.lastTime=0;this.damageRate=0;this.engagedAt=0;this.recoveryUntil=0;this.reengageAfter=0;this.lastReceived=0;this.strategicMap=new StrategicMap();this.probedBases=new Map();this.probe=null;this.siege=null;this.siegeDecision=null;this.reposition=null;this.repositionReadyAt=0;this.strategy=null;this.failedSieges=0;this.strategyChanges=0;}
   phase(m){const elapsed=Math.max(0,m.time-m.preparation);return elapsed<180?'hunt':elapsed<420?'pressure':elapsed<720?'siege':'endgame';}
   targetScore(m,u,target,known,stats){
-    const phase=this.phase(m),weights={hunt:{economy:.7,kill:1.5,siege:.7,denial:.7,vulnerability:1.2},pressure:{economy:1.1,kill:1.25,siege:1.1,denial:1,vulnerability:1.3},siege:{economy:1.4,kill:1,siege:1.3,denial:1.2,vulnerability:1.25},endgame:{economy:1.15,kill:1.4,siege:1.25,denial:1.6,vulnerability:1.35}}[phase];
-    const d=Math.max(.01,distance(u,target)),reach=stats.range+(target.kind?B.structures[target.kind].radius:0)-.35,approach={x:target.x+(u.x-target.x)/d*Math.min(d,reach),z:target.z+(u.z-target.z)/d*Math.min(d,reach)},danger=combatRisk(m,u,known,approach,target),hpRatio=target.hp/Math.max(1,target.maxHp),economicValue=target.kind==='mine'?70+(target.tier||1)*8:target.kind==='core'?65+(target.tier||1)*10:target.role==='wisp'?25:0,easyKill=target.role==='elf'&&!target.ghost&&(d<8||target.hp<stats.damage*2),killValue=target.role==='elf'&&!target.ghost?(easyKill?150:45):target.ghost?5:0,siegeValue={tower:200,wall:160,core:130,mine:65,workshop:45}[target.kind]||0,progressionDenial=(target.tier||0)*7+(target.legendary?100:0)+(target.kind==='tower'?danger.dps*5:0),vulnerability=(1-hpRatio)*100+100/(1+danger.killSeconds),opportunity=1/(1+danger.riskScore*2+danger.killSeconds/25),sector=this.strategicMap.report(m,u).find(s=>s.id===this.strategicMap.idAt(m,target)),failurePenalty=sector?.failedSieges||0,travelCost=d/Math.max(1,stats.movement),numerator=economicValue*weights.economy+killValue*weights.kill+siegeValue*weights.siege+progressionDenial*weights.denial+vulnerability*weights.vulnerability;
-    return {score:numerator*opportunity/(1+travelCost*.05+failurePenalty*.4),danger,opportunity,economicValue,killValue,siegeValue,progressionDenial,vulnerability,phase};
+    const phase=this.phase(m),weights={hunt:{economy:.7,kill:1.5,siege:.7,denial:.7,vulnerability:1.2},pressure:{economy:1.1,kill:1.25,siege:1.1,denial:1,vulnerability:1.3},siege:{economy:1.4,kill:1,siege:1.3,denial:1.2,vulnerability:1.25},endgame:{economy:1.15,kill:1.4,siege:1.25,denial:1.6,vulnerability:1.35}}[phase],strategyWeights={hunter:{economy:.8,kill:1.45,siege:.85},siegebreaker:{economy:.9,kill:.8,siege:1.4},raider:{economy:1.45,kill:.9,siege:.9},adaptive:{economy:1,kill:1,siege:1}}[this.strategy||'adaptive'];
+    const d=Math.max(.01,distance(u,target)),reach=stats.range+(target.kind?B.structures[target.kind].radius:0)-.35,approach={x:target.x+(u.x-target.x)/d*Math.min(d,reach),z:target.z+(u.z-target.z)/d*Math.min(d,reach)},danger=combatRisk(m,u,known,approach,target),hpRatio=target.hp/Math.max(1,target.maxHp),economicValue=target.kind==='mine'?70+(target.tier||1)*8:target.kind==='core'?65+(target.tier||1)*10:target.role==='wisp'?25:0,easyKill=target.role==='elf'&&!target.ghost&&(d<8||target.hp<stats.damage*2),killValue=target.role==='elf'&&!target.ghost?(easyKill?150:45):target.ghost?5:0,siegeValue={tower:200,wall:160,core:130,mine:65,workshop:45}[target.kind]||0,progressionDenial=(target.tier||0)*7+(target.legendary?100:0)+(target.kind==='tower'?danger.dps*5:0),vulnerability=(1-hpRatio)*100+100/(1+danger.killSeconds),opportunity=1/(1+danger.riskScore*2+danger.killSeconds/25),sector=this.strategicMap.report(m,u).find(s=>s.id===this.strategicMap.idAt(m,target)),failurePenalty=sector?.failedSieges||0,travelCost=d/Math.max(1,stats.movement);
+    const strategicNumerator=economicValue*weights.economy*strategyWeights.economy+killValue*weights.kill*strategyWeights.kill+siegeValue*weights.siege*strategyWeights.siege+progressionDenial*weights.denial+vulnerability*weights.vulnerability;
+    return {score:strategicNumerator*opportunity/(1+travelCost*.05+failurePenalty*.4),danger,opportunity,economicValue,killValue,siegeValue,progressionDenial,vulnerability,phase,strategy:this.strategy};
   }
   beginSiege(m,u,target,evaluation){
     if(this.siege?.targetId===target.id)return;
@@ -21,7 +22,11 @@ export class TrollBrain {
     const sectorId=this.strategicMap.idAt(m,target),failures=this.strategicMap.report(m,u).find(s=>s.id===sectorId)?.failedSieges||0;
     this.siege={targetId:target.id,sectorId,point:{x:target.x,z:target.z},start:m.time,startHp:u.hp,startMaxHp:u.maxHp,targetStartHp:target.hp,targetMaxHp:target.maxHp||target.hp,minCommitUntil:m.time+4,maxDuration:Math.min(40,18+failures*4),maxHpLoss:Math.min(.42,.22+failures*.04),targetValueRequired:Math.max(.2,.45-failures*.05),previousFailures:failures,healsAtStart:m.telemetry.healing.uses,evaluation};
   }
-  finishSiegeMemory(m,u,successful){if(!this.siege)return;this.strategicMap.recordSiege(m,this.siege.point,successful);this.siege=null;this.siegeDecision=null;}
+  finishSiegeMemory(m,u,successful){
+    if(!this.siege)return;this.strategicMap.recordSiege(m,this.siege.point,successful);
+    if(successful)this.failedSieges=Math.max(0,this.failedSieges-1);else{this.failedSieges++;if(this.failedSieges%5===0){const strategies=['hunter','raider','siegebreaker'];this.strategy=strategies[(strategies.indexOf(this.strategy)+1+strategies.length)%strategies.length];this.strategyChanges++;}}
+    this.siege=null;this.siegeDecision=null;
+  }
   evaluateSiege(m,u){
     const siege=this.siege;if(!siege)return null;const target=m.entity(siege.targetId);
     if(!target||target.hp<=0){this.finishSiegeMemory(m,u,true);return null;}
@@ -30,7 +35,7 @@ export class TrollBrain {
   }
   tick(c,m,u){
     if(m.state!=='MATCH_ACTIVE'){c.stop(u);return;}
-    const now=m.time,visible=m.visibleEnemies(u),elapsed=Math.max(.1,now-this.lastTime);this.strategicMap.update(m,u,visible);
+    const now=m.time,visible=m.visibleEnemies(u),elapsed=Math.max(.1,now-this.lastTime);this.strategicMap.update(m,u,visible);this.strategy??=['hunter','siegebreaker','raider'][[...m.map.seed].reduce((n,ch)=>n+ch.charCodeAt(0),0)%3];
     if(c.navigationFailure){
       const failed=c.navigationFailure==='point'?null:visible.find(e=>e.id===c.navigationFailure)||c.discovered.get(c.navigationFailure);
       if(failed)this.avoid.push({id:failed.id,x:failed.x,z:failed.z,until:now+12});
@@ -66,21 +71,22 @@ export class TrollBrain {
     const targetRisk=target?combatRisk(m,u,known,u,target):localRisk;
     const finishing=inRange&&targetRisk.killSeconds+targetRisk.escapeSeconds+2<u.hp/Math.max(1,dps)&&targetRisk.killSeconds<3;
     const survival=u.hp/Math.max(1,dps),health=u.hp/u.maxHp;
-    // After several successful retreats in the late game, stop replaying the
-    // same safe loop. The Troll still preserves itself at truly critical HP,
-    // but commits through ordinary pressure to force a result.
-    const hardened=now>B.finalAge&&c.metrics.retreatAttempts>=5,lastStand=now>B.finalAge&&c.metrics.retreatAttempts>=10,decisiveAssault=legendaryAssault||hardened;
-    const emergencyHealth=hardened&&!legendaryAssault ? .12 : .22,emergencySeconds=hardened&&!legendaryAssault?2.5:4;
-    const emergency=!lastStand&&threatened&&(health<=emergencyHealth||survival<emergencySeconds);
-    const overextended=threatened&&((survival<5.5&&!finishing)||(u.exposure>17&&survival<18&&!finishing));
-    const predictiveEscape=!lastStand&&!decisiveAssault&&threatened&&localRisk.towers>0&&this.projectedEscapeHp<.25&&!finishing;
+    const emergency=threatened&&(health<=.24||survival<3.5),overextended=threatened&&((survival<7&&!finishing)||(u.exposure>B.troll.exposureGrace+5&&survival<20&&!finishing)),predictiveEscape=!legendaryAssault&&threatened&&localRisk.towers>0&&this.projectedEscapeHp<.2&&!finishing;
     // Long inactivity changes only the bot's priorities. It must never alter
     // health: a human Troll may wait, scout or return to the Sanctuary safely.
     const idlePressure=now>B.idlePressureAge-10&&now-u.lastAttack>B.idlePressureGrace-10;
     const healingAvailable=(u.healCharges||0)>0&&!(u.cooldowns.heal>now)&&u.hp<u.maxHp*.92;
     if(threatened&&health<.55&&healingAvailable)m.act(u.id,{type:'heal'});
-    const sustainedByHeal=(u.healingUntil||0)>now&&health>.24,siegeDecision=this.evaluateSiege(m,u),commitmentProtected=siegeDecision?.withinCommitment&&!emergency,ordinaryRetreat=predictiveEscape||(!sustainedByHeal&&!decisiveAssault&&(overextended||(health<c.profile.retreat&&!finishing&&(threatened||(!idlePressure&&now>this.reengageAfter)))))||siegeDecision?.shouldExit;
-    if(!c.retreating&&(emergency||(!commitmentProtected&&ordinaryRetreat))){
+    const sustainedByHeal=(u.healingUntil||0)>now&&health>.24,siegeDecision=this.evaluateSiege(m,u),commitmentProtected=siegeDecision?.withinCommitment&&!emergency,deathRisk=Math.max(0,(8-survival)/8)+Math.max(0,.35-health)*2,escapeDifficulty=escapePlan?Math.max(0,escapePlan.damage/Math.max(1,u.hp)):.15,negativeTrade=siegeDecision?Math.max(0,.45-siegeDecision.tradeScore):0,objectiveHope=siegeDecision?.objectiveCompletionProbability||0,availableSustain=healingAvailable ? .25 : 0,retreatNeed=deathRisk+escapeDifficulty+negativeTrade-objectiveHope*.55-availableSustain;this.retreatNeed={score:+retreatNeed.toFixed(3),deathRisk:+deathRisk.toFixed(3),escapeDifficulty:+escapeDifficulty.toFixed(3),negativeTrade:+negativeTrade.toFixed(3),objectiveHope:+objectiveHope.toFixed(3),availableSustain};
+    if(this.reposition){
+      if(emergency){this.reposition=null;}else if(now<this.reposition.until&&(threatened||risk(u)>1)){this.state='reposition';c.go(m,u,this.reposition.point,1.5);return;}else{this.avoid.push({id:null,x:this.reposition.origin.x,z:this.reposition.origin.z,until:now+6});this.reposition=null;this.repositionReadyAt=now+8;this.safePoint=null;this.state='rotate';c.exploreTarget=null;}
+    }
+    if(siegeDecision?.shouldExit&&!threatened&&!commitmentProtected){if(this.siege)this.avoid.push({id:null,x:this.siege.point.x,z:this.siege.point.z,until:now+20});if(this.siege)this.finishSiegeMemory(m,u,false);this.targetId=null;this.state='rotate';c.exploreTarget=null;c.stop(u);return;}
+    const repositionNeeded=now>=this.repositionReadyAt&&!commitmentProtected&&!emergency&&(localRisk.towers>0||this.damageRate>0)&&!finishing&&(overextended||retreatNeed>.45||siegeDecision?.shouldExit),fullDisengage=emergency||predictiveEscape||(!commitmentProtected&&retreatNeed>1.05);
+    if(!c.retreating&&repositionNeeded&&!fullDisengage){
+      if(siegeDecision?.shouldExit&&this.siege)this.avoid.push({id:null,x:this.siege.point.x,z:this.siege.point.z,until:now+20});if(this.siege)this.finishSiegeMemory(m,u,false);this.reposition={point:escapePlan?.point||this.planEscape(c,m,u,knownTowers)?.point||m.map.trollSpawn,origin:{x:u.x,z:u.z},until:now+4,resumeTarget:this.targetId};this.state='reposition';this.targetId=null;c.go(m,u,this.reposition.point,1.5);return;
+    }
+    if(!c.retreating&&fullDisengage){
       if(siegeDecision?.shouldExit&&this.siege)this.avoid.push({id:null,x:this.siege.point.x,z:this.siege.point.z,until:now+20});
       if(this.siege)this.finishSiegeMemory(m,u,false);
       c.retreating=true;c.metrics.retreatAttempts++;this.state='disengage';this.safePoint=escapePlan?.point||null;this.recoveryUntil=0;m.telemetry.retreatStart(m,u);
@@ -88,15 +94,17 @@ export class TrollBrain {
     }
     if(c.retreating){
       const recovering=!threatened&&risk(u)<1;
+      if(recovering&&health<.5&&healingAvailable)m.act(u.id,{type:'heal'});
       const atSanctuary=distance(u,m.map.trollSpawn)<=B.troll.sanctuaryRadius-1;
-      const returnToSanctuary=recovering&&health<.3&&!idlePressure&&!atSanctuary;
+      const sanctuaryTravel=distance(u,m.map.trollSpawn)/Math.max(1,stats.movement*B.movement.sprint),returnToSanctuary=recovering&&health<.38&&!idlePressure&&!atSanctuary&&sanctuaryTravel<10;
       if(returnToSanctuary){this.state='recover';this.safePoint=m.map.trollSpawn;this.recoveryUntil=0;c.go(m,u,this.safePoint,B.troll.sanctuaryRadius-1);return;}
       // Count the recovery window only after the Troll actually reaches
       // safety. Previously most of the 18 seconds elapsed while it was still
       // escaping tower fire, forcing it to reengage at critically low HP.
-      if(recovering&&!this.recoveryUntil)this.recoveryUntil=now+18;
+      const endgame=this.phase(m)==='endgame',recoveryWindow=endgame?10:18;
+      if(recovering&&!this.recoveryUntil)this.recoveryUntil=now+recoveryWindow;
       else if(!recovering)this.recoveryUntil=0;
-      const recoveredEnough=health>=.58||(this.recoveryUntil&&now>=this.recoveryUntil&&health>=.45);
+      const recoveredEnough=health>=(endgame ? .48 : .58)||(this.recoveryUntil&&now>=this.recoveryUntil&&health>=(endgame ? .38 : .45));
       if(recovering&&(recoveredEnough||idlePressure)){
         c.retreating=false;this.safePoint=null;this.state='rotate';c.exploreTarget=null;c.metrics.retreatSuccesses++;this.reengageAfter=now+6;m.telemetry.reengage(m,u);
       }else{

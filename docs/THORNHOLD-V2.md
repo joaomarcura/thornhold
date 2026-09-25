@@ -129,6 +129,24 @@ O compromisso impede reavaliações comuns durante os primeiros quatro segundos,
 
 O contexto atual é exportado como `siegeDecision`. Esses cálculos mudam decisões, mas continuam sem modificar atributos.
 
+## V2.5 — Retreat Rewrite
+
+`Hardened` e `Last Stand` foram removidos. A quantidade de recuos nunca desliga a autopreservação.
+
+A necessidade de retirada considera:
+
+- risco de morte;
+- dificuldade da rota de fuga;
+- troca negativa;
+- probabilidade de concluir o objetivo;
+- sustain disponível.
+
+`REPOSITION` dura no máximo quatro segundos, possui cooldown e bloqueia temporariamente o ângulo abandonado. `DISENGAGE` fica reservado a risco real de morte. Em recuperação segura, a IA pode usar uma carga de cura, avaliar o custo de viagem ao Santuário e aceitar um reset menor no `ENDGAME`.
+
+Cinco cercos globais fracassados mudam a estratégia entre Hunter, Raider e Siegebreaker em vez de ignorar risco.
+
+A primeira amostra isolada de 20 seeds terminou 18 partidas e deu 30% de vitórias ao Troll. É um resultado intermediário esperado: a autopreservação deixou explícito o custo econômico do tempo de recuperação. A V2.6 deve corrigir essa dependência sem reintroduzir comportamento suicida.
+
 ## Balance Lab
 
 `npm run simulate:arena` usa 1×5 por padrão. Para uma análise secundária explícita, `SIM_ELF_COUNTS` pode fornecer outros tamanhos.
