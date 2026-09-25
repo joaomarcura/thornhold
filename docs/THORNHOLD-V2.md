@@ -218,6 +218,14 @@ Baseline de 100 partidas 1×5 Normal, teto diagnóstico de 30 minutos:
 
 `GAME-116` permanece aberto: o equilíbrio e a resolução estão corretos, mas a mediana ainda não atingiu 13–15 minutos.
 
+## V2.10 — Observabilidade de progressão
+
+O resultado de cada partida agora registra o primeiro Lendário, a primeira Torre Lendária, o primeiro Épico, o momento da Espada Lendária e o estado final dos níveis do Troll e das estruturas. `scripts/arena.js` agrega frequência e distribuição desses marcos sem alterar a simulação.
+
+A auditoria de `GAME-116` encontrou uma assimetria estrutural: no lote diagnóstico de 30 seeds, a Espada do Troll apareceu em 27 partidas com mediana ativa de 5:02, enquanto a primeira estrutura Lendária dos Elfos apareceu em apenas cinco, com mediana de 18:37. Experimentos de curva contínua elevaram a mediana até 12:55, mas favoreceram os Elfos e criaram partidas abertas. Experimentos combinando financiamento tardio e dano adicional da Espada removeram parte dos impasses, porém deslocaram o resultado para 57–63% do Troll e reduziram a mediana.
+
+Esses candidatos foram rejeitados e não alteram o balanceamento vigente. O próximo desenho de `GAME-116` deve alinhar o custo e o momento das duas condições Lendárias, em vez de aplicar multiplicadores globais ou transformar estagnação em suicídio da IA. Os artefatos `game116-*.json` preservam as amostras diagnósticas locais.
+
 ## Balance Lab
 
 `npm run simulate:arena` usa 1×5 Normal por padrão. Para uma análise secundária explícita, `SIM_ELF_COUNTS` e `SIM_DIFFICULTIES` podem fornecer outros tamanhos e dificuldades.

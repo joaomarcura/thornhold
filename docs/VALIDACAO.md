@@ -2,6 +2,13 @@
 
 Os testes exercitam o código real, não telas simuladas. As conexões chamadas de “humanas” nos testes automáticos são clientes de rede sintéticos, sem controlador IA do servidor. Isso valida protocolo e ocupação dos slots; não substitui sessões de usabilidade com pessoas.
 
+## Auditoria de progressão do GAME-116 — 25/09/2026
+
+- A telemetria registra marcos Lendário/Épico, níveis finais do Troll e maior tier final por tipo de estrutura; o agregador apresenta frequência, média, mediana, P10 e P90.
+- A amostra de referência para o diagnóstico terminou 12 Troll–18 Elfos, mediana 11:03 e zero abertas. A Espada surgiu em 27/30 partidas, mediana ativa 5:02; estruturas Lendárias élficas surgiram em 5/30, mediana ativa 18:37.
+- Curva contínua, limiares 4/6, piso de recuperação, teto de ameaça e bônus de cerco Lendário foram testados isoladamente e em combinação. Nenhum candidato preservou simultaneamente 45–55%, mediana 13–15 e zero partidas abertas.
+- Todos os ajustes de gameplay dessa exploração foram rejeitados. O baseline oficial permanece `wall-tier2-final-patrol-100.json`; somente a instrumentação de progressão foi incorporada.
+
 ## IA de abertura e baseline 1×5 Normal — 25/09/2026
 
 - Bots evoluem a Barricada para nível 2 antes de Núcleo 2/Mina; sob pressão, uma evolução viável não é sufocada por reparo ordinário.
