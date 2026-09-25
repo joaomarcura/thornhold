@@ -50,6 +50,11 @@ test('IA não memoriza nem contorna estruturas que ainda não avistou',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('hard'),b=m.map.bases[0];m.state=STATES.ACTIVE;m.time=60;
   m.structures.push({id:'hidden',kind:'wall',x:b.gate.x,z:b.gate.z,hp:1000,maxHp:1000,progress:1});assert.equal(m.canSee(u,m.structures[0]),false);c.troll(m,u);assert.equal(c.discovered.has('hidden'),false);assert.equal(c.navigationBlocks(m,u).size,0);
 });
+test('IA Elfa planeja upgrade distante e caminha até a estrutura',()=>{
+  const m=match(),u=m.unit('e0'),t=m.unit('t'),c=new AIController('normal'),base=m.map.bases[0];m.state=STATES.ACTIVE;m.time=80;Object.assign(t,{x:0,z:0});Object.assign(u,{x:base.outside.x,z:base.outside.z,gold:10000,wood:10000,baseId:base.id});
+  const core={id:'remote-core',kind:'core',owner:u.id,baseId:base.id,x:base.x,z:base.z,hp:360,maxHp:360,tier:1,progress:1,upgrading:0},wall={id:'remote-wall',kind:'wall',owner:u.id,baseId:base.id,x:base.gate.x,z:base.gate.z,hp:1100,maxHp:1100,tier:1,progress:1,upgrading:0},tower={id:'remote-tower',kind:'tower',owner:u.id,baseId:base.id,x:base.x+3,z:base.z,hp:360,maxHp:360,tier:1,progress:1,upgrading:0};m.structures.push(core,wall,tower);
+  assert.ok(distance(u,core)>B.interactRange);c.elf(m,u);assert.equal(c.destination?.entityId,core.id);
+});
 test('Memória estratégica V2 persiste com confiança decrescente sem conhecer alvos ocultos',()=>{
   const m=match(),t=m.unit('t'),memory=new StrategicMap(),visible={id:'seen-tower',kind:'tower',x:t.x+4,z:t.z,hp:360,maxHp:360,tier:2,branch:'power',progress:1,baseId:'known'};
   const hidden={id:'hidden-mine',kind:'mine',x:t.x+40,z:t.z+40,hp:200,maxHp:200,tier:7,coreTier:7,progress:1,baseId:'hidden'};m.structures.push(visible,hidden);m.state=STATES.ACTIVE;m.time=60;
@@ -75,6 +80,10 @@ test('Siege Budget respeita commitment mínimo e abandona troca improdutiva',()=
 test('Siege Budget mantém ataque produtivo acima da duração nominal',()=>{
   const m=match(),t=m.unit('t'),c=new AIController('normal'),wall={id:'productive-wall',kind:'wall',owner:'e0',baseId:'productive-base',x:t.x+2,z:t.z,hp:1100,maxHp:1100,tier:1,progress:1,bounty:500};m.state=STATES.ACTIVE;m.time=100;m.structures.push(wall);for(const elf of m.units.filter(u=>u.role==='elf'))Object.assign(elf,{x:0,z:0});c.troll(m,t);c.brain.probedBases.set(wall.baseId,m.time);c.troll(m,t);wall.hp=220;t.hp=t.maxHp*.9;m.time+=19;c.troll(m,t);
   assert.equal(c.brain.siegeDecision.budgetExceeded,true);assert.ok(c.brain.siegeDecision.tradeScore>.45);assert.equal(c.brain.siegeDecision.shouldExit,false);assert.equal(c.retreating,false);
+});
+test('Siege Budget impede loop de reposicionamento antes de exceder orçamento',()=>{
+  const m=match(),t=m.unit('t'),c=new AIController('normal'),tower={id:'budget-tower',kind:'tower',owner:'e0',baseId:'budget-base',x:t.x+2,z:t.z,hp:900,maxHp:900,tier:1,branch:'power',progress:1,bounty:500};m.state=STATES.ACTIVE;m.time=100;m.structures.push(tower);for(const elf of m.units.filter(u=>u.role==='elf'))Object.assign(elf,{x:0,z:0});c.troll(m,t);c.brain.probedBases.set(tower.baseId,m.time);c.troll(m,t);assert.equal(c.brain.state,'siege');
+  t.hp=t.maxHp*.9;t.stats.damageReceived=100;m.time+=5;c.troll(m,t);assert.equal(c.brain.siegeDecision.budgetExceeded,false);assert.equal(c.brain.state,'siege');assert.equal(c.brain.reposition,null);
 });
 test('Navegação do Troll não trata a própria estrutura-alvo como obstáculo',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('hard'),tower={id:'tower-target',kind:'tower',x:u.x+6,z:u.z,hp:400,maxHp:400,tier:1,branch:'power',progress:1};

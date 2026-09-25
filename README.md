@@ -115,6 +115,8 @@ npm test
 npm run balance
 npm run simulate -- 240
 npm run audit:combat
+npm run audit:economy -- artifacts/arena.json
+npm run audit:sensitivity -- 12 artifacts/sensitivity.json
 npm run audit:progression -- 6 artifacts/progression-current-20hz.json
 ```
 
@@ -125,6 +127,8 @@ npm run audit:progression -- 6 artifacts/progression-current-20hz.json
 - Patrulha do Troll, preferência de refúgios, perfil econômico/defensivo e layout das construções élficas variam com a seed. A mesma seed continua reproduzindo exatamente o mesmo plano para diagnóstico.
 - O servidor grava resultados reais em `telemetry/matches.jsonl`.
 - `npm run audit:combat`: 126 cenários controlados com o combate real, reparo, habilidades e exposição. Gera `artifacts/combat-audit.json`; a arena sintética não representa uma clareira legal.
+- `npm run audit:economy -- CAMINHO`: separa geração, estoque e investimento dos Elfos por checkpoint, perfil e resultado.
+- `npm run audit:sensitivity -- N CAMINHO`: executa seeds 1×5 pareadas com variações de ±5% e calcula fragilidade. Use `SENS_MODE=candidates` para comparar os pacotes de calibração declarados no script.
 - `npm run audit:progression -- 6 CAMINHO`: 72 partidas pareadas a 20 Hz, dificuldade separada por papel, compras, economia, comandos rejeitados e duração. Partidas sem vencedor em 25 min são registradas e fazem o comando retornar código 1.
 - [Progressão infinita, Wisps e combate](docs/PROGRESSAO-INFINITA-E-COMBATE.md): regras implementadas, builds, custos, testes e próximos ajustes. O lote atual terminou com 38 vitórias do Troll, 32 dos Elfos e duas partidas sem vencedor aos 25 minutos; apenas oito das 72 ficaram na meta de **12–18 minutos**.
 - [Auditoria anterior](docs/BALANCEAMENTO-E-PROGRESSAO.md): pesquisa das variantes e diagnóstico antes da progressão infinita; mantida como histórico.

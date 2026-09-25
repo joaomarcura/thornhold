@@ -160,7 +160,9 @@ export class AIController {
     }
     if(threat&&!avoidedEntity(wall)&&wall.hp<wall.maxHp*.95){this.actNear(match,u,wall,{type:'repair',target:wall.id});return;}
     const upgrade=s=>this.actNear(match,u,s,{type:'upgrade',target:s.id});
-    const affordable=s=>s&&!avoidedEntity(s)&&!s.upgrading&&upgradeStatus(u,s,match.time,match.state,match.structures).allowed;
+    // Distance is an execution requirement, not a strategic blocker. Treat a
+    // sole distance reason as a valid plan so actNear can walk to the target.
+    const affordable=s=>{if(!s||avoidedEntity(s)||s.upgrading)return false;const status=upgradeStatus(u,s,match.time,match.state,match.structures);return status.allowed||status.reasons.every(reason=>reason.code==='distance');};
     const mineRules=mineEconomy(core.tier),desiredMines=Math.min(mineRules.capacity,Math.max(1,Math.ceil(mineRules.capacity*strategy.mineRatio)));
     // Every profile establishes income before multiplying defences. The profile
     // controls how far it pushes that economy, not whether it understands it.

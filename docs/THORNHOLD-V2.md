@@ -175,6 +175,31 @@ Na amostra determinística de 20 seeds, sem nenhuma mudança de gameplay:
 
 O diagnóstico é saturação de decisões no late game, não escassez. Portanto a V2.7 não reduz renda: esses dados serão usados na V2.8 para calibrar prioridades e curvas sem mascarar a causa.
 
+## V2.8 — Calibração de IA e combate
+
+O laboratório de sensibilidade executa as mesmas seeds com variações de ±5% em dano de torre, HP e dano do Troll, HP da barricada, ouro por dano, Exposure e Threat Income. O relatório mede delta de vitória, duração, partidas precoces, partidas abertas, flips pareados e fragilidade.
+
+A análise encontrou duas falhas comportamentais antes de qualquer ajuste de atributos:
+
+1. A IA Elfa tratava distância como bloqueio estratégico. Um bot longe da estrutura não planejava caminhar até ela para evoluí-la, mesmo com recursos abundantes. Agora somente distância significa “vá até o alvo”; custos, propriedade, tiers e pré-requisitos continuam autoritativos.
+2. Após os quatro segundos de compromisso, o Troll podia reposicionar por trade baixo antes de exceder o Siege Budget. Durante um cerco, saídas táticas comuns agora pertencem ao orçamento adaptativo; risco real de morte continua tendo precedência.
+
+Depois dessas correções, 100 partidas 1×5 sem ajuste de stats produziram 57 Troll, 39 Elfos e 4 ainda ativas aos 20 minutos, com mediana de 9:55. O uso de ouro dos Elfos aos 15 minutos subiu de 47,7% para 76,6%.
+
+Quatro pacotes pequenos foram comparados em seeds pareadas. O melhor candidato foi `+5% HP de Barricada / +3% dano da torre comum`: aumentou a mediana sem deslocar fortemente a taxa de vitória. Os valores oficiais passaram de 1100 para 1155 HP e de 10,5 para 10,815 de dano. A torre lendária não foi alterada.
+
+Baseline calibrado de 100 partidas com teto diagnóstico de 30 minutos:
+
+- 53 vitórias do Troll, 43 dos Elfos e 4 partidas ainda ativas;
+- entre partidas concluídas: 55,2% Troll / 44,8% Elfos;
+- mediana 10:59, P90 19:28;
+- 4% abaixo de quatro minutos e 36% abaixo de dez minutos;
+- 51,5% de sucesso em cercos e 14,68 cercos por partida;
+- pressure gap médio de −13,83;
+- 4% permaneceram ativas aos 30 minutos, todas com combate recente e objetivos restantes.
+
+A meta de vitória está atendida no limite superior. A duração melhorou, mas ainda está abaixo da mediana aspiracional de 13–15 minutos; novos aumentos simples de HP elevaram partidas abertas e não serão aplicados sem playtest humano.
+
 ## Balance Lab
 
 `npm run simulate:arena` usa 1×5 por padrão. Para uma análise secundária explícita, `SIM_ELF_COUNTS` pode fornecer outros tamanhos.

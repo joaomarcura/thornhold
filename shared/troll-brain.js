@@ -82,7 +82,11 @@ export class TrollBrain {
       if(emergency){this.reposition=null;}else if(now<this.reposition.until&&(threatened||risk(u)>1)){this.state='reposition';c.go(m,u,this.reposition.point,1.5);return;}else{this.avoid.push({id:null,x:this.reposition.origin.x,z:this.reposition.origin.z,until:now+6});this.reposition=null;this.repositionReadyAt=now+8;this.safePoint=null;this.state='rotate';c.exploreTarget=null;}
     }
     if(siegeDecision?.shouldExit&&!threatened&&!commitmentProtected){if(this.siege)this.avoid.push({id:null,x:this.siege.point.x,z:this.siege.point.z,until:now+20});if(this.siege)this.finishSiegeMemory(m,u,false);this.targetId=null;this.state='rotate';c.exploreTarget=null;c.stop(u);return;}
-    const repositionNeeded=now>=this.repositionReadyAt&&!commitmentProtected&&!emergency&&(localRisk.towers>0||this.damageRate>0)&&!finishing&&(overextended||retreatNeed>.45||siegeDecision?.shouldExit),fullDisengage=emergency||predictiveEscape||(!commitmentProtected&&retreatNeed>1.05);
+    // During a siege, its adaptive HP/time budget owns ordinary tactical
+    // exits. Raw low trade immediately after the four-second commitment was
+    // causing a repeatable 4.2 s attack/reposition loop before the budget had
+    // any chance to work.
+    const tacticalExit=siegeDecision?(overextended||siegeDecision.shouldExit):(overextended||retreatNeed>.45),repositionNeeded=now>=this.repositionReadyAt&&!commitmentProtected&&!emergency&&(localRisk.towers>0||this.damageRate>0)&&!finishing&&tacticalExit,fullDisengage=emergency||predictiveEscape||(!commitmentProtected&&retreatNeed>1.05);
     if(!c.retreating&&repositionNeeded&&!fullDisengage){
       if(siegeDecision?.shouldExit&&this.siege)this.avoid.push({id:null,x:this.siege.point.x,z:this.siege.point.z,until:now+20});if(this.siege)this.finishSiegeMemory(m,u,false);this.reposition={point:escapePlan?.point||this.planEscape(c,m,u,knownTowers)?.point||m.map.trollSpawn,origin:{x:u.x,z:u.z},until:now+4,resumeTarget:this.targetId};this.state='reposition';this.targetId=null;c.go(m,u,this.reposition.point,1.5);return;
     }

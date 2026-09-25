@@ -22,8 +22,8 @@ export const BALANCE = {
   troll: { hp: 2200, speed: 5.8, travelSpeed:1.05, damage: 24, interval: 1.05, range: 3.6, armor: 1, gold: 0, goldPerDamage: 0.42, combatRegenRate:.001,restRegenRate:.003,combatRegenPerLevel:.0005,restRegenPerLevel:.001,regenLevelCap:10,sanctuaryRadius:6,sanctuaryRegenRate:.005,damageGrowth:1.18,speedFactor:.88,healthPerLevel:320,armorPerLevel:3,movementPerLevel:.08,siegePerLevel:.18,finalSiege:1.35,regenDelay:4,healPercent:.2,healCharges:2,healRecharge:180,healCooldown:75,healDuration:6,exposureGrace:9,exposureRate:.035,heavy: 2.25,heavyRecovery:1.3, heavyCooldown: 4, dashCooldown: 7,dashDuration:.4,dashSpeed:2.5, roarCooldown: 18,roarRange:9,roarDuration:2 },
   structures: {
     core: { name:'Núcleo', gold:65, wood:25, hp:360, radius:1.55, seconds:4, income:3, growth:1.65, upgradeGold:100, upgradeWood:35, color:0xe4c37a },
-    wall: { name:'Barricada', gold:35, wood:40, hp:1100, radius:1.05, seconds:3, growth:1.9, upgradeGold:85, upgradeWood:30, color:0xa48862 },
-    tower: { name:'Torre', gold:70, wood:35, hp:360, radius:0.9, seconds:4, damage:10.5, interval:1.2, range:17, retainRange:1, muzzleHeight:4.5, targetHeight:2, growth:1.65, upgradeGold:90, upgradeWood:40, color:0x81cabb },
+    wall: { name:'Barricada', gold:35, wood:40, hp:1155, radius:1.05, seconds:3, growth:1.9, upgradeGold:85, upgradeWood:30, color:0xa48862 },
+    tower: { name:'Torre', gold:70, wood:35, hp:360, radius:0.9, seconds:4, damage:10.815, interval:1.2, range:17, retainRange:1, muzzleHeight:4.5, targetHeight:2, growth:1.65, upgradeGold:90, upgradeWood:40, color:0x81cabb },
     mine: { name:'Mina', gold:85, wood:35, hp:200, radius:1.05, seconds:5, income:1.3, growth:1.7, upgradeGold:110, upgradeWood:45, color:0xc2a54c },
     workshop: { name:'Oficina', gold:100, wood:50, hp:250, radius:1.1, seconds:5, growth:1.6, upgradeGold:125, upgradeWood:45, color:0x748fa3 }
   },
