@@ -67,6 +67,15 @@ test('PROBE abandona ameaça medida sem usar conhecimento oculto',()=>{
   const m=match(),t=m.unit('t'),c=new AIController('normal'),tower={id:'probe-danger',kind:'tower',owner:'e0',baseId:'danger-base',x:t.x+6,z:t.z,hp:360,maxHp:360,tier:5,branch:'power',progress:1,bounty:500};m.state=STATES.ACTIVE;m.time=100;m.structures.push(tower);for(const elf of m.units.filter(u=>u.role==='elf'))Object.assign(elf,{x:0,z:0});c.troll(m,t);assert.equal(c.brain.state,'probe');
   t.stats.damageReceived=t.maxHp*.2;m.time+=3.1;c.troll(m,t);assert.equal(c.brain.state,'rotate');assert.equal(c.brain.targetId,null);assert.ok(c.brain.strategicMap.report(m,t).some(s=>s.failedSieges===1));
 });
+test('Siege Budget respeita commitment mínimo e abandona troca improdutiva',()=>{
+  const m=match(),t=m.unit('t'),c=new AIController('normal'),wall={id:'budget-wall',kind:'wall',owner:'e0',baseId:'budget-base',x:t.x+2,z:t.z,hp:1100,maxHp:1100,tier:1,progress:1,bounty:500};m.state=STATES.ACTIVE;m.time=100;m.structures.push(wall);for(const elf of m.units.filter(u=>u.role==='elf'))Object.assign(elf,{x:0,z:0});c.brain??=null;c.troll(m,t);c.brain.probedBases.set(wall.baseId,m.time);c.troll(m,t);assert.equal(c.brain.state,'siege');assert.ok(c.brain.siege);
+  t.hp=t.maxHp*.76;m.time+=1;c.troll(m,t);assert.equal(c.retreating,false);assert.equal(c.brain.siegeDecision.withinCommitment,true);
+  m.time+=4;c.troll(m,t);assert.equal(c.retreating,false);assert.equal(c.brain.state,'rotate');assert.equal(c.brain.targetId,null);
+});
+test('Siege Budget mantém ataque produtivo acima da duração nominal',()=>{
+  const m=match(),t=m.unit('t'),c=new AIController('normal'),wall={id:'productive-wall',kind:'wall',owner:'e0',baseId:'productive-base',x:t.x+2,z:t.z,hp:1100,maxHp:1100,tier:1,progress:1,bounty:500};m.state=STATES.ACTIVE;m.time=100;m.structures.push(wall);for(const elf of m.units.filter(u=>u.role==='elf'))Object.assign(elf,{x:0,z:0});c.troll(m,t);c.brain.probedBases.set(wall.baseId,m.time);c.troll(m,t);wall.hp=220;t.hp=t.maxHp*.9;m.time+=19;c.troll(m,t);
+  assert.equal(c.brain.siegeDecision.budgetExceeded,true);assert.ok(c.brain.siegeDecision.tradeScore>.45);assert.equal(c.brain.siegeDecision.shouldExit,false);assert.equal(c.retreating,false);
+});
 test('Navegação do Troll não trata a própria estrutura-alvo como obstáculo',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('hard'),tower={id:'tower-target',kind:'tower',x:u.x+6,z:u.z,hp:400,maxHp:400,tier:1,branch:'power',progress:1};
   m.state=STATES.ACTIVE;m.structures.push(tower);c.discovered.set(tower.id,{...tower,seenAt:m.time});

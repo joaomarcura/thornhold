@@ -112,6 +112,23 @@ Antes de um cerco desconhecido, o Troll observa de uma distância mais segura. E
 
 Primeira amostra de 50 seeds, sem mudanças de atributos: 42% de vitórias do Troll, mediana de 10:26, zero partidas inacabadas. Esse resultado ainda não é baseline final; V2.4 e V2.5 precisam reduzir cercos ruins e tempo excessivo de retirada antes da rodada oficial de 100 partidas.
 
+## V2.4 — Siege Intelligence
+
+Cada `SIEGE` possui agora um contexto próprio:
+
+- compromisso mínimo de 4 segundos;
+- orçamento nominal de 22% de HP;
+- duração nominal de 18 segundos;
+- progresso do objetivo;
+- probabilidade de conclusão;
+- curas consumidas;
+- trade score vivo;
+- limite mínimo de valor de 0,45.
+
+O compromisso impede reavaliações comuns durante os primeiros quatro segundos, mas risco crítico de morte continua podendo interromper o ataque. Ultrapassar duração ou HP não força saída automaticamente: um ataque produtivo ou perto de destruir o objetivo continua. Uma troca cara sem progresso gera `DISENGAGE` seguido de `ROTATE`, e o setor recebe memória de falha.
+
+O contexto atual é exportado como `siegeDecision`. Esses cálculos mudam decisões, mas continuam sem modificar atributos.
+
 ## Balance Lab
 
 `npm run simulate:arena` usa 1×5 por padrão. Para uma análise secundária explícita, `SIM_ELF_COUNTS` pode fornecer outros tamanhos.
