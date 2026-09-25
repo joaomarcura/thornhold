@@ -10,6 +10,8 @@ export function aggregate(rows){
   const mean=v=>v.length?v.reduce((a,b)=>a+b,0)/v.length:0;
   const distribution=v=>{const s=[...v].sort((a,b)=>a-b),p=n=>s[Math.floor((s.length-1)*n)]??null;return {mean:mean(s),median:p(.5),p10:p(.1),p90:p(.9)};};
   const troll=r=>r.ai.find(a=>a.role==='troll')||{};
+  const v2=rows.map(r=>r.telemetry?.v2).filter(Boolean),sieges=v2.flatMap(v=>v.sieges||[]),states=[...new Set(v2.flatMap(v=>Object.keys(v.stateSeconds||{})))];
+  const checkpoints=[180,300,480,600,720,900].map(time=>{const samples=v2.flatMap(v=>v.economyCheckpoints||[]).filter(c=>c.time===time);return samples.length?{time,samples:samples.length,elfGoldIncomePerSecond:mean(samples.map(c=>c.elves.goldIncomePerSecond)),elfWoodIncomePerSecond:mean(samples.map(c=>c.elves.woodIncomePerSecond)),elfGeneratedGold:mean(samples.map(c=>c.elves.generatedGold)),elfSpentGold:mean(samples.map(c=>c.elves.spentGold)),elfUpgrades:mean(samples.map(c=>c.elves.upgrades)),trollGeneratedGold:mean(samples.map(c=>c.troll?.generatedGold||0)),trollSpentGold:mean(samples.map(c=>c.troll?.spentGold||0))}:null;}).filter(Boolean);
   return {runs:rows.length,duration:distribution(rows.map(r=>r.duration)),trollWins:rows.filter(r=>r.winner==='troll').length,
     elfWins:rows.filter(r=>r.winner==='elves').length,timeLimit:rows.filter(r=>r.endReason==='time-limit-objective').length,
     unfinished:rows.filter(r=>!r.completed).length,under4Minutes:rows.filter(r=>r.duration<240).length,
@@ -27,7 +29,8 @@ export function aggregate(rows){
     meanPathRecalculations:mean(rows.map(r=>r.ai.reduce((n,a)=>n+(a.pathRecalculations||0),0))),
     meanTrollFailedNavigation:mean(rows.map(r=>troll(r).failedNavigation||0)),
     meanGoldPerMinute:mean(rows.map(r=>r.players.filter(p=>p.role==='elf').reduce((n,p)=>n+p.goldPerMinute,0)/r.elves)),
-    meanWoodPerMinute:mean(rows.map(r=>r.players.filter(p=>p.role==='elf').reduce((n,p)=>n+p.woodPerMinute,0)/r.elves))};
+    meanWoodPerMinute:mean(rows.map(r=>r.players.filter(p=>p.role==='elf').reduce((n,p)=>n+p.woodPerMinute,0)/r.elves)),
+    v2:{observedRuns:v2.length,stateSeconds:Object.fromEntries(states.map(state=>[state,mean(v2.map(v=>v.stateSeconds?.[state]||0))])),sieges:{count:sieges.length,perMatch:mean(v2.map(v=>v.siegeSummary?.count||0)),successRate:sieges.length?sieges.filter(s=>s.successful).length/sieges.length*100:0,averageSeconds:mean(sieges.map(s=>s.duration)),averageHpLossPercent:mean(sieges.map(s=>s.hpLossPercent)),averageTradeScore:mean(sieges.map(s=>s.tradeScore))},economyCheckpoints:checkpoints,meanVisitedSectors:mean(v2.map(v=>v.sectors?.filter(s=>s.visits>0).length||0)),meanPressureGap:mean(v2.flatMap(v=>v.pressureWindows||[]).map(w=>w.pressureGap))}};
 }
 if(!isMainThread){
   for(const i of workerData.indices){
@@ -41,7 +44,9 @@ if(!isMainThread){
   }
 }else if(process.argv[1]?.endsWith('arena.js')){
   const count=Math.min(1000,Math.max(1,Number(process.argv[2])||60)),out=process.argv[3]||'artifacts/arena.json',baselinePath=process.argv[4],step=Number(process.env.SIM_STEP)||.1;
-  const elfCounts=(process.env.SIM_ELF_COUNTS||'2,3,5,8').split(',').map(Number).filter(n=>Number.isInteger(n)&&n>=1&&n<=8);
+  // Product balance always defaults to the standard 1x5 lobby. Alternate
+  // populations require an explicit SIM_ELF_COUNTS override.
+  const elfCounts=(process.env.SIM_ELF_COUNTS||'5').split(',').map(Number).filter(n=>Number.isInteger(n)&&n>=1&&n<=8);
   const mapSizes=(process.env.SIM_MAP_SIZES||'compact').split(',').filter(n=>['compact','large'].includes(n));
   const crossed=process.env.SIM_CROSSED==='1';
   const maxSeconds=Math.max(60,Number(process.env.SIM_MAX_SECONDS)||3600);
@@ -60,7 +65,7 @@ if(!isMainThread){
   if(baselinePath){const baseline=JSON.parse(await readFile(baselinePath,'utf8')),paired=rows.map(r=>{const before=baseline.matches.find(b=>b.seed===r.seed&&b.elves===r.elves&&b.difficulty===r.difficulty&&(b.mapSize||'compact')===r.mapSize);if(!before)return null;return {seed:r.seed,durationDelta:r.duration-before.duration,trollDamageDelta:r.trollDamage-before.trollDamage,winnerBefore:before.winner,winnerAfter:r.winner};}).filter(Boolean);if(!paired.length)throw Error('No matching seeds in baseline');comparison={matchedRuns:paired.length,baseline:aggregate(baseline.matches.filter(b=>paired.some(r=>r.seed===b.seed))),current:aggregate(rows.filter(b=>paired.some(r=>r.seed===b.seed))),paired};}
   let gitCommit='unavailable',dirty=null;try{gitCommit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();dirty=!!execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim();}catch{}
   const metadata={release:RELEASE,gitCommit,dirty,node:process.version,generatedAt:new Date().toISOString(),configHash:createHash('sha256').update(JSON.stringify({BALANCE,DEFAULT_SETTINGS})).digest('hex'),defaultSettings:DEFAULT_SETTINGS,seedPattern:crossed?'MATRIX-{replicate}':'SIM-{run}',crossedSeeds:crossed,simulationCeilingSeconds:maxSeconds,matrix:{elves:elfCounts,difficulty:['easy','normal','hard'],mapSize:mapSizes}};
-  const result={schema:2,metadata,step,count,elapsedSeconds:(performance.now()-start)/1000,summary,groups,comparison,matches:rows};
+  const result={schema:3,metadata,step,count,elapsedSeconds:(performance.now()-start)/1000,summary,groups,comparison,matches:rows};
   await mkdir('artifacts',{recursive:true});await writeFile(out,JSON.stringify(result,null,2));
   console.log(JSON.stringify({...result,matches:undefined,groups:undefined,comparison:comparison?{baseline:comparison.baseline,current:comparison.current,matchedRuns:comparison.matchedRuns}:null},null,2));
   if(summary.unfinished)process.exitCode=1;

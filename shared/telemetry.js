@@ -1,4 +1,12 @@
-// Bounded diagnostics; no hidden observations are fed back into decisions.
+import { BALANCE as B, income, towerDamage, towerProfile, wispIncome } from './config.js';
+
+const round=(value,digits=2)=>Number.isFinite(value)?+value.toFixed(digits):0;
+const sum=values=>values.reduce((total,value)=>total+value,0);
+const phaseFor=elapsed=>elapsed<180?'HUNT':elapsed<420?'PRESSURE':elapsed<720?'SIEGE':'ENDGAME';
+const confidenceFor=age=>Math.exp(-Math.max(0,age)/120);
+
+// V2.1 is deliberately observational. Controllers never read these values,
+// so diagnostics cannot secretly influence a match outcome.
 export class CombatTelemetry {
   constructor(detailed=false){
     this.detailed=detailed;this.timeline=[];this.nextSample=0;this.hits=new Map();
@@ -6,6 +14,12 @@ export class CombatTelemetry {
     this.healing={consumable:0,regen:0,sanctuary:0,uses:0};this.retreats=[];this.currentRetreat=null;
     this.engagementCount=0;this.lastContact=-Infinity;this.peakTowers=0;this.peakAttackers=0;
     this.towersSeconds=0;this.death=null;this.destroyed={};this.eliminations=[];this.towerDiagnostics=new Map();
+    this.stateSeconds={};this.stateTransitions=[];this.previousState=null;
+    this.sectors=new Map();this.lastSectorId=null;this.discoveredBases=new Set();
+    this.sieges=[];this.currentSiege=null;this.nextSiegeId=1;
+    this.economyCheckpoints=[];this.checkpointTimes=[180,300,480,600,720,900];this.nextCheckpoint=0;
+    this.pressureWindows=[];this.nextPressureAt=60;this.pressureBaseline=null;
+    this.matchState=null;this.matchStateTimeline=[];
   }
   towerState(tower,status,dt){
     if(!tower)return;let row=this.towerDiagnostics.get(tower.id);
@@ -14,59 +28,84 @@ export class CombatTelemetry {
     if(Number.isFinite(status.distance))row.closestDistance=row.closestDistance===null?status.distance:Math.min(row.closestDistance,status.distance);
   }
   towerShot(id){const row=this.towerDiagnostics.get(id);if(row)row.shots++;}
+  sectorId(m,entity){
+    if(!entity||!Number.isFinite(entity.x)||!Number.isFinite(entity.z))return null;
+    const width=Math.max(1,(m.map.size-1)*m.map.cell),x=Math.max(0,Math.min(5,Math.floor(entity.x/width*6))),z=Math.max(0,Math.min(5,Math.floor(entity.z/width*6)));
+    return `${x}:${z}`;
+  }
+  sector(m,entity){
+    const id=this.sectorId(m,entity);if(!id)return null;
+    if(!this.sectors.has(id)){const[x,z]=id.split(':').map(Number);this.sectors.set(id,{id,x,z,visits:0,secondsVisited:0,lastVisitedAt:null,lastEnemySeenAt:null,damageTaken:0,damageDealt:0,structuresDestroyed:0,elvesKilled:0,knownStructureIds:new Set(),knownElfIds:new Set()});}
+    return this.sectors.get(id);
+  }
   hit(m,target,actual,source,kind,sourceId){
-    if(target.kind&&target.hp<=0)this.destroyed[target.kind]=(this.destroyed[target.kind]||0)+1;
-    if(target.hp<=0&&target.role&&!target.ghost)this.eliminations.push({time:m.time,id:target.id,role:target.role,cause:kind,source:sourceId||source?.id||null});
+    const destroyed=target.hp<=0;
+    if(target.kind&&destroyed)this.destroyed[target.kind]=(this.destroyed[target.kind]||0)+1;
+    if(destroyed&&target.role&&!target.ghost)this.eliminations.push({time:m.time,id:target.id,role:target.role,cause:kind,source:sourceId||source?.id||null});
     if(target.role==='troll'){
-      const category=kind==='tower'?'tower':kind==='hunger'?'hunger':source?.role==='elf'?'elf':'other';
-      this.received[category]+=actual;
-      if(kind!=='hunger')this.hits.set(sourceId||source?.id||kind,{time:m.time,kind});
-      if(target.hp<=0)this.death={time:m.time,cause:kind,source:sourceId||source?.id||null};
+      const category=kind==='tower'||kind==='legendary-beam'?'tower':kind==='hunger'?'hunger':source?.role==='elf'?'elf':'other';
+      this.received[category]+=actual;if(kind!=='hunger')this.hits.set(sourceId||source?.id||kind,{time:m.time,kind:category});
+      if(destroyed)this.death={time:m.time,cause:kind,source:sourceId||source?.id||null};
+      const sector=this.sector(m,target);if(sector)sector.damageTaken+=actual;if(this.currentSiege)this.currentSiege.hpDamage+=actual;
     }
-    if(source?.role==='troll'){this.dealt+=actual;if(target.kind)this.dealtToBuildings+=actual;}
-    if(source?.role==='troll'||(target.role==='troll'&&kind!=='hunger')){
-      if(m.time-this.lastContact>5)this.engagementCount++;
-      this.lastContact=m.time;
+    if(source?.role==='troll'){
+      this.dealt+=actual;if(target.kind)this.dealtToBuildings+=actual;
+      const sector=this.sector(m,target);if(sector){sector.damageDealt+=actual;if(destroyed&&target.kind)sector.structuresDestroyed++;if(destroyed&&target.role==='elf'&&!target.ghost)sector.elvesKilled++;}
+      if(this.currentSiege){
+        this.currentSiege.damageDealt+=actual;if(target.kind)this.currentSiege.structureDamage+=actual;if(target.role==='elf'&&!target.ghost)this.currentSiege.killProgress+=actual/Math.max(1,target.maxHp);
+        if(destroyed&&target.kind){const economicDamage=['core','mine'].includes(target.kind)?income(target)*60:0,objectiveValue={tower:45,wall:35,core:70,mine:50,workshop:30}[target.kind]||20;this.currentSiege.valueDestroyed+=objectiveValue+economicDamage;this.currentSiege.economicDamage+=economicDamage;this.currentSiege.structuresDestroyed[target.kind]=(this.currentSiege.structuresDestroyed[target.kind]||0)+1;}
+        if(destroyed&&target.role==='elf'&&!target.ghost)this.currentSiege.elvesKilled++;
+      }
     }
+    if(source?.role==='troll'||(target.role==='troll'&&kind!=='hunger')){if(m.time-this.lastContact>5)this.engagementCount++;this.lastContact=m.time;}
   }
   heal(kind,actual){if(actual>0)this.healing[kind]=(this.healing[kind]||0)+actual;}
-  healUse(){this.healing.uses++;}
+  healUse(){this.healing.uses++;if(this.currentSiege)this.currentSiege.healsUsed++;}
   retreatStart(m,u){if(this.currentRetreat)return;this.currentRetreat={start:m.time,hpPercent:u.hp/Math.max(1,u.maxHp)};}
   reengage(m,u){if(!this.currentRetreat)return;this.retreats.push({...this.currentRetreat,end:m.time,duration:m.time-this.currentRetreat.start,reengageHpPercent:u.hp/Math.max(1,u.maxHp)});this.currentRetreat=null;}
+  trollState(m,troll,controller,dt){
+    const state=controller?.retreating?(controller?.brain?.state||'disengage').toUpperCase():(controller?.brain?.state||'human').toUpperCase();
+    this.stateSeconds[state]=(this.stateSeconds[state]||0)+dt;
+    if(state!==this.previousState){if(this.stateTransitions.length<1000)this.stateTransitions.push({time:round(m.time,1),from:this.previousState,to:state,target:controller?.brain?.targetId||null});this.previousState=state;}
+    const siegeNow=state==='SIEGE';
+    if(siegeNow&&!this.currentSiege)this.currentSiege={id:this.nextSiegeId++,start:m.time,startHp:troll.hp,startMaxHp:troll.maxHp,targetId:controller?.brain?.targetId||null,sectorId:this.sectorId(m,troll),damageDealt:0,structureDamage:0,hpDamage:0,valueDestroyed:0,economicDamage:0,killProgress:0,elvesKilled:0,healsUsed:0,structuresDestroyed:{}};
+    else if(!siegeNow&&this.currentSiege)this.finishSiege(m,troll,state);
+  }
+  finishSiege(m,troll,outcomeState='END'){
+    const siege=this.currentSiege;if(!siege)return;const duration=Math.max(.01,m.time-siege.start),hpLoss=Math.max(0,siege.startHp-troll.hp),hpLossPercent=hpLoss/Math.max(1,siege.startMaxHp)*100,numerator=siege.valueDestroyed+siege.killProgress*80+siege.structureDamage/100,denominator=Math.max(1,hpLossPercent+siege.healsUsed*10+duration*.5);
+    this.sieges.push({...siege,end:m.time,duration:round(duration),endHp:troll.hp,hpLoss:round(hpLoss),hpLossPercent:round(hpLossPercent),tradeScore:round(numerator/denominator,3),successful:siege.valueDestroyed>0||siege.elvesKilled>0,outcomeState});this.currentSiege=null;
+  }
+  sampleSectors(m,troll,controller,dt){
+    const sector=this.sector(m,troll);if(!sector)return;if(sector.id!==this.lastSectorId){sector.visits++;this.lastSectorId=sector.id;}sector.secondsVisited+=dt;sector.lastVisitedAt=m.time;
+    for(const observed of controller?.discovered?.values?.()||[]){const row=this.sector(m,observed);if(!row)continue;row.lastEnemySeenAt=Math.max(row.lastEnemySeenAt??-Infinity,observed.seenAt||m.time);if(observed.kind)row.knownStructureIds.add(observed.id);if(observed.role==='elf')row.knownElfIds.add(observed.id);if(observed.baseId)this.discoveredBases.add(observed.baseId);}
+  }
+  economySnapshot(m,time){
+    const elves=m.units.filter(u=>u.role==='elf'),troll=m.units.find(u=>u.role==='troll'),structures=m.structures.filter(s=>s.hp>0&&s.progress>=1),wisps=m.wisps.filter(w=>w.alive),elfGoldIncome=sum(structures.map(s=>income(s))),elfWoodIncome=sum(wisps.map(w=>wispIncome(w))),generated=sum(elves.map(u=>(u.stats.goldGenerated||0)+(u.stats.woodGenerated||0))),spent=sum(elves.map(u=>(u.stats.goldSpent||0)+(u.stats.woodSpent||0)));
+    return {time,matchTime:round(m.time,1),elves:{generatedGold:sum(elves.map(u=>u.stats.goldGenerated||0)),generatedWood:sum(elves.map(u=>u.stats.woodGenerated||0)),spentGold:sum(elves.map(u=>u.stats.goldSpent||0)),spentWood:sum(elves.map(u=>u.stats.woodSpent||0)),storedGold:sum(elves.map(u=>u.gold||0)),storedWood:sum(elves.map(u=>u.wood||0)),upgrades:sum(elves.map(u=>u.stats.upgrades||0)),structuresBuilt:sum(elves.map(u=>u.stats.structuresBuilt||0)),goldIncomePerSecond:round(elfGoldIncome),woodIncomePerSecond:round(elfWoodIncome),liveStructures:Object.fromEntries(['core','wall','tower','mine','workshop'].map(kind=>[kind,structures.filter(s=>s.kind===kind).length])),tierSum:sum(structures.map(s=>s.tier||1)),economicEfficiency:generated?round(spent/generated,3):0},troll:troll?{generatedGold:round(troll.stats.goldGenerated||0),spentGold:round(troll.stats.goldSpent||0),storedGold:round(troll.gold||0),upgrades:troll.stats.upgrades||0,damage:round(troll.stats.damage||0),structuresDestroyed:troll.stats.structuresDestroyed||0}:null};
+  }
+  pressureSample(m,activeElapsed=Math.max(0,m.time-m.preparation)){
+    const economy=this.economySnapshot(m,activeElapsed),current={time:activeElapsed,structuresDestroyed:sum(Object.values(this.destroyed)),buildingDamage:this.dealtToBuildings,elfKills:this.eliminations.filter(e=>e.role==='elf').length,basesDiscovered:this.discoveredBases.size,towerDamage:this.received.tower,elfIncome:economy.elves.goldIncomePerSecond+economy.elves.woodIncomePerSecond,retreatSeconds:this.retreatSeconds,legendaryProgress:m.structures.filter(s=>s.owner&&s.tier>=B.legendary.tier&&s.hp>0).length};
+    this.pressureBaseline??={time:0,structuresDestroyed:0,buildingDamage:0,elfKills:0,basesDiscovered:0,towerDamage:0,elfIncome:0,retreatSeconds:0,legendaryProgress:0};
+    const d=Object.fromEntries(Object.keys(current).filter(k=>k!=='time').map(k=>[k,current[k]-this.pressureBaseline[k]])),trollPressure=d.structuresDestroyed*30+d.buildingDamage*.02+d.elfKills*60+d.basesDiscovered*10,elfPressure=d.towerDamage*.02+Math.max(0,d.elfIncome)*8+d.retreatSeconds*.5+Math.max(0,d.legendaryProgress)*35,previous=this.pressureWindows.at(-1);
+    this.pressureWindows.push({start:this.pressureBaseline.time,end:m.time,components:d,trollPressure:round(trollPressure),elfPressure:round(elfPressure),pressureGap:round(trollPressure-elfPressure),trollMomentum:round(trollPressure-(previous?.trollPressure||0)),elfMomentum:round(elfPressure-(previous?.elfPressure||0))});this.pressureBaseline=current;
+  }
+  updateMatchState(m,troll){
+    const activeElapsed=Math.max(0,m.time-m.preparation),economy=this.economySnapshot(m,m.time),stats=m.trollStats(troll),structures=m.structures.filter(s=>s.hp>0&&s.progress>=1),towers=structures.filter(s=>s.kind==='tower'),elfPower=sum(structures.map(s=>s.hp))+sum(towers.map(s=>towerDamage(s.tier)*towerProfile(s).damage))*20+economy.elves.goldIncomePerSecond*100,trollPower=troll.hp+stats.damage/stats.interval*stats.siege*35+stats.armor*50,latest=this.pressureWindows.at(-1)||{elfPressure:0,trollPressure:0};
+    this.matchState={phase:phaseFor(activeElapsed),elapsedTime:round(activeElapsed,1),elfPower:round(elfPower),trollPower:round(trollPower),elfPressure:latest.elfPressure,trollPressure:latest.trollPressure,elfEconomy:round(economy.elves.goldIncomePerSecond+economy.elves.woodIncomePerSecond),trollEconomy:round((troll.stats.goldGenerated||0)/Math.max(1,activeElapsed)*60),activeElfCount:m.units.filter(u=>u.role==='elf'&&u.alive).length,mapControl:{claimedBases:m.elfBasesClaimed.size,discoveredBases:this.discoveredBases.size,visitedSectors:[...this.sectors.values()].filter(s=>s.visits>0).length,totalSectors:36},volatility:round(Math.abs(latest.trollMomentum||0)+Math.abs(latest.elfMomentum||0))};
+  }
   step(m,dt){
-    const t=m.units.find(u=>u.role==='troll');if(!t)return;
-    for(const[id,hit]of this.hits)if(m.time-hit.time>2)this.hits.delete(id);
-    const towers=[...this.hits.values()].filter(h=>h.kind==='tower').length;
-    this.peakTowers=Math.max(this.peakTowers,towers);this.peakAttackers=Math.max(this.peakAttackers,this.hits.size);
-    this.towersSeconds+=towers*dt;
-    const c=m.controllers.get(t.id),inCombat=m.time-this.lastContact<=5,retreating=!!c?.retreating;
-    if(inCombat)this.combatSeconds+=dt;
-    if(retreating)this.retreatSeconds+=dt;
-    if(!inCombat&&!retreating&&Math.hypot(t.input?.x||0,t.input?.z||0)>.1)this.movingWithoutCombatSeconds+=dt;
-    if(this.detailed&&(m.time>=this.nextSample||!t.alive)){
-      this.nextSample=m.time+5;const stats=m.trollStats(t);
-      if(this.timeline.length<500)this.timeline.push({time:+m.time.toFixed(1),hp:Math.round(t.hp),maxHp:t.maxHp,
-        x:+t.x.toFixed(1),z:+t.z.toFixed(1),state:c?.brain?.state||'human',target:c?.brain?.targetId||null,
-        risk:c?.brain?.riskScore??null,towers,received:{...this.received},damage:this.dealt,
-        armor:stats.armor,combatRegen:stats.combatRegen,restRegen:stats.restRegen,movement:stats.movement,levels:{...t.levels},
-        economy:m.units.map(u=>({id:u.id,gold:Math.floor(u.gold),wood:Math.floor(u.wood),goldGenerated:Math.round(u.stats.goldGenerated),woodGenerated:Math.round(u.stats.woodGenerated)}))});
-    }
+    const troll=m.units.find(u=>u.role==='troll');if(!troll)return;for(const[id,hit]of this.hits)if(m.time-hit.time>2)this.hits.delete(id);
+    const towers=[...this.hits.values()].filter(h=>h.kind==='tower').length;this.peakTowers=Math.max(this.peakTowers,towers);this.peakAttackers=Math.max(this.peakAttackers,this.hits.size);this.towersSeconds+=towers*dt;
+    const controller=m.controllers.get(troll.id),active=m.state==='MATCH_ACTIVE',activeElapsed=Math.max(0,m.time-m.preparation),inCombat=m.time-this.lastContact<=5,retreating=!!controller?.retreating;if(active&&inCombat)this.combatSeconds+=dt;if(active&&retreating)this.retreatSeconds+=dt;if(active&&!inCombat&&!retreating&&Math.hypot(troll.input?.x||0,troll.input?.z||0)>.1)this.movingWithoutCombatSeconds+=dt;
+    if(active){this.trollState(m,troll,controller,dt);this.sampleSectors(m,troll,controller,dt);}
+    while(this.nextCheckpoint<this.checkpointTimes.length&&activeElapsed>=this.checkpointTimes[this.nextCheckpoint])this.economyCheckpoints.push(this.economySnapshot(m,this.checkpointTimes[this.nextCheckpoint++]));
+    while(activeElapsed>=this.nextPressureAt){this.pressureSample(m,this.nextPressureAt);this.nextPressureAt+=60;}
+    if(m.time>=this.nextSample||!troll.alive){this.nextSample=m.time+5;this.updateMatchState(m,troll);if(this.matchStateTimeline.length<500)this.matchStateTimeline.push({...this.matchState});if(this.detailed){const stats=m.trollStats(troll);this.timeline.push({time:round(m.time,1),hp:Math.round(troll.hp),maxHp:troll.maxHp,x:round(troll.x,1),z:round(troll.z,1),state:controller?.brain?.state||'human',target:controller?.brain?.targetId||null,risk:controller?.brain?.riskScore??null,towers,received:{...this.received},damage:this.dealt,armor:stats.armor,combatRegen:stats.combatRegen,restRegen:stats.restRegen,movement:stats.movement,levels:{...troll.levels},economy:m.units.map(u=>({id:u.id,gold:Math.floor(u.gold),wood:Math.floor(u.wood),goldGenerated:Math.round(u.stats.goldGenerated),woodGenerated:Math.round(u.stats.woodGenerated)}))});}}
   }
   result(m){
-    const duration=Math.max(1,m.time),received=Object.values(this.received).reduce((a,b)=>a+b,0);
-    const retreats=[...this.retreats];if(this.currentRetreat)retreats.push({...this.currentRetreat,end:m.time,duration:m.time-this.currentRetreat.start,reengageHpPercent:null});
-    const avg=key=>retreats.length?retreats.reduce((n,r)=>n+(r[key]??0),0)/retreats.length:0;
-    return {schema:2,received:{...this.received},dealt:this.dealt,dealtToBuildings:this.dealtToBuildings,combatSeconds:this.combatSeconds,retreatSeconds:this.retreatSeconds,movingWithoutCombatSeconds:this.movingWithoutCombatSeconds,
-      combatTimePercent:this.combatSeconds/duration*100,retreatTimePercent:this.retreatSeconds/duration*100,movingWithoutCombatPercent:this.movingWithoutCombatSeconds/duration*100,
-      averageRetreatDuration:avg('duration'),averageRetreatHpPercent:avg('hpPercent')*100,averageReengageHpPercent:avg('reengageHpPercent')*100,retreats,healing:{...this.healing},
-      receivedDps:received/duration,dealtDps:this.dealt/duration,damagePerMinute:this.dealt/duration*60,buildingDamagePerMinute:this.dealtToBuildings/duration*60,
-      combatReceivedDps:(received-this.received.hunger)/Math.max(1,this.combatSeconds),
-      combatDealtDps:this.dealt/Math.max(1,this.combatSeconds),
-      engagementCount:this.engagementCount,averageEngagementSeconds:this.combatSeconds/Math.max(1,this.engagementCount),
-      peakSimultaneousTowers:this.peakTowers,peakSimultaneousAttackers:this.peakAttackers,
-      averageSimultaneousTowers:this.towersSeconds/duration,death:this.death,
-      trollSurvivalSeconds:this.death?.time??m.time,survivalCensored:!this.death,
-      timeToElfDefeat:['army-eliminated','all-elf-bases-destroyed'].includes(m.endReason)?m.time:null,
-      structuresDestroyed:{...this.destroyed},eliminations:this.eliminations,towerDiagnostics:[...this.towerDiagnostics.values()].map(row=>({...row,seconds:Object.fromEntries(Object.entries(row.seconds).map(([key,value])=>[key,+value.toFixed(2)])),closestDistance:row.closestDistance===null?null:+row.closestDistance.toFixed(2)})),timeline:this.timeline};
+    const troll=m.units.find(u=>u.role==='troll'),activeElapsed=Math.max(0,m.time-m.preparation);if(this.currentSiege&&troll)this.finishSiege(m,troll,'MATCH_END');if(this.pressureBaseline?.time!==activeElapsed)this.pressureSample(m,activeElapsed);if(!this.matchState&&troll)this.updateMatchState(m,troll);
+    const duration=Math.max(1,m.time),received=sum(Object.values(this.received)),retreats=[...this.retreats];if(this.currentRetreat)retreats.push({...this.currentRetreat,end:m.time,duration:m.time-this.currentRetreat.start,reengageHpPercent:null});const avg=key=>retreats.length?sum(retreats.map(r=>r[key]??0))/retreats.length:0;
+    const sectors=[...this.sectors.values()].map(s=>{const age=s.lastVisitedAt===null?Infinity:m.time-s.lastVisitedAt;return {...s,secondsVisited:round(s.secondsVisited),damageTaken:round(s.damageTaken),damageDealt:round(s.damageDealt),confidence:s.lastVisitedAt===null?0:round(confidenceFor(age),3),knownStructureIds:[...s.knownStructureIds],knownElfIds:[...s.knownElfIds]};}),successful=this.sieges.filter(s=>s.successful);
+    return {schema:3,received:{...this.received},dealt:this.dealt,dealtToBuildings:this.dealtToBuildings,combatSeconds:this.combatSeconds,retreatSeconds:this.retreatSeconds,movingWithoutCombatSeconds:this.movingWithoutCombatSeconds,combatTimePercent:this.combatSeconds/duration*100,retreatTimePercent:this.retreatSeconds/duration*100,movingWithoutCombatPercent:this.movingWithoutCombatSeconds/duration*100,averageRetreatDuration:avg('duration'),averageRetreatHpPercent:avg('hpPercent')*100,averageReengageHpPercent:avg('reengageHpPercent')*100,retreats,healing:{...this.healing},receivedDps:received/duration,dealtDps:this.dealt/duration,damagePerMinute:this.dealt/duration*60,buildingDamagePerMinute:this.dealtToBuildings/duration*60,combatReceivedDps:(received-this.received.hunger)/Math.max(1,this.combatSeconds),combatDealtDps:this.dealt/Math.max(1,this.combatSeconds),engagementCount:this.engagementCount,averageEngagementSeconds:this.combatSeconds/Math.max(1,this.engagementCount),peakSimultaneousTowers:this.peakTowers,peakSimultaneousAttackers:this.peakAttackers,averageSimultaneousTowers:this.towersSeconds/duration,death:this.death,trollSurvivalSeconds:this.death?.time??m.time,survivalCensored:!this.death,timeToElfDefeat:['army-eliminated','all-elf-bases-destroyed'].includes(m.endReason)?m.time:null,structuresDestroyed:{...this.destroyed},eliminations:this.eliminations,towerDiagnostics:[...this.towerDiagnostics.values()].map(row=>({...row,seconds:Object.fromEntries(Object.entries(row.seconds).map(([key,value])=>[key,round(value)])),closestDistance:row.closestDistance===null?null:round(row.closestDistance)})),timeline:this.timeline,v2:{observational:true,matchState:this.matchState,matchStateTimeline:this.matchStateTimeline,stateSeconds:Object.fromEntries(Object.entries(this.stateSeconds).map(([key,value])=>[key,round(value)])),stateTransitions:this.stateTransitions,sectors,sieges:this.sieges,siegeSummary:{count:this.sieges.length,successful:successful.length,failed:this.sieges.length-successful.length,successRate:this.sieges.length?round(successful.length/this.sieges.length*100,1):0,averageSeconds:this.sieges.length?round(sum(this.sieges.map(s=>s.duration))/this.sieges.length):0,averageHpLossPercent:this.sieges.length?round(sum(this.sieges.map(s=>s.hpLossPercent))/this.sieges.length):0,averageTradeScore:this.sieges.length?round(sum(this.sieges.map(s=>s.tradeScore))/this.sieges.length,3):0},economyCheckpoints:this.economyCheckpoints,pressureWindows:this.pressureWindows,formulaVersion:'v2.1-observability-1'}};
   }
 }

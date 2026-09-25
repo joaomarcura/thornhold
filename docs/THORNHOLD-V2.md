@@ -1,0 +1,89 @@
+# Thornhold V2 — Balance & AI System
+
+## Princípio
+
+Nenhum sistema da V2 decide secretamente quem vence. Match State, mapa estratégico, IA, cerco, economia e Balance Lab orientam comportamento, progressão e diagnóstico; vitória continua sendo consequência das regras autoritativas e das ações dos jogadores.
+
+O formato de produto e o padrão de balanceamento é **1 Troll × 5 Elfos**. Outros tamanhos só entram em análises explicitamente configuradas.
+
+## Ordem de implementação
+
+1. V2.1 — Observability.
+2. V2.2 — Strategic Memory.
+3. V2.3 — Troll State Machine.
+4. V2.4 — Siege Intelligence.
+5. V2.5 — Retreat Rewrite.
+6. V2.6 — Troll Economy.
+7. V2.7 — Elf Economy Analysis.
+8. V2.8 — Combat Calibration.
+
+## V2.1 — Observability
+
+Esta etapa não altera atributos, decisões ou regras. A telemetria é escrita pela simulação, mas nunca é lida pelos controladores.
+
+### Match State
+
+O relatório calcula a cada cinco segundos:
+
+- fase (`HUNT`, `PRESSURE`, `SIEGE`, `ENDGAME`);
+- tempo ativo;
+- poder estimado de cada lado;
+- pressão recente;
+- economia;
+- Elfos ativos;
+- controle de mapa;
+- volatilidade.
+
+`elfPower` e `trollPower` são indicadores diagnósticos, não buffs e não probabilidades de vitória.
+
+### Setores
+
+O mapa é observado em uma grade diagnóstica 6×6. Cada setor registra visitas, tempo, último contato, dano causado/recebido, destruições e IDs conhecidos pela memória real do bot.
+
+A confiança decai apenas no relatório:
+
+`confidence = exp(-secondsSinceVisit / 120)`
+
+Ela ainda não é usada pela IA. Isso será responsabilidade da V2.2.
+
+### Cercos e Trade Score
+
+Uma sessão começa quando o cérebro entra em `SIEGE` e termina quando sai. O relatório guarda duração, HP gasto, dano, estruturas destruídas, dano econômico, curas e estado de saída.
+
+O primeiro score diagnóstico usa:
+
+`numerator = valueDestroyed + killProgress * 80 + structureDamage / 100`
+
+`denominator = hpLossPercent + healsUsed * 10 + duration * 0.5`
+
+`tradeScore = numerator / max(1, denominator)`
+
+Os pesos são versionados como `v2.1-observability-1`. O score serve para comparar ataques; não controla retreat nem target selection nesta etapa.
+
+### Pressão e momentum
+
+Janelas de 60 segundos armazenam componentes brutos e scores diagnósticos dos dois lados. Momentum é a diferença em relação à janela anterior. Nenhum score aplica rubber-band ou modifica atributos.
+
+### Economia
+
+Snapshots são registrados em 3, 5, 8, 10, 12 e 15 minutos, contendo geração, gasto, estoque, renda atual, estruturas, tiers e upgrades. O Balance Lab agrega esses checkpoints entre partidas.
+
+### Tempo por estado
+
+O relatório contabiliza os estados atuais (`SCOUT`, `PURSUE`, `SIEGE`, `RETREAT`, `RECOVER`, `ROTATE` e outros) e suas transições. Os estados novos da V2 só serão introduzidos na V2.3.
+
+## Balance Lab
+
+`npm run simulate:arena` usa 1×5 por padrão. Para uma análise secundária explícita, `SIM_ELF_COUNTS` pode fornecer outros tamanhos.
+
+O artefato agrega:
+
+- tempo por estado;
+- cercos por partida;
+- sucesso de cerco;
+- duração, HP gasto e trade score;
+- setores visitados;
+- pressure gap;
+- checkpoints econômicos.
+
+Win rate permanece uma métrica de validação, não o algoritmo do jogo.

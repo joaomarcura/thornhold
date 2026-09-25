@@ -116,6 +116,16 @@ test('Match diagnostics do not alter deterministic gameplay',()=>{
   for(let i=0;i<100;i++){a.step(.1);b.step(.1);}
   assert.deepEqual(a.units,b.units);assert.deepEqual(a.structures,b.structures);
 });
+test('V2.1 registra estado, setores, cercos, trade, pressão e economia sem dirigir a IA',()=>{
+  const m=create(),t=m.unit('t'),e=m.unit('e'),controller=new AIController('normal');m.state=STATES.ACTIVE;m.controllers.set(t.id,controller);controller.brain={state:'siege',targetId:'v2-wall'};
+  const wall={id:'v2-wall',kind:'wall',owner:e.id,baseId:'v2-base',x:t.x+2,z:t.z,hp:20,maxHp:20,tier:1,progress:1,bounty:20};m.structures.push(wall);
+  m.time=60;m.telemetry.step(m,.1);m.damage(wall,20,t,'melee');controller.brain.state='rotate';controller.brain.targetId=null;m.time=65;m.telemetry.step(m,.1);
+  m.time=m.preparation+430;m.telemetry.step(m,.1);const v2=m.result().telemetry.v2;
+  assert.equal(v2.observational,true);assert.equal(v2.matchState.phase,'SIEGE');assert.ok(v2.sectors.some(s=>s.visits>0));
+  assert.equal(v2.siegeSummary.count,1);assert.equal(v2.siegeSummary.successful,1);assert.ok(v2.sieges[0].tradeScore>0);assert.equal(v2.sieges[0].structuresDestroyed.wall,1);
+  assert.ok(v2.pressureWindows.length>=1);assert.ok(v2.economyCheckpoints.some(c=>c.time===180));assert.ok(v2.stateSeconds.SIEGE>0);assert.ok(v2.stateSeconds.ROTATE>0);
+  assert.equal(Object.hasOwn(v2.matchState,'elfPower'),true);assert.equal(Object.hasOwn(v2.matchState,'volatility'),true);
+});
 test('Stun defensivo só funciona na própria base rompida e bloqueia o Troll por 3s',()=>{
   const m=new Match({seed:'STUN'},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},{id:'e0',role:'elf',occupant:{type:'human',name:'A'}},{id:'e1',role:'elf',occupant:{type:'human',name:'B'}}]);
   const troll=m.unit('t'),elf=m.unit('e0'),ally=m.unit('e1'),base=m.map.bases[0];m.state=STATES.ACTIVE;m.time=60;
