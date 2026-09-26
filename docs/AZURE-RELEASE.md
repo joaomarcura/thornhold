@@ -46,7 +46,9 @@ logs ou roles. Execute:
 O script registra os providers, cria `rg-thornhold-prod`, cria uma identidade
 gerenciada e limita o acesso dela a `AcrPush` no registry e
 `Container Apps Contributor` somente no Container App. Depois imprime os
-valores necessários para o environment `production` do GitHub.
+valores necessários para o environment `production` do GitHub. Ele consulta a
+API pública do GitHub para construir o `sub` OIDC com os IDs imutáveis do owner
+e do repositório, no formato atualmente emitido pelo GitHub Actions.
 
 Crie em GitHub → Settings → Environments → `production`:
 

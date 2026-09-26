@@ -1,6 +1,6 @@
 param(
   [Parameter(Mandatory=$true)][string]$SubscriptionId,
-  [string]$GitHubOwner = 'pmarcura',
+  [string]$GitHubOwner = 'joaomarcura',
   [string]$GitHubRepository = 'thornhold',
   [string]$GitHubEnvironment = 'production',
   [string]$Location = 'brazilsouth',
@@ -20,8 +20,19 @@ $appScope = az containerapp show --name $ContainerAppName --resource-group $Reso
 az role assignment create --assignee-object-id $identity.principalId --assignee-principal-type ServicePrincipal --role AcrPush --scope $registryScope | Out-Null
 az role assignment create --assignee-object-id $identity.principalId --assignee-principal-type ServicePrincipal --role 'Container Apps Contributor' --scope $appScope | Out-Null
 
-$subject = "repo:$GitHubOwner/$GitHubRepository`:environment:$GitHubEnvironment"
-az identity federated-credential create --name github-$GitHubEnvironment --identity-name $IdentityName --resource-group $ResourceGroup --issuer https://token.actions.githubusercontent.com --subject $subject --audiences api://AzureADTokenExchange | Out-Null
+$githubHeaders = @{
+  Accept = 'application/vnd.github+json'
+  'User-Agent' = 'thornhold-azure-bootstrap'
+}
+$githubRepo = Invoke-RestMethod -Uri "https://api.github.com/repos/$GitHubOwner/$GitHubRepository" -Headers $githubHeaders
+$subject = "repo:$GitHubOwner@$($githubRepo.owner.id)/$GitHubRepository@$($githubRepo.id)`:environment:$GitHubEnvironment"
+$credentialName = "github-$GitHubEnvironment"
+az identity federated-credential show --name $credentialName --identity-name $IdentityName --resource-group $ResourceGroup 2>$null | Out-Null
+if ($LASTEXITCODE -eq 0) {
+  az identity federated-credential update --name $credentialName --identity-name $IdentityName --resource-group $ResourceGroup --issuer https://token.actions.githubusercontent.com --subject $subject --audiences api://AzureADTokenExchange | Out-Null
+} else {
+  az identity federated-credential create --name $credentialName --identity-name $IdentityName --resource-group $ResourceGroup --issuer https://token.actions.githubusercontent.com --subject $subject --audiences api://AzureADTokenExchange | Out-Null
+}
 
 $tenantId = az account show --query tenantId --output tsv
 Write-Host ''
@@ -34,6 +45,5 @@ Write-Host 'Configure these GitHub environment variables:'
 Write-Host "AZURE_RESOURCE_GROUP=$ResourceGroup"
 Write-Host "AZURE_CONTAINER_APP=$ContainerAppName"
 Write-Host "AZURE_CONTAINER_REGISTRY=$RegistryName"
-Write-Host "AZURE_LOCATION=$Location"
-Write-Host 'AZURE_MONTHLY_BUDGET_USD=25'
-Write-Host 'AZURE_BUDGET_EMAIL=YOUR_EMAIL'
+Write-Host ''
+Write-Host "OIDC_SUBJECT=$subject"
