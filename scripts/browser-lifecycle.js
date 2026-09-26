@@ -26,6 +26,8 @@ try {
   const code = await host.locator('.invite b').textContent();
   await host.locator('[data-setting=seed]').fill('TEST-2');
   await host.locator('[data-setting=seed]').blur();
+  for(let attempt=0;attempt<40&&server.sessions.rooms.get(code)?.settings.seed!=='TEST-2';attempt++)await new Promise(resolve=>setTimeout(resolve,25));
+  assert.equal(server.sessions.rooms.get(code)?.settings.seed,'TEST-2');
   await host.getByRole('button', { name: 'Marcar como pronto' }).click();
   await host.getByRole('button', { name: 'Iniciar expedição →' }).click();
   await host.locator('#role-name').filter({ hasText: 'OBSERVADOR' }).waitFor();
@@ -40,7 +42,9 @@ try {
   devSpeedValidated=true;
 
   // Accelerate the real simulation only inside this isolated test server.
-  // No HP, gold, positions or victory conditions are overwritten.
+  // Pause the interval's contribution so it cannot interleave .4 s ticks with
+  // the deterministic .05 s steps below. No gameplay state is overwritten.
+  room.devSpeed=0;
   while (room.match.state !== STATES.END && room.match.time < 1800) {
     for (let i = 0; i < 100; i++) room.match.step(.05);
     await new Promise(resolve => setTimeout(resolve, 5));
@@ -56,6 +60,8 @@ try {
   assert.equal(await host.locator('.invite b').textContent(), code);
   await host.locator('[data-setting=seed]').fill('REVANCHE-VALIDADA');
   await host.locator('[data-setting=seed]').blur();
+  for(let attempt=0;attempt<40&&room.settings.seed!=='REVANCHE-VALIDADA';attempt++)await new Promise(resolve=>setTimeout(resolve,25));
+  assert.equal(room.settings.seed,'REVANCHE-VALIDADA');
   await host.getByRole('button', { name: 'Marcar como pronto' }).click();
   await host.getByRole('button', { name: 'Iniciar expedição →' }).click();
   await host.locator('#role-name').filter({ hasText: 'OBSERVADOR' }).waitFor();

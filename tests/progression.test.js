@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Match } from '../shared/simulation.js';
-import { BALANCE as B, STATES, wispCost, wispIncome, structureHP, structureRewardHP, tierScale, trollCost, upgradeCost, mineEconomy, resourceProducer } from '../shared/config.js';
+import { BALANCE as B, STATES, distance, wispCost, wispIncome, structureHP, structureRewardHP, tierScale, lateTierScale, wallTierScale, trollLateThreatIncome, trollCost, upgradeCost, mineEconomy, resourceProducer } from '../shared/config.js';
 import { combatStats, ITEMS } from '../shared/equipment.js';
 import { jobRefund } from '../shared/jobs.js';
 import { availableTrees } from '../shared/wisps.js';
@@ -25,9 +25,28 @@ function arena(){
 }
 function ready(m,t){advance(m,Math.max(0,(t.cooldowns.attack||0)-m.time)+.05);}
 
-test('Todas as Barricadas herdam o dobro do HP base em cada nível',()=>{
+test('Barricadas preservam o early game e limitam a curva tardia',()=>{
   assert.equal(B.structures.wall.hp,2310);assert.equal(structureHP('wall',1),2310);
-  for(let tier=1;tier<=B.maxTier;tier++){const legendary=tier>=B.legendary.tier?B.legendary.wallHealth:1;assert.equal(structureHP('wall',tier),2310*tierScale(B.structures.wall.growth,tier)*legendary);}
+  for(let tier=1;tier<=9;tier++)assert.equal(structureHP('wall',tier),2310*tierScale(B.structures.wall.growth,tier));
+  for(let tier=2;tier<=B.maxTier;tier++)assert.ok(structureHP('wall',tier)>structureHP('wall',tier-1));
+  assert.equal(structureHP('wall',10),2310*wallTierScale(10)*B.legendary.wallHealth);
+  assert.ok(structureHP('wall',10)<structureHP('wall',9)*2);
+  assert.ok(structureHP('wall',20)<150000);
+});
+test('Economia tardia desacelera sem alterar os níveis 1–9',()=>{
+  const core=tier=>resourceProducer({kind:'core',tier}).amount,mine=tier=>resourceProducer({kind:'mine',tier,coreTier:5}).amount,wisp=level=>wispIncome({level,rich:false});
+  for(let tier=1;tier<=9;tier++){
+    assert.equal(core(tier),B.structures.core.income*tierScale(B.structures.core.growth,tier));
+    assert.equal(mine(tier),B.structures.mine.income*tierScale(B.structures.mine.growth,tier)*mineEconomy(5).productionFactor);
+    assert.equal(wisp(tier),B.wisps.income*Math.pow(B.wisps.incomeGrowth,tier-1));
+  }
+  assert.equal(lateTierScale(B.structures.core.growth,9),tierScale(B.structures.core.growth,9));
+  assert.ok(core(20)<80);assert.ok(mine(20)<70);assert.ok(wisp(20)<25);
+  assert.ok(core(20)>core(10));assert.ok(mine(20)>mine(10));assert.ok(wisp(20)>wisp(10));
+});
+test('Renda de ameaça do Troll cresce somente no late game',()=>{
+  assert.equal(trollLateThreatIncome(899,439,1),null);assert.equal(trollLateThreatIncome(900,439,0),null);
+  assert.equal(trollLateThreatIncome(900,0,1),8);assert.ok(Math.abs(trollLateThreatIncome(900,439,1)-40.925)<1e-9);assert.equal(trollLateThreatIncome(900,1000,1),45);
 });
 test('Breach Momentum aumenta dano contínuo e reduz reparo da Barricada',()=>{
   const m=match(),t=m.unit('t'),e=m.unit('e'),wall={id:'breach-wall',kind:'wall',owner:e.id,baseId:'breach-base',x:t.x,z:t.z+2,hp:231000,maxHp:231000,tier:B.legendary.tier,progress:1,bounty:500,lastHit:-100};m.settings.breachEnabled=true;m.state=STATES.ACTIVE;m.time=80;m.structures.push(wall);Object.assign(e,m.map.bases[0]);Object.assign(m.unit('ally'),m.map.bases[1]);t.yaw=0;
@@ -73,10 +92,18 @@ test('Santuário do Troll acelera cura somente fora de combate e dentro da base'
   Object.assign(t,m.map.trollSpawn);t.lastHit=m.time;advance(m,1);assert.equal(m.telemetry.healing.sanctuary,sanctuary);
 });
 
+test('Retorno do Troll desbloqueia no late game, canaliza, pode ser interrompido e concede ímpeto ao sair',()=>{
+  const m=match(),t=m.unit('t'),elf=m.unit('e');m.state=STATES.ACTIVE;m.time=m.preparation+B.troll.recallUnlock-1;Object.assign(t,{x:m.map.trollSpawn.x+35,z:m.map.trollSpawn.z,hp:t.maxHp*.4});
+  assert.match(m.act(t.id,{type:'trollRecall'}),/Disponível em/);m.time+=1;assert.equal(m.act(t.id,{type:'trollRecall'}),undefined);assert.equal(t.recallUntil,m.time+B.troll.recallChannel);
+  m.damage(t,1,elf,'tower','interrupt');assert.equal(t.recallUntil,0);assert.equal(t.stats.recalls,0);
+  assert.equal(m.act(t.id,{type:'trollRecall'}),undefined);advance(m,B.troll.recallChannel+.1);assert.ok(distance(t,m.map.trollSpawn)<.01);assert.equal(t.stats.recalls,1);assert.ok(t.cooldowns.recall-m.time>B.troll.recallCooldown-.2&&t.cooldowns.recall-m.time<=B.troll.recallCooldown);
+  Object.assign(t,{x:m.map.trollSpawn.x+B.troll.sanctuaryRadius+1,z:m.map.trollSpawn.z,input:{x:1,z:0,sprint:true}});m.movement(t,.05);assert.ok(t.recallSpeedUntil>m.time);assert.ok(m.snapshot(t.id).units.find(u=>u.id===t.id).effects.some(e=>e.id==='recall-speed'));
+});
+
 test('Nível 10 é Lendário, nível 20 é Épico e somente 20 bloqueia novas melhorias',()=>{
   const m=match(),{e,core,wall}=baseFixture(m);Object.assign(e,{gold:1000000,wood:1000000});wall.tier=5;
   core.tier=9;core.maxHp=structureHP('core',9);core.hp=core.maxHp*.75;Object.assign(e,{x:core.x+2,z:core.z});const income9=resourceProducer(core).amount;
-  assert.equal(m.act(e.id,{type:'upgrade',target:core.id}),undefined);advance(m,11);assert.equal(core.tier,10);assert.equal(core.legendary,true);assert.ok(Math.abs(core.hp/core.maxHp-.75)<.001);assert.ok(Math.abs(resourceProducer(core).amount/income9-B.legendary.coreIncome*tierScale(B.structures.core.growth,10)/tierScale(B.structures.core.growth,9))<1e-9);
+  assert.equal(m.act(e.id,{type:'upgrade',target:core.id}),undefined);advance(m,11);assert.equal(core.tier,10);assert.equal(core.legendary,true);assert.ok(Math.abs(core.hp/core.maxHp-.75)<.001);assert.ok(Math.abs(resourceProducer(core).amount/income9-B.legendary.coreIncome*lateTierScale(B.structures.core.growth,10)/lateTierScale(B.structures.core.growth,9))<1e-9);
   wall.tier=20;wall.maxHp=structureHP('wall',20);wall.hp=wall.maxHp;for(let tier=11;tier<=20;tier++){assert.equal(m.act(e.id,{type:'upgrade',target:core.id}),undefined);advance(m,11);assert.equal(core.tier,tier);}assert.equal(core.epic,true);assert.match(m.act(e.id,{type:'upgrade',target:core.id}),/máximo/);
   wall.tier=9;wall.maxHp=structureHP('wall',9);wall.hp=wall.maxHp*.6;wall.bounty=500;wall.bountyFactor=1.3;Object.assign(e,{x:wall.x,z:wall.z});const bounty=wall.bounty,expectedDelta=(structureRewardHP('wall',10)-structureRewardHP('wall',9))*B.troll.goldPerDamage*wall.bountyFactor;
   assert.equal(m.act(e.id,{type:'upgrade',target:wall.id}),undefined);advance(m,11);assert.equal(wall.legendary,true);assert.equal(wall.maxHp,structureRewardHP('wall',10)*B.legendary.wallHealth);assert.ok(Math.abs(wall.hp/wall.maxHp-.6)<.001);assert.ok(Math.abs(wall.bounty-bounty-expectedDelta)<.01);

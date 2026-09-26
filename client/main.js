@@ -16,7 +16,7 @@ const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>'
 const num=x=>Math.floor(x||0).toLocaleString(localeCode()),clock=x=>`${Math.floor(x/60)}:${String(Math.floor(x%60)).padStart(2,'0')}`;
 const diffName={easy:'Fácil',normal:'Normal',hard:'Difícil'};
 const modeName=Object.fromEntries(Object.entries(MATCH_MODES).map(([key,value])=>[key,value.name]));
-let view='menu',modal=null,room=null,rooms=[],snapshot=null,result=null,clientId=null,viewerId=null,ws=null,ping=0,connected=false,devMode=false,devSpeed=1,debugCombat=false,selected=null,buildKind=null,buildPoint=null,buildValid=false,rotation=0,snap=true,keys=new Set(),lastMouse={x:innerWidth/2,y:innerHeight/2},lastHud=0,lastSound=0,toastTimer,selectionKey='',reconnecting=false,bindingCapture=null,rankedState={queued:false,role:null,players:{troll:0,elf:0},party:null};
+let view='menu',modal=null,room=null,rooms=[],snapshot=null,result=null,clientId=null,viewerId=null,ws=null,ping=0,connected=false,devMode=false,devSpeed=1,debugCombat=false,selected=null,buildKind=null,buildPoint=null,buildValid=false,rotation=0,snap=true,keys=new Set(),lastMouse={x:innerWidth/2,y:innerHeight/2},lastHud=0,lastSound=0,toastTimer,selectionKey='',scoreboardKey='',controlHintsKey='',reconnecting=false,bindingCapture=null,rankedState={queued:false,role:null,players:{troll:0,elf:0},party:null};
 let nickname=localStorage.getItem('thornhold-name')||'Viajante',soundOn=localStorage.getItem('thornhold-sound')!=='off';
 const exploredBases=new Set();
 let world;
@@ -68,7 +68,7 @@ function connect(){
     case 'lobby':room=msg.room;if(room.state===STATES.LOBBY){view='lobby';snapshot=null;result=null;viewerId=null;buildKind=null;hud.hidden=true;$('#labels').innerHTML='';if(!world.isMenu)world.menuScene();render();}else if(view==='lobby'){view='game';render();}else if(modal==='pause')render();break;
     case 'queue':rankedState={...rankedState,...msg};if(modal==='ranked')render();break;
     case 'rooms':rooms=msg.rooms;if(view==='browser')render();break;
-    case 'map':rankedState.queued=false;mouseLook.reset();world.start(msg.map);tactical=new TacticalMap(msg.map);mapOpen=false;exploredBases.clear();viewerId=msg.viewerId;view='game';modal=null;selected=null;buildKind=null;awaitingBuild=false;selectionKey='';snapshot=null;keys.clear();render();setupHUD();break;
+    case 'map':rankedState.queued=false;mouseLook.reset();world.start(msg.map);tactical=new TacticalMap(msg.map);mapOpen=false;exploredBases.clear();viewerId=msg.viewerId;view='game';modal=null;selected=null;buildKind=null;awaitingBuild=false;selectionKey='';scoreboardKey='';controlHintsKey='';snapshot=null;keys.clear();render();setupHUD();break;
     case 'snapshot':snapshot=msg.snapshot;devSpeed=snapshot.devSpeed||devSpeed;world.update(snapshot);for(const e of snapshot.events)if(e.id>lastSound){if(distance(me()||world.target,e)<35||e.type==='phase')sound(e.type);if(e.type==='impact'&&e.unit===viewerId)hitFeedback(e);if(['damage','gather','repair','purchase','build','upgrade','complete','destroy','dev-grant','resource','stun'].includes(e.type)&&(e.type!=='resource'||e.unit===viewerId))floatFeedback(e);if(e.type==='stun')toast(e.unit===viewerId?'Troll atordoado por 3s · fuja!':'O Troll foi atordoado por 3s.');if(e.type==='relocation'&&e.unit===viewerId)toast(`Núcleo destruído · reassentamento gratuito por ${B.elf.relocationSeconds}s!`);if(e.type==='phase')toast(e.text);if(e.type==='dev-grant'&&e.unit===viewerId)toast(`Dev: +${num(e.gold)} ouro · +${num(e.wood)} madeira`);if(e.type==='cancel'&&e.unit===viewerId){selectionKey='';toast('Cancelado · recuperou '+num(e.gold)+' ouro e '+num(e.wood)+' madeira.');}if(e.type==='demolish'&&e.unit===viewerId){selected=null;selectionKey='';toast('Estrutura demolida · recuperou '+num(e.gold)+' ouro e '+num(e.wood)+' madeira.');}if(e.type==='build'&&e.unit===viewerId&&awaitingBuild){awaitingBuild=false;if(!buildKind)selectEntity(e.entity);}if(e.type==='ping')toast(`${snapshot.units.find(u=>u.id===e.unit)?.name||'Aliado'}: ${e.text}`);lastSound=Math.max(lastSound,e.id);}break;
     case 'dev':devSpeed=msg.speed||devSpeed;if(msg.granted)toast(`Dev: +${num(msg.granted.gold)} ouro · +${num(msg.granted.wood)} madeira`);if(modal==='dev')render();break;
     case 'phase':if(msg.state===STATES.LOADING){view='loading';lastSound=0;render();}break;
@@ -163,6 +163,11 @@ function updateTacticalHUD(u){
   if(u?.role==='elf'){const b=$('#hotbar [data-do="elf-stun"]'),status=snapshot.elfStun;if(b&&status){b.disabled=!status.available;b.title=status.reason;b.classList.toggle('ready',status.available);b.classList.toggle('cooling',status.readyAt>snapshot.time);let timer=b.querySelector('.skill-timer');if(!timer){timer=document.createElement('small');timer.className='skill-timer';b.append(timer);}timer.textContent=status.readyAt>snapshot.time?Math.ceil(status.readyAt-snapshot.time)+'s':'3s';}}
   if(u?.ghost){const b=$('#hotbar [data-do="ghost-reveal"]'),readyAt=u.cooldowns.ghostReveal||0;if(b){b.classList.toggle('cooling',readyAt>snapshot.time);let timer=b.querySelector('.skill-timer');if(!timer){timer=document.createElement('small');timer.className='skill-timer';b.append(timer);}timer.textContent=readyAt>snapshot.time?Math.ceil(readyAt-snapshot.time)+'s':'pronto';}}
   if(u?.role==='troll')for(const[key,task]of [['heavy','heavy'],['dash','dash'],['roar','roar'],['heal','heal']]){const b=$(`#hotbar [data-do="${task}"]`);if(b){let timer=b.querySelector('.skill-timer');if(!timer){timer=document.createElement('small');timer.className='skill-timer';b.append(timer);}timer.textContent=key==='heal'?`${u.healCharges||0}/2${u.healingUntil>snapshot.time?' · curando':''}`:remaining(u,key);b.disabled=key==='heal'&&(!(u.healCharges>0)||u.cooldowns.heal>snapshot.time||u.hp>=u.maxHp);b.classList.toggle('cooling',u.cooldowns[key]>snapshot.time);}}
+  if(u?.role==='troll'){
+    const status=snapshot.trollRecall,shop=$('#hotbar [data-do="shop"]');let b=$('#hotbar [data-do="troll-recall"]');
+    if(!b&&shop){b=document.createElement('button');b.dataset.do='troll-recall';b.innerHTML=`<kbd>${keyLabel(binding('recall'))}</kbd><b>${icon('recall')}</b><span>Retornar</span><small class="skill-timer">5s</small>`;shop.before(b);}
+    if(b&&status){b.disabled=!status.available&&!status.channeling;b.title=status.reason;b.classList.toggle('ready',status.available);b.classList.toggle('cooling',status.readyAt>snapshot.time);const timer=b.querySelector('.skill-timer');timer.textContent=status.channeling?`${Math.max(.1,status.readyAt-snapshot.time).toFixed(1)}s`:status.readyAt>snapshot.time?`${Math.ceil(status.readyAt-snapshot.time)}s`:'5s';}
+  }
 }
 function updateHUD(){
   if(!snapshot||view!=='game')return;
@@ -182,7 +187,8 @@ function updateHUD(){
   $('#combo-meter').hidden=elf||observer||!u?.combo;$('#combo-meter').textContent=u?.combo?'COMBO '+u.combo+'/3 · terceiro acerto +25%':'';
   const hotbarKey=(observer?'observer':ghost?'ghost':elf?'elf':'troll')+buildKind+(relocating?'-relocating':'');
   if($('#hotbar').dataset.key!==hotbarKey){$('#hotbar').dataset.key=hotbarKey;$('#hotbar').innerHTML=observer?`<button data-do="spectate"><kbd>${keyLabel(binding('spectate'))}</kbd><span>Próximo</span></button>`:ghost?`<button data-do="ghost-reveal" title="Revela inimigos e terreno em ${B.ghost.revealRadius}m por ${B.ghost.revealDuration}s"><kbd>${keyLabel(binding('ability'))}</kbd><b>${icon('reveal')}</b><span>Revelar</span><small>60s</small></button><button data-do="repair"><kbd>${keyLabel(binding('repair'))}</kbd><b>${icon('wall')}</b><span>Reparar</span><small>50%</small></button>`:elf?Object.entries(B.structures).map(([k,d],i)=>{const free=k==='core'&&relocating,mine=k==='mine';return `<button class="${buildKind===k?'active':''}" data-do="build" data-kind="${k}" title="${free?'Voucher de reassentamento: sem custo':mine?'Custo, vagas e produção escalam com o Núcleo':`${d.name}: ${d.gold} ouro, ${d.wood} madeira`}"><kbd>${i+1}</kbd><b>${icon(k)}</b><span>${d.name}</span><small>${free?'GRÁTIS':mine?'NÚCLEO':resourceCost(d)}</small></button>`;}).join('')+`<button data-do="elf-stun" title="Disponível após sua Barricada ser rompida"><kbd>${keyLabel(binding('ability'))}</kbd><b>${icon('stun')}</b><span>Atordoar</span><small>3s</small></button>`:`<button data-do="light"><kbd>CLIQUE</kbd><b>${icon('sword')}</b><span>Golpe</span></button><button data-do="heavy"><kbd>${keyLabel(binding('heavy'))}</kbd><b>${icon('heavy')}</b><span>Pesado</span></button><button data-do="heal" title="Recupera 20% da vida máxima durante 6s"><kbd>${keyLabel(binding('heal'))}</kbd><b>${icon('health')}</b><span>Regenerar</span><small>2/2</small></button><button data-do="dash"><kbd>${keyLabel(binding('dash'))}</kbd><b>${icon('dash')}</b><span>Esquiva</span></button><button data-do="roar"><kbd>${keyLabel(binding('ability'))}</kbd><b>${icon('roar')}</b><span>Rugido</span></button><button data-do="shop"><kbd>${keyLabel(binding('shop'))}</kbd><b>${icon('gold')}</b><span>Melhorias</span></button>`;}
-  $('#control-hints').innerHTML=!$('#shop').hidden?`<kbd>WASD / ↑↓</kbd> navegar · <kbd>ENTER</kbd> confirmar · <kbd>${keyLabel(binding('shop'))} / ESC</kbd> fechar`:buildKind?'<kbd>CLIQUE</kbd> construir na mira · <kbd>SHIFT</kbd> repetir · <kbd>R</kbd> girar · <kbd>ESC / DIREITO</kbd> cancelar':`<kbd>${keyLabel(binding('forward'))}${keyLabel(binding('left'))}${keyLabel(binding('backward'))}${keyLabel(binding('right'))}</kbd> mover · <kbd>${keyLabel(binding('sprint'))}</kbd> correr${elf?` · <kbd>${keyLabel(binding('wisp'))}</kbd> Wisp automático · segure <kbd>${keyLabel(binding('repair'))}</kbd> coletar/reparar`:''} · mira travada`;
+  const controlHints=!$('#shop').hidden?`<kbd>WASD / ↑↓</kbd> navegar · <kbd>ENTER</kbd> confirmar · <kbd>${keyLabel(binding('shop'))} / ESC</kbd> fechar`:buildKind?'<kbd>CLIQUE</kbd> construir na mira · <kbd>SHIFT</kbd> repetir · <kbd>R</kbd> girar · <kbd>ESC / DIREITO</kbd> cancelar':`<kbd>${keyLabel(binding('forward'))}${keyLabel(binding('left'))}${keyLabel(binding('backward'))}${keyLabel(binding('right'))}</kbd> mover · <kbd>${keyLabel(binding('sprint'))}</kbd> correr${elf?` · <kbd>${keyLabel(binding('wisp'))}</kbd> Wisp automático · segure <kbd>${keyLabel(binding('repair'))}</kbd> coletar/reparar`:''} · mira travada`;
+  if(controlHints!==controlHintsKey){controlHintsKey=controlHints;$('#control-hints').innerHTML=controlHints;}
   const selectedEntity=[...snapshot.structures,...snapshot.trees,...snapshot.units,...(snapshot.wisps||[])].find(e=>e.id===selected);if(selected&&!selectedEntity)deselect();const key=selectedEntity?selectionMarkup(selectedEntity,{u,snapshot,map:world.map}):'';
   if(key!==selectionKey){selectionKey=key;renderSelection(selectedEntity,key);}
   if(!$('#shop').hidden)updateShop(u);
@@ -228,7 +234,7 @@ function updateShop(u){if(!u||u.role!=='troll')return;const shop=$('#shop'),key=
 function updateLiveScoreboard(){
   const panel=$('#live-scoreboard');if(!panel)return;
   const rows=(snapshot.scoreboard||[]).map((p,i)=>`<div class="${p.id===viewerId?'self':''} ${p.alive?'':'eliminated'}"><span>${i+1}</span><b>${p.role==='troll'?'♜':'❧'} ${escape(p.name)}</b><small>${p.kills} K · ${num(p.damage)} DMG</small><strong>${num(p.score)}</strong></div>`).join('');
-  panel.innerHTML=`<header><span>PLACAR AO VIVO</span><small>PONTOS</small></header>${rows}`;
+  if(rows===scoreboardKey)return;scoreboardKey=rows;panel.innerHTML=`<header><span>PLACAR AO VIVO</span><small>PONTOS</small></header>${rows}`;
 }
 function hitFeedback(e){
   const el=$('#combat-feedback');if(!el)return;clearTimeout(impactTimer);el.hidden=false;el.className=e.broken?'combat-feedback breach':'combat-feedback';
@@ -375,6 +381,7 @@ document.addEventListener('click',async event=>{
     case 'heal':action({type:'heal'});break;
     case 'dash':action({type:'dash'});break;
     case 'roar':action({type:'roar'});break;
+    case 'troll-recall':action({type:'trollRecall'});break;
     case 'elf-stun':action({type:'elfStun'});break;
     case 'ghost-reveal':action({type:'ghostReveal'});break;
     case 'spectate':spectate();break;
@@ -419,6 +426,7 @@ addEventListener('keydown',e=>{
   if(modal)return;
   if(matches(e,'map')&&!e.repeat){toggleMap();return;}
   if(matches(e,'camera')&&!e.repeat){returnCamera();return;}
+  if(matches(e,'recall')&&!e.repeat&&me()?.role==='troll'){action({type:'trollRecall'});return;}
   if(matches(e,'shop')&&!e.repeat&&me()?.role==='troll'){toggleShop();return;}
   if(matches(e,'core')&&!e.repeat&&me()?.role==='elf'){openCore();return;}
   if(matches(e,'ping')&&!e.repeat){const wheel=$('#ping-wheel');if(wheel)wheel.hidden=!wheel.hidden;return;}

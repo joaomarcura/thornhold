@@ -1,0 +1,29 @@
+{
+  "family": "thornhold-production",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/thornhold-ecs-execution",
+  "containerDefinitions": [{
+    "name": "thornhold",
+    "image": "ACCOUNT_ID.dkr.ecr.sa-east-1.amazonaws.com/thornhold:bootstrap",
+    "essential": true,
+    "portMappings": [{"containerPort": 3000, "protocol": "tcp"}],
+    "environment": [
+      {"name":"PORT","value":"3000"},
+      {"name":"HOST","value":"0.0.0.0"},
+      {"name":"NODE_ENV","value":"production"},
+      {"name":"TELEMETRY_MODE","value":"stdout"},
+      {"name":"TELEMETRY_PROVIDER","value":"aws"},
+      {"name":"DEPLOY_ENV","value":"production"},
+      {"name":"TRUST_PROXY","value":"1"},
+      {"name":"MAX_ROOMS","value":"200"},
+      {"name":"MAX_CONNECTIONS","value":"1200"},
+      {"name":"MAX_CONNECTIONS_PER_IP","value":"24"}
+    ],
+    "logConfiguration": {"logDriver":"awslogs","options":{"awslogs-group":"/ecs/thornhold","awslogs-region":"sa-east-1","awslogs-stream-prefix":"app","mode":"non-blocking","max-buffer-size":"4m"}},
+    "healthCheck": {"command":["CMD-SHELL","node -e \"fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""],"interval":30,"timeout":5,"retries":3,"startPeriod":20}
+  }],
+  "tags": [{"key":"Project","value":"thornhold"},{"key":"Environment","value":"production"}]
+}

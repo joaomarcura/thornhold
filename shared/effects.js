@@ -12,6 +12,8 @@ export function unitEffects(u, time, state, preparation) {
   if(u.role!=='troll')return effects;
   const stats=combatStats(u);
   if(state===STATES.PREP){add('seal','Selo de preparação','debuff',preparation,'Aguarde a libertação');return effects;}
+  if(u.recallUntil>time)add('recall-channel','Retorno ao Santuário','buff',u.recallUntil,'Canalizando · dano, movimento ou habilidade interrompe');
+  if(u.recallSpeedUntil>time)add('recall-speed','Ímpeto do Santuário','buff',u.recallSpeedUntil,'Movimento +20%');
   if(time-u.lastHit<stats.regenDelay)add('regen-delay','Regeneração plena bloqueada','debuff',u.lastHit+stats.regenDelay,'Sustentação de combate permanece ativa');
   if(u.healingUntil>time)add('consumable-heal','Cura ancestral','buff',u.healingUntil,'20% da vida máxima em 6s');
   if(u.inSanctuary&&u.hp<u.maxHp&&time-u.lastHit>=stats.regenDelay)add('sanctuary','Santuário ancestral','buff',null,`+${(B.troll.sanctuaryRegenRate*u.maxHp).toFixed(1)} vida/s`);

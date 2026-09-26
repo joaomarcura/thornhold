@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Match } from '../shared/simulation.js';
 import { STATES, BALANCE as B, distance } from '../shared/config.js';
-import { toCell, index } from '../shared/map.js';
+import { toCell, index, baseAt } from '../shared/map.js';
 import { AIController } from '../shared/controllers.js';
 import { TacticalMap } from '../client/tactical-map.js';
 import { StrategicMap } from '../shared/strategic-map.js';
@@ -93,20 +93,27 @@ test('IA Elfa planeja upgrade distante e caminha até a estrutura',()=>{
   const core={id:'remote-core',kind:'core',owner:u.id,baseId:base.id,x:base.x,z:base.z,hp:360,maxHp:360,tier:1,progress:1,upgrading:0},wall={id:'remote-wall',kind:'wall',owner:u.id,baseId:base.id,x:base.gate.x,z:base.gate.z,hp:2035,maxHp:2035,tier:2,progress:1,upgrading:0},tower={id:'remote-tower',kind:'tower',owner:u.id,baseId:base.id,x:base.x+3,z:base.z,hp:360,maxHp:360,tier:1,progress:1,upgrading:0};m.structures.push(core,wall,tower);
   assert.ok(distance(u,core)>B.interactRange);c.elf(m,u);assert.equal(c.destination?.entityId,core.id);
 });
-test('IA Elfa prioriza Barricada 2 antes da expansão econômica',()=>{
+test('Perfil defensor prioriza Barricada 2 antes da expansão econômica',()=>{
   const m=match(),u=m.unit('e0'),t=m.unit('t'),c=new AIController('normal'),base=m.map.bases[0];m.state=STATES.ACTIVE;m.time=80;Object.assign(t,{x:0,z:0});Object.assign(u,{x:base.gate.x,z:base.gate.z,gold:10000,wood:10000,baseId:base.id});
+  c.elfProfile='defense';c.buildPlan={towerDepths:[2,3,4],towerSides:[-2,2],utilityOffset:0,utilityDirection:1};
   const core={id:'opening-core',kind:'core',owner:u.id,baseId:base.id,x:base.x,z:base.z,hp:360,maxHp:360,tier:1,progress:1,upgrading:0},wall={id:'opening-wall',kind:'wall',owner:u.id,baseId:base.id,x:base.gate.x,z:base.gate.z,hp:1155,maxHp:1155,tier:1,progress:1,upgrading:0},tower={id:'opening-tower',kind:'tower',owner:u.id,baseId:base.id,x:base.x+3,z:base.z,hp:360,maxHp:360,tier:1,progress:1,upgrading:0};m.structures.push(core,wall,tower);
   c.elf(m,u);assert.ok(wall.upgrading>0);assert.equal(core.upgrading,0);assert.equal(m.structures.some(s=>s.kind==='mine'),false);
 });
 test('IA Elfa melhora Barricada viável sob pressão em vez de reparar para sempre',()=>{
   const m=match(),u=m.unit('e0'),t=m.unit('t'),c=new AIController('normal'),base=m.map.bases[0];m.state=STATES.ACTIVE;m.time=80;Object.assign(u,{x:base.gate.x,z:base.gate.z,gold:10000,wood:10000,baseId:base.id});Object.assign(t,{x:base.gate.x+5,z:base.gate.z});
   const core={id:'siege-core',kind:'core',owner:u.id,baseId:base.id,x:base.x,z:base.z,hp:360,maxHp:360,tier:1,progress:1,upgrading:0},wall={id:'siege-wall',kind:'wall',owner:u.id,baseId:base.id,x:base.gate.x,z:base.gate.z,hp:924,maxHp:1155,tier:1,progress:1,upgrading:0},tower={id:'siege-tower',kind:'tower',owner:u.id,baseId:base.id,x:base.x+3,z:base.z,hp:360,maxHp:360,tier:1,progress:1,upgrading:0};m.structures.push(core,wall,tower);
-  c.elf(m,u);assert.ok(wall.upgrading>0);assert.notEqual(u.action,'repair');
+  const hp=wall.hp;c.elf(m,u);assert.ok(wall.upgrading>0);assert.ok(wall.hp>hp);
 });
 test('IA Elfa não repõe Torre durante cerco ativo',()=>{
   const m=match(),u=m.unit('e0'),t=m.unit('t'),c=new AIController('normal'),base=m.map.bases[0];m.state=STATES.ACTIVE;m.time=180;Object.assign(u,{x:base.x,z:base.z,gold:100000,wood:100000,baseId:base.id});Object.assign(t,{x:base.x+5,z:base.z});
   const core={id:'sieged-core',kind:'core',owner:u.id,baseId:base.id,x:base.x,z:base.z,hp:980,maxHp:980,tier:3,progress:1,upgrading:0},wall={id:'sieged-wall',kind:'wall',owner:u.id,baseId:base.id,x:base.gate.x,z:base.gate.z,hp:4170,maxHp:4170,tier:3,progress:1,upgrading:0};m.structures.push(core,wall);
   c.elf(m,u);assert.equal(m.structures.some(s=>s.kind==='tower'),false);assert.notEqual(u.action,'build');
+});
+test('Bot próximo mantém Barricada e melhora Torre durante cerco sem entrar em loop de reparo',()=>{
+  const m=match(),u=m.unit('e0'),t=m.unit('t'),c=new AIController('normal'),base=m.map.bases[0];m.state=STATES.ACTIVE;m.time=180;Object.assign(u,{x:base.gate.x,z:base.gate.z,baseId:base.id,gold:10000,wood:10000});Object.assign(t,{x:base.outside.x,z:base.outside.z});
+  c.elfProfile='defense';c.buildPlan={towerDepths:[2,3,4],towerSides:[-2,2],utilityOffset:0,utilityDirection:1};
+  const core={id:'defense-core',kind:'core',owner:u.id,baseId:base.id,x:base.x,z:base.z,hp:980,maxHp:980,tier:2,progress:1,upgrading:0},wall={id:'defense-wall',kind:'wall',owner:u.id,baseId:base.id,x:base.gate.x,z:base.gate.z,hp:1900,maxHp:2035,tier:2,progress:1,upgrading:0,lastHit:m.time-1},tower={id:'defense-tower',kind:'tower',owner:u.id,baseId:base.id,x:base.gate.x+8,z:base.gate.z,hp:360,maxHp:360,tier:1,progress:1,upgrading:0,branch:'power'};m.structures.push(core,wall,tower);Object.assign(u,{x:tower.x,z:tower.z});
+  const hp=wall.hp;c.elf(m,u);assert.ok(wall.hp>hp);assert.ok(tower.upgrading>0);
 });
 test('Memória estratégica V2 persiste com confiança decrescente sem conhecer alvos ocultos',()=>{
   const m=match(),t=m.unit('t'),memory=new StrategicMap(),visible={id:'seen-tower',kind:'tower',x:t.x+4,z:t.z,hp:360,maxHp:360,tier:2,branch:'power',progress:1,baseId:'known'};
@@ -115,11 +122,16 @@ test('Memória estratégica V2 persiste com confiança decrescente sem conhecer 
   const initial=known.confidence;m.time=240;t.x+=40;t.z+=40;memory.update(m,t,[]);report=memory.report(m,t);known=report.find(s=>s.knownStructures>0);assert.ok(known.confidence<initial);assert.equal(known.knownStructures,1);
 });
 test('State Machine V2 usa fases explícitas e PROBE sem atacar a estrutura',()=>{
-  assert.deepEqual(TROLL_STATES,['explore','hunt','probe','siege','breach','chase','reposition','disengage','recover','rotate','finisher']);
-  const m=match(),t=m.unit('t'),c=new AIController('normal'),wall={id:'probe-wall',kind:'wall',owner:'e0',baseId:'probe-base',x:t.x+6,z:t.z,hp:1100,maxHp:1100,tier:1,progress:1,bounty:500};m.state=STATES.ACTIVE;m.time=m.preparation+60;m.structures.push(wall);for(const elf of m.units.filter(u=>u.role==='elf'))Object.assign(elf,{x:0,z:0});
+  assert.deepEqual(TROLL_STATES,['explore','hunt','probe','siege','breach','chase','reposition','disengage','recover','rotate']);
+  const m=match(),t=m.unit('t'),c=new AIController('normal'),wall={id:'probe-wall',kind:'wall',owner:'e0',baseId:'probe-base',x:t.x+3,z:t.z,hp:1100,maxHp:1100,tier:1,progress:1,bounty:500};m.state=STATES.ACTIVE;m.time=m.preparation+60;m.structures.push(wall);for(const elf of m.units.filter(u=>u.role==='elf'))Object.assign(elf,{x:0,z:0});
   const hp=wall.hp;c.troll(m,t);assert.equal(c.brain.phase(m),'hunt');assert.equal(c.brain.state,'probe');assert.equal(wall.hp,hp);
   m.time+=3.1;c.troll(m,t);assert.equal(c.brain.state,'siege');assert.equal(c.brain.targetEvaluation.phase,'hunt');
   m.time=m.preparation+430;assert.equal(c.brain.phase(m),'siege');m.time=m.preparation+721;assert.equal(c.brain.phase(m),'endgame');
+});
+test('SIEGE só começa quando o Troll alcança posição real de ataque',()=>{
+  const m=match(),t=m.unit('t'),c=new AIController('normal'),wall={id:'approach-wall',kind:'wall',owner:'e0',baseId:'approach-base',x:t.x+9,z:t.z,hp:1100,maxHp:1100,tier:1,progress:1,bounty:500};m.state=STATES.ACTIVE;m.time=100;m.structures.push(wall);for(const elf of m.units.filter(u=>u.role==='elf'))Object.assign(elf,{x:0,z:0});
+  c.troll(m,t);m.time+=3.1;c.troll(m,t);assert.equal(c.brain.state,'probe');assert.equal(c.brain.siege,null);
+  Object.assign(t,{x:wall.x-3,z:wall.z});c.troll(m,t);assert.equal(c.brain.state,'siege');assert.ok(c.brain.siege);
 });
 test('PROBE abandona ameaça medida sem usar conhecimento oculto',()=>{
   const m=match(),t=m.unit('t'),c=new AIController('normal'),tower={id:'probe-danger',kind:'tower',owner:'e0',baseId:'danger-base',x:t.x+6,z:t.z,hp:360,maxHp:360,tier:5,branch:'power',progress:1,bounty:500};m.state=STATES.ACTIVE;m.time=100;m.structures.push(tower);for(const elf of m.units.filter(u=>u.role==='elf'))Object.assign(elf,{x:0,z:0});c.troll(m,t);assert.equal(c.brain.state,'probe');
@@ -129,6 +141,7 @@ test('Siege Budget respeita commitment mínimo e abandona troca improdutiva',()=
   const m=match(),t=m.unit('t'),c=new AIController('normal'),wall={id:'budget-wall',kind:'wall',owner:'e0',baseId:'budget-base',x:t.x+2,z:t.z,hp:1100,maxHp:1100,tier:1,progress:1,bounty:500};m.state=STATES.ACTIVE;m.time=100;m.structures.push(wall);for(const elf of m.units.filter(u=>u.role==='elf'))Object.assign(elf,{x:0,z:0});c.brain??=null;c.troll(m,t);c.brain.probedBases.set(wall.baseId,m.time);c.troll(m,t);assert.equal(c.brain.state,'siege');assert.ok(c.brain.siege);
   t.hp=t.maxHp*.76;m.time+=1;c.troll(m,t);assert.equal(c.retreating,false);assert.equal(c.brain.siegeDecision.withinCommitment,true);
   m.time+=4;c.troll(m,t);assert.equal(c.retreating,false);assert.equal(c.brain.state,'rotate');assert.equal(c.brain.targetId,null);
+  assert.equal(c.brain.lastFailedSiege.targetId,wall.id);assert.equal(c.brain.lastFailedSiege.targetHpStart,1100);assert.equal(c.brain.lastFailedSiege.targetHpEnd,1100);assert.ok(c.brain.lastFailedSiege.trollHpLoss>0);assert.deepEqual(c.brain.lastFailedSiege.levels,t.levels);
 });
 test('Siege Budget mantém ataque produtivo acima da duração nominal',()=>{
   const m=match(),t=m.unit('t'),c=new AIController('normal'),wall={id:'productive-wall',kind:'wall',owner:'e0',baseId:'productive-base',x:t.x+2,z:t.z,hp:1100,maxHp:1100,tier:1,progress:1,bounty:500};m.state=STATES.ACTIVE;m.time=100;m.structures.push(wall);for(const elf of m.units.filter(u=>u.role==='elf'))Object.assign(elf,{x:0,z:0});c.troll(m,t);c.brain.probedBases.set(wall.baseId,m.time);c.troll(m,t);wall.hp=220;t.hp=t.maxHp*.9;m.time+=19;c.troll(m,t);
@@ -149,6 +162,29 @@ test('Alvo interno sem rota transforma a Barricada conhecida em pré-requisito',
   const m=match(),u=m.unit('t'),c=new AIController('normal'),baseId='blocked-base',wall={id:'blocking-wall',kind:'wall',owner:'e0',baseId,x:u.x+5,z:u.z,hp:5000,maxHp:5000,tier:4,progress:1},mine={id:'blocked-mine',kind:'mine',owner:'e0',baseId,x:u.x+7,z:u.z,hp:500,maxHp:500,tier:4,progress:1};
   m.state=STATES.ACTIVE;m.time=100;for(const elf of m.units.filter(a=>a.role==='elf'))Object.assign(elf,{x:0,z:0});m.structures.push(wall,mine);c.brain=new TrollBrain();for(const entity of [wall,mine])c.discovered.set(entity.id,{...entity,seenAt:m.time});c.navigationFailure=mine.id;
   c.troll(m,u);assert.equal(c.brain.blockedBases.get(baseId).wallId,wall.id);assert.ok(c.brain.navigationBlockedTargets.has(mine.id));assert.equal(c.brain.targetId,wall.id);
+  m.structures.push({id:'unrelated',kind:'tower',owner:'e1',baseId:'other-base',x:u.x+30,z:u.z,hp:0,maxHp:300,tier:1,progress:1});c.discovered.delete(mine.id);m.time+=600;c.troll(m,u);
+  assert.equal(c.brain.blockedBases.get(baseId).wallId,wall.id,'destruição global ou memória expirada não libera o interior');
+  assert.equal(c.brain.navigationBlockedTargets.has(mine.id),false,'o bloqueio do alvo pode expirar sem liberar a dependência da base');
+  wall.hp=0;m.time+=1;c.troll(m,u);assert.equal(c.brain.blockedBases.has(baseId),false,'somente a queda da Barricada libera o interior conhecido');
+});
+test('Modo final não espera na base diante de uma fortificação suprimida',()=>{
+  const m=match(),u=m.unit('t'),c=new AIController('normal'),wall={id:'fortified-final-wall',kind:'wall',owner:'e0',baseId:'final-base',x:u.x+5,z:u.z,hp:5000,maxHp:5000,tier:8,progress:1},core={id:'final-core',kind:'core',owner:'e0',baseId:'final-base',x:u.x+8,z:u.z,hp:2000,maxHp:2000,tier:8,progress:1};
+  m.state=STATES.ACTIVE;m.time=900;m.structures.push(wall,core);for(const elf of m.units.filter(a=>a.role==='elf'))elf.alive=false;m.elfBasesClaimed.add(wall.baseId);
+  c.brain=new TrollBrain();c.brain.discoveredBases.add(wall.baseId);for(const entity of [wall,core])c.discovered.set(entity.id,{...entity,seenAt:m.time});c.brain.strategicMap.update(m,u,[wall,core]);
+  c.brain.targetFailures.set(wall.id,{failures:3,lastPower:c.brain.powerValue(u),suppressedUntil:m.time+600,tradeScores:[0,0],fortified:true,siegeLevel:u.levels.siege,equipmentCount:u.inventory.length,targetHpRatio:1,knownTowers:0,legendary:false});
+  u.cooldowns.heavy=m.time+5;c.troll(m,u);assert.equal(c.brain.mode,'finisher');assert.equal(c.brain.targetId,wall.id);assert.equal(c.brain.state,'probe');assert.notEqual(c.brain.state,'recover','o Troll não deve esperar na base pelo ataque pesado');
+  u.levels.siege+=1;assert.equal(c.brain.targetSuppressed(m,u,wall),false,'ganho de poder permite reavaliar o alvo');
+});
+test('Modo final reavalia fortificação suprimida após cooldown quando não existe alternativa',()=>{
+  const m=match(),u=m.unit('t'),c=new AIController('normal'),wall={id:'retry-final-wall',kind:'wall',owner:'e0',baseId:'retry-base',x:u.x+3,z:u.z,hp:5000,maxHp:5000,tier:8,progress:1},core={id:'retry-core',kind:'core',owner:'e0',baseId:'retry-base',x:u.x+7,z:u.z,hp:2000,maxHp:2000,tier:8,progress:1};
+  m.state=STATES.ACTIVE;m.time=900;m.structures.push(wall,core);for(const elf of m.units.filter(a=>a.role==='elf'))elf.alive=false;m.elfBasesClaimed.add(wall.baseId);
+  c.brain=new TrollBrain();c.brain.discoveredBases.add(wall.baseId);c.brain.observedIds.add(wall.id);c.brain.lastProgressValue=20;c.brain.lastProgressAt=700;for(const entity of [wall,core])c.discovered.set(entity.id,{...entity,seenAt:m.time});c.brain.strategicMap.update(m,u,[wall,core]);
+  c.brain.targetFailures.set(wall.id,{failures:3,lastPower:c.brain.powerValue(u),suppressedUntil:1500,retryAfter:850,tradeScores:[0,0],fortified:true,siegeLevel:u.levels.siege,equipmentCount:u.inventory.length,targetHpRatio:1,knownTowers:0,legendary:false});
+  c.troll(m,u);assert.equal(c.brain.mode,'finisher');assert.equal(c.brain.targetId,wall.id);assert.equal(c.brain.state,'probe');m.time+=3.1;c.troll(m,u);assert.equal(c.brain.state,'siege');assert.equal(c.brain.siege.decisive,true);assert.equal(c.brain.decisiveAssaults,1);
+});
+test('Assalto final escolhe a barricada com menor TTK e exposição prevista',()=>{
+  const m=match(),u=m.unit('t'),brain=new TrollBrain(),easy={id:'easy-wall',kind:'wall',baseId:'easy',x:u.x+5,z:u.z,hp:5000,maxHp:5000,tier:7,progress:1},hard={id:'hard-wall',kind:'wall',baseId:'hard',x:u.x-5,z:u.z,hp:9000,maxHp:9000,tier:9,progress:1},towers=Array.from({length:5},(_,i)=>({id:'hard-tower-'+i,kind:'tower',baseId:'hard',x:hard.x+(i-2),z:hard.z+3,hp:1000,maxHp:1000,tier:10,branch:'power',progress:1}));
+  m.state=STATES.ACTIVE;m.time=1000;m.structures.push(easy,hard,...towers);const known=[easy,hard,...towers];assert.ok(brain.assaultScore(m,u,easy,known).score<brain.assaultScore(m,u,hard,known).score);
 });
 test('Percepção de estruturas não depende do yaw do Troll',()=>{
   const m=match(),u=m.unit('t'),tower={id:'tower-visible',kind:'tower',x:u.x+5,z:u.z,hp:400,maxHp:400,tier:1,branch:'power',progress:1};
@@ -158,7 +194,8 @@ test('IA recua de cerco perigoso e recupera vida sem ganhar atributos',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=60;u.hp=200;u.lastHit=60;
   m.structures.push({id:'tower',kind:'tower',x:u.x+5,z:u.z,hp:400,maxHp:400,tier:3,branch:'power',progress:1});
   const speed=B.troll.speed,maxHp=u.maxHp;c.troll(m,u);assert.equal(c.retreating,true);assert.equal(c.brain.state,'disengage');assert.ok(c.destination);assert.ok(distance(c.destination,u)>5);assert.equal(u.maxHp,maxHp);assert.equal(B.troll.speed,speed);
-  Object.assign(u,c.destination);m.time=65;u.lastHit=60;c.troll(m,u);assert.equal(c.brain.state,'recover');assert.equal(c.destination.x,m.map.trollSpawn.x);assert.equal(c.destination.z,m.map.trollSpawn.z);
+  Object.assign(u,c.destination);m.time=65;u.lastHit=60;m.structures=[];c.discovered.clear();c.troll(m,u);assert.equal(c.brain.state,'recover');assert.equal(c.destination.x,m.map.trollSpawn.x);assert.equal(c.destination.z,m.map.trollSpawn.z);
+  Object.assign(u,c.destination);m.time=74;u.lastHit=60;c.troll(m,u);assert.equal(c.retreating,true);m.time=83;c.troll(m,u);assert.equal(c.retreating,false);assert.notEqual(c.brain.state,'recover','recuperação segura nunca pode prender o Troll na base');
 });
 test('IA antecipa dano da rota de fuga e usa o Santuário quando muito ferida',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=100;u.hp=u.maxHp*.35;u.lastHit=m.time;
@@ -193,7 +230,7 @@ test('Janela de recuperação começa somente quando o Troll sai do fogo das tor
   c.troll(m,u);assert.equal(c.retreating,true);assert.equal(c.brain.recoveryUntil,0);
   m.time+=12;u.lastHit=-100;m.structures=[];c.discovered.clear();Object.assign(u,c.brain.safePoint||u);c.troll(m,u);
   assert.equal(c.brain.recoveryUntil,0);assert.equal(c.destination.x,m.map.trollSpawn.x);
-  Object.assign(u,m.map.trollSpawn);c.troll(m,u);assert.ok(c.brain.recoveryUntil>=m.time+17.9);assert.equal(c.retreating,true);
+  Object.assign(u,m.map.trollSpawn);c.troll(m,u);assert.ok(c.brain.recoveryUntil>=m.time+7.9);assert.ok(c.brain.recoveryUntil<=m.time+8.1);assert.equal(c.retreating,true);
 });
 test('Recuos repetidos nunca desativam autopreservação do Troll',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=B.finalAge+50;u.lastHit=m.time;c.metrics.retreatAttempts=5;
@@ -212,6 +249,19 @@ test('Troll não força rush de espada e mantém progressão distribuída',()=>{
 test('IA persegue Elfo exposto antes de desperdiçar tempo em estrutura resistente',()=>{
   const m=match(),u=m.unit('t'),elf=m.unit('e0'),c=new AIController('hard');m.state=STATES.ACTIVE;m.time=60;elf.x=u.x+6;elf.z=u.z;m.unit('e1').x=0;m.unit('e1').z=0;
   m.structures.push({id:'core',kind:'core',x:u.x-6,z:u.z,hp:3000,maxHp:3000,tier:4,progress:1});c.troll(m,u);assert.equal(c.brain.targetId,elf.id);assert.equal(c.brain.state,'chase');
+});
+test('Troll mantém a ordem Barricada, Elfo e somente depois estruturas internas',()=>{
+  const m=match(),t=m.unit('t'),elf=m.unit('e0'),other=m.unit('e1'),c=new AIController('hard');m.state=STATES.ACTIVE;m.time=100;Object.assign(other,{x:0,z:0});
+  Object.assign(elf,{x:t.x+5,z:t.z,baseId:'breached-base'});
+  const wall={id:'priority-wall',kind:'wall',owner:elf.id,baseId:'breached-base',x:t.x+3,z:t.z,hp:1100,maxHp:1100,tier:1,progress:1},tower={id:'priority-tower',kind:'tower',owner:elf.id,baseId:'breached-base',x:t.x+4,z:t.z+2,hp:360,maxHp:360,tier:5,branch:'power',progress:1};m.structures.push(wall,tower);
+  c.troll(m,t);assert.equal(c.brain.targetId,wall.id);
+  wall.hp=0;m.time+=5;c.troll(m,t);assert.equal(c.brain.targetId,elf.id);assert.equal(c.brain.state,'chase');
+});
+test('Bot Elfo evacua a clareira e não volta imediatamente quando o Troll rompe a entrada',()=>{
+  const m=match(),u=m.unit('e0'),t=m.unit('t'),c=new AIController('normal'),base=m.map.bases[0];m.state=STATES.ACTIVE;m.time=100;Object.assign(u,{x:base.x,z:base.z,baseId:base.id,gold:1000,wood:1000});Object.assign(t,{x:base.x+2,z:base.z});m.unit('e1').alive=false;
+  m.structures.push({id:'evac-core',kind:'core',owner:u.id,baseId:base.id,x:base.x,z:base.z,hp:980,maxHp:980,tier:3,progress:1,upgrading:0});m.brokenBases.add(base.id);m.breachUntil.set(base.id,m.time+45);
+  c.elf(m,u);assert.ok(c.destination);assert.notEqual(baseAt(m.map,c.destination)?.id,base.id);assert.ok(c.metrics.evacuations>=1);
+  const destination={...c.destination};Object.assign(t,{x:0,z:0});m.time+=3;c.elf(m,u);assert.deepEqual(c.destination,destination);
 });
 test('Movimento lateral preserva orientação da mira enviada pelo jogador',()=>{
   const m=match(),u=m.unit('e0');m.input(u.id,{x:1,z:0,yaw:Math.PI});m.movement(u,.05);assert.equal(u.yaw,Math.PI);

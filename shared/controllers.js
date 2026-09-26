@@ -25,7 +25,7 @@ export class AIController {
     }
     if(u.role==='troll'){
       const state=this.brain?.state||'idle';
-      const bucket=['chase','siege','breach'].includes(state)?'attacking':['disengage','recover'].includes(state)?'retreating':['rotate','explore','hunt','probe','reposition','finisher'].includes(state)?'defending':'idle';
+      const bucket=['chase','siege','breach'].includes(state)?'attacking':['disengage','recover'].includes(state)?'retreating':['rotate','explore','hunt','probe','reposition'].includes(state)?'defending':'idle';
       this.metrics[bucket]+=dt;
     }
   }
@@ -96,6 +96,19 @@ export class AIController {
     if(!(u.cooldowns.ghostReveal>match.time)){match.act(u.id,{type:'ghostReveal'});this.stop(u);return;}
     const ally=match.units.filter(a=>a.role==='elf'&&a.alive).sort((a,b)=>distance(u,a)-distance(u,b))[0];if(ally)this.go(match,u,ally,4);else this.stop(u);
   }
+  elfEscapePoint(match,u,base){
+    if(this.elfEvade?.baseId===base.id&&this.elfEvade.destination)return this.elfEvade.destination;
+    // Refuges have a single gate. Once the Troll is inside, another corner of
+    // the same refuge is a trap, so continue through the gate toward the
+    // nearest reachable refuge trail.
+    const alternatives=match.map.bases.filter(candidate=>candidate.id!==base.id)
+      .sort((a,b)=>distance(base.ramp.to,a.outside)-distance(base.ramp.to,b.outside));
+    const destination=alternatives.map(candidate=>candidate.outside)
+      .find(point=>this.reachablePoint(match,u,point))||base.ramp.to||base.outside;
+    this.elfEvade={baseId:base.id,destination:{x:destination.x,z:destination.z},until:match.time+12};
+    this.metrics.evacuations=(this.metrics.evacuations||0)+1;
+    return this.elfEvade.destination;
+  }
   elf(match,u){
     if(this.navigationFailure){
       this.elfAvoid??=[];this.elfAvoidEntities??=new Map();const failed=this.navigationFailureTarget;if(failed)this.elfAvoid.push({x:failed.x,z:failed.z,until:match.time+20});if(failed?.entityId)this.elfAvoidEntities.set(failed.entityId,match.time+20);
@@ -105,8 +118,14 @@ export class AIController {
       const profiles=['economy','balanced','defense'],elves=match.units.filter(a=>a.role==='elf'),elfIndex=Math.max(0,elves.findIndex(a=>a.id===u.id));
       const strategyRng=randomFor(`${match.map.seed}:elf-strategies`),shift=Math.floor(strategyRng()*profiles.length),buildRng=randomFor(`${match.map.seed}:elf-build:${u.id}`);
       this.elfProfile=profiles[(shift+elfIndex)%profiles.length];
-      this.buildPlan={towerDepths:shuffled([2,3,4],buildRng),towerSides:shuffled([-1,1,-2,2],buildRng),utilityOffset:Math.floor(buildRng()*8),utilityDirection:buildRng()<.5?-1:1};
-      this.metrics.strategy=this.elfProfile;this.metrics.buildPlan={...this.buildPlan};
+      const personalities={economy:['Faelar · Mercador','Lúmen · Cultivador','Nym · Provedor'],balanced:['Aerin · Estrategista','Elyra · Guardiã','Cael · Versátil'],defense:['Thalia · Sentinela','Orin · Bastião','Maelis · Muralha']};
+      // Profiles repeat every three seats in a 1x5 lobby. Use the profile
+      // occurrence rather than the absolute seat so repeated profiles still
+      // receive distinct, readable names on the scoreboard.
+      if(u.controller==='bot')u.name=personalities[this.elfProfile][Math.floor(elfIndex/profiles.length)%personalities[this.elfProfile].length];
+      // Keep both towers on the flanks so the Core-to-gate lane stays open.
+      this.buildPlan={towerDepths:shuffled([2,3,4],buildRng),towerSides:shuffled([-2,2],buildRng),utilityOffset:Math.floor(buildRng()*8),utilityDirection:buildRng()<.5?-1:1};
+      this.metrics.strategy=this.elfProfile;this.metrics.personalityName=u.name;this.metrics.buildPlan={...this.buildPlan};
     }
     const strategy={economy:{mineRatio:1,towerBase:1,towerGrowth:.25,towerTierOffset:-1,wispTarget:4},balanced:{mineRatio:.75,towerBase:1,towerGrowth:.5,towerTierOffset:0,wispTarget:3},defense:{mineRatio:.5,towerBase:2,towerGrowth:.75,towerTierOffset:1,wispTarget:2}}[this.elfProfile];
     const avoidedEntity=e=>(this.elfAvoidEntities?.get(e.id)||0)>match.time;
@@ -129,16 +148,19 @@ export class AIController {
     base=match.map.bases.find(b=>b.id===core.baseId);
     const wall=own.find(s=>s.kind==='wall'),towers=own.filter(s=>s.kind==='tower'),mines=own.filter(s=>s.kind==='mine');
     const threat=match.visibleEnemies(u).find(e=>e.role==='troll');
+    const response={economy:{range:14,repairFloor:.45,reserve:0},balanced:{range:20,repairFloor:.6,reserve:0},defense:{range:28,repairFloor:.75,reserve:120}}[this.elfProfile];
+    const approaching=threat&&(distance(threat,base.gate)<=response.range||(wall&&match.time-wall.lastHit<5));
+    if(approaching)this.elfThreatUntil=match.time+6;
+    const defenseMode=approaching||(this.elfThreatUntil||0)>match.time;
     const stun=match.elfStunStatus(u);
-    if(threat&&stun.available){
-      match.act(u.id,{type:'elfStun'});
-      // Use the three-second opening for a short lateral reposition inside the
-      // refuge. Running to a far corner made bots abandon repairs and concede.
-      const dx=u.x-threat.x,dz=u.z-threat.z,n=Math.max(.001,Math.hypot(dx,dz)),away={x:dx/n,z:dz/n},side={x:-away.z,z:away.x};
-      const choices=[[away.x*6,away.z*6],[away.x*4+side.x*4,away.z*4+side.z*4],[away.x*4-side.x*4,away.z*4-side.z*4]]
-        .map(([x,z])=>({x:u.x+x,z:u.z+z})).filter(p=>baseAt(match.map,p)?.id===base.id&&match.positionValid(u,p.x,p.z)&&this.reachablePoint(match,u,p));
-      choices.sort((a,b)=>distance(b,threat)-distance(a,threat));if(choices[0])this.go(match,u,choices[0],.8);return;
+    const trollInside=threat&&baseAt(match.map,threat)?.id===base.id;
+    if(trollInside){
+      const destination=this.elfEscapePoint(match,u,base);this.elfEvade.until=match.time+12;
+      if(stun.available)match.act(u.id,{type:'elfStun'});
+      this.go(match,u,destination,2);return;
     }
+    if(this.elfEvade?.baseId===base.id&&match.time<this.elfEvade.until){this.go(match,u,this.elfEvade.destination,2);return;}
+    if(this.elfEvade?.baseId===base.id)this.elfEvade=null;
     const gateDistance=distance(base,base.gate),ix=(base.x-base.gate.x)/gateDistance*match.map.cell,iz=(base.z-base.gate.z)/gateDistance*match.map.cell;
     const towerPositions=[];for(const depth of this.buildPlan.towerDepths)for(const side of this.buildPlan.towerSides)towerPositions.push({x:base.gate.x+ix*depth+side*iz,z:base.gate.z+iz*depth-side*ix});
     const avoidedPoint=p=>this.elfAvoid?.some(a=>a.until>match.time&&distance(a,p)<3);
@@ -150,11 +172,16 @@ export class AIController {
     // Distance is an execution requirement, not a strategic blocker. Treat a
     // sole distance reason as a valid plan so actNear can walk to the target.
     const affordable=s=>{if(!s||avoidedEntity(s)||s.upgrading)return false;const status=upgradeStatus(u,s,match.time,match.state,match.structures);return status.allowed||status.reasons.every(reason=>reason.code==='distance');};
-    if(wall&&!avoidedEntity(wall)&&wall.hp/wall.maxHp<this.profile.repair){this.actNear(match,u,wall,{type:'repair',target:wall.id});return;}
+    // Proximity maintenance is bot-only. It no longer consumes the complete
+    // strategic decision, allowing a nearby bot to repair and then improve a
+    // tower during the same defensive cycle.
+    const maintenanceRange=10;
+    if(wall&&!avoidedEntity(wall)&&wall.hp<wall.maxHp&&distance(u,wall)<=maintenanceRange)match.repair(u,wall.id,maintenanceRange);
+    if(defenseMode&&wall&&!avoidedEntity(wall)&&wall.hp/wall.maxHp<response.repairFloor&&distance(u,wall)>B.interactRange){this.go(match,u,wall,B.interactRange);return;}
     if(u.wood<45){this.gather(match,u,base);return;}
     // The first defensive tower is the bot's opening combat insurance. Building
     // the wall first leaves no reaction window when the Troll arrives early.
-    if(!threat&&!towers.length&&u.gold>=B.structures.tower.gold&&u.wood>=B.structures.tower.wood){if(buildTower()!=='no-position')return;}
+    if((!threat||(defenseMode&&wall&&wall.hp/wall.maxHp>=response.repairFloor))&&!towers.length&&u.gold>=B.structures.tower.gold&&u.wood>=B.structures.tower.wood){if(buildTower()!=='no-position')return;}
     if(!wall){
       if((match.breachUntil.get(base.id)||0)>match.time||(threat&&distance(threat,base.gate)<B.construction.enemyClearance)){
         // Survive the breach instead of repeatedly issuing a rejected rebuild.
@@ -169,26 +196,31 @@ export class AIController {
     // Repair still wins at critical health; otherwise commit the affordable
     // upgrade before ordinary siege maintenance.
     if(wall.tier<2&&!wall.upgrading&&affordable(wall)){upgrade(wall);return;}
-    if(threat&&!avoidedEntity(wall)&&wall.hp<wall.maxHp*.95){this.actNear(match,u,wall,{type:'repair',target:wall.id});return;}
+    const urgentTower=towers.slice().sort((a,b)=>a.tier-b.tier).find(s=>s.tier<2&&affordable(s));
+    if(defenseMode&&urgentTower&&wall.hp/wall.maxHp>=response.repairFloor){upgrade(urgentTower);return;}
     const mineRules=mineEconomy(core.tier),desiredMines=Math.min(mineRules.capacity,Math.max(1,Math.ceil(mineRules.capacity*strategy.mineRatio)));
     // Every profile establishes income before multiplying defences. The profile
     // controls how far it pushes that economy, not whether it understands it.
-    if(!threat&&core.tier===1&&affordable(core)){upgrade(core);return;}
-    if(!threat&&core.tier>=2&&!mines.length&&u.gold>=mineRules.cost.gold&&u.wood>=mineRules.cost.wood){if(buildUtility('mine')!=='no-position')return;}
+    if(this.elfProfile==='defense'&&urgentTower){upgrade(urgentTower);return;}
+    if(!defenseMode&&core.tier===1&&affordable(core)&&u.gold-upgradeCost(core).gold>=response.reserve){upgrade(core);return;}
+    // A defensive reserve starts only after the first Mine exists. Holding the
+    // reserve before minimum income could strand a defender with strong towers
+    // but no way to finance the rest of the match.
+    if(!defenseMode&&core.tier>=2&&!mines.length&&u.gold>=mineRules.cost.gold&&u.wood>=mineRules.cost.wood){if(buildUtility('mine')!=='no-position')return;}
     const wisps=match.wisps.filter(w=>w.owner===u.id&&w.alive),training=wisps.some(w=>w.readyAt>match.time),hire=wispCost(wisps.length);
-    if(!threat&&!training&&towers.length&&wisps.length<Math.min(strategy.wispTarget,core.tier+1)&&u.gold>=hire.gold+35&&u.wood>=hire.wood&&availableTrees(match,u,core).length){this.actNear(match,u,core,{type:'trainWisp',target:core.id});return;}
-    if(!threat&&core.tier>=2&&mines.length<desiredMines&&u.gold>=mineRules.cost.gold&&u.wood>=mineRules.cost.wood){if(buildUtility('mine')!=='no-position')return;}
+    if(!defenseMode&&!training&&towers.length&&wisps.length<Math.min(strategy.wispTarget,core.tier+1)&&u.gold>=hire.gold+35+response.reserve&&u.wood>=hire.wood&&availableTrees(match,u,core).length){this.actNear(match,u,core,{type:'trainWisp',target:core.id});return;}
+    if(!defenseMode&&core.tier>=2&&mines.length<desiredMines&&u.gold>=mineRules.cost.gold+response.reserve&&u.wood>=mineRules.cost.wood){if(buildUtility('mine')!=='no-position')return;}
     const requiredWall=Math.max(2,requiredBarricadeTier(core.tier+1));
-    if(!threat&&wall.tier<requiredWall&&affordable(wall)){upgrade(wall);return;}
-    if(!threat&&affordable(core)){upgrade(core);return;}
-    if(affordable(wall)&&threat){upgrade(wall);return;}
+    if(!defenseMode&&wall.tier<requiredWall&&affordable(wall)){upgrade(wall);return;}
+    if(!defenseMode&&affordable(core)&&u.gold-upgradeCost(core).gold>=response.reserve){upgrade(core);return;}
+    if(affordable(wall)&&defenseMode){upgrade(wall);return;}
     const desiredTowers=Math.min(B.construction.limits.tower,Math.max(1,Math.floor(strategy.towerBase+core.tier*strategy.towerGrowth)));
-    if(!threat&&towers.length<desiredTowers&&u.gold>=B.structures.tower.gold+35&&u.wood>=B.structures.tower.wood){if(buildTower()!=='no-position')return;}
+    if(towers.length<desiredTowers&&(!defenseMode||wall.hp/wall.maxHp>=response.repairFloor)&&u.gold>=B.structures.tower.gold+35+(defenseMode?0:response.reserve)&&u.wood>=B.structures.tower.wood){if(buildTower()!=='no-position')return;}
     const towerTierCeiling=Math.max(1,core.tier+strategy.towerTierOffset),tower=towers.sort((a,b)=>a.tier-b.tier).find(s=>s.tier<towerTierCeiling&&affordable(s));if(tower){upgrade(tower);return;}
     if(!own.some(s=>s.kind==='workshop')&&core.tier>=3&&u.gold>300&&u.wood>=B.structures.workshop.wood){if(buildUtility('workshop')!=='no-position')return;}
     const worker=wisps.filter(w=>w.readyAt<=match.time&&!w.upgradingUntil&&w.level<core.tier+1).sort((a,b)=>a.level-b.level).find(w=>u.gold>=wispUpgradeCost(w.level).gold&&u.wood>=wispUpgradeCost(w.level).wood);
-    if(worker&&!threat){this.actNear(match,u,core,{type:'upgradeWisp',target:worker.id});return;}
-    const utility=own.find(s=>['mine','workshop'].includes(s.kind)&&s.tier<core.tier&&affordable(s));if(utility&&!threat){upgrade(utility);return;}
+    if(worker&&!defenseMode){this.actNear(match,u,core,{type:'upgradeWisp',target:worker.id});return;}
+    const utility=own.find(s=>['mine','workshop'].includes(s.kind)&&s.tier<core.tier&&affordable(s));if(utility&&!defenseMode){upgrade(utility);return;}
     const reserve=Math.max(120,...own.map(s=>upgradeCost(s).wood*2));
     if(u.wood>reserve&&wisps.length){this.stop(u);return;}
     this.gather(match,u,base);

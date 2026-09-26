@@ -78,6 +78,13 @@ test('Servidor HTTP serve apenas assets permitidos; salas privadas não vazam no
   finally{await app.close();}
 });
 
+test('Servidor sinaliza draining no health check antes de encerrar uma revisão',async()=>{
+  const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false});
+  const draining=app.drain({graceMs:150});
+  const response=await fetch(`http://127.0.0.1:${app.port}/health`),health=await response.json();
+  assert.equal(response.status,503);assert.equal(health.ok,false);assert.equal(health.draining,true);await draining;
+});
+
 test('Modo dev fica protegido por configuração e controla recursos e velocidade',async()=>{
   const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false,devMode:true});let host;
   try{

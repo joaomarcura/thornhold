@@ -1,0 +1,37 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Thornhold monthly cost alert guardrail. Activate the Project cost allocation tag first.
+Parameters:
+  MonthlyBudgetUsd:
+    Type: Number
+    Default: 75
+    MinValue: 10
+    MaxValue: 1000
+  AlertEmail:
+    Type: String
+  ProjectTagValue:
+    Type: String
+    Default: thornhold
+Resources:
+  ThornholdBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: !Sub thornhold-${ProjectTagValue}-monthly
+        BudgetLimit:
+          Amount: !Ref MonthlyBudgetUsd
+          Unit: USD
+        BudgetType: COST
+        CostFilters:
+          TagKeyValue:
+            - !Sub user:Project$${ProjectTagValue}
+        TimeUnit: MONTHLY
+      NotificationsWithSubscribers:
+        - Notification: {ComparisonOperator: GREATER_THAN, NotificationType: FORECASTED, Threshold: 50, ThresholdType: PERCENTAGE}
+          Subscribers: [{Address: !Ref AlertEmail, SubscriptionType: EMAIL}]
+        - Notification: {ComparisonOperator: GREATER_THAN, NotificationType: ACTUAL, Threshold: 80, ThresholdType: PERCENTAGE}
+          Subscribers: [{Address: !Ref AlertEmail, SubscriptionType: EMAIL}]
+        - Notification: {ComparisonOperator: GREATER_THAN, NotificationType: ACTUAL, Threshold: 100, ThresholdType: PERCENTAGE}
+          Subscribers: [{Address: !Ref AlertEmail, SubscriptionType: EMAIL}]
+Outputs:
+  BudgetName:
+    Value: !Ref ThornholdBudget

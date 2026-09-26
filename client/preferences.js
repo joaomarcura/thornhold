@@ -1,14 +1,14 @@
 export const DEFAULT_BINDINGS=Object.freeze({
   forward:'KeyW',backward:'KeyS',left:'KeyA',right:'KeyD',sprint:'ShiftLeft',
   interact:'KeyE',repair:'KeyR',heal:'KeyR',heavy:'KeyQ',dash:'Space',ability:'KeyF',
-  shop:'KeyB',map:'KeyM',camera:'KeyC',core:'KeyN',upgrade:'KeyQ',
+  recall:'KeyB',shop:'KeyG',map:'KeyM',camera:'KeyC',core:'KeyN',upgrade:'KeyQ',
   wisp:'KeyT',ping:'KeyV',spectate:'Tab',help:'KeyH'
 });
 
 export const BINDING_LABELS=Object.freeze({
   forward:'Mover para frente',backward:'Mover para trás',left:'Mover à esquerda',right:'Mover à direita',sprint:'Correr',
   interact:'Interagir / coletar',repair:'Reparar / girar projeto',heal:'Cura do Troll',heavy:'Golpe pesado',dash:'Esquiva',ability:'Habilidade',
-  shop:'Loja do Troll',map:'Mapa tático',camera:'Voltar à câmera',core:'Núcleo / Wisps',upgrade:'Evoluir seleção',
+  recall:'Retorno ao Santuário',shop:'Loja do Troll',map:'Mapa tático',camera:'Voltar à câmera',core:'Núcleo / Wisps',upgrade:'Evoluir seleção',
   wisp:'Formar Wisp',ping:'Comunicação',spectate:'Trocar observado',help:'Como jogar'
 });
 
@@ -21,8 +21,8 @@ function storage(){return typeof globalThis.localStorage==='undefined'?null:glob
 function load(){
   let saved={};try{saved=JSON.parse(storage()?.getItem(STORAGE_KEY)||'{}')||{};}catch{}
   const scale=SCALES.includes(Number(saved.scale))?Number(saved.scale):1;
-  const bindings={...DEFAULT_BINDINGS,...(saved.bindings||{})};if(saved.bindingVersion!==2){bindings.upgrade='KeyQ';bindings.heal='KeyR';}
-  return {scale,reducedMotion:saved.reducedMotion===true,bindingVersion:2,bindings};
+  const bindings={...DEFAULT_BINDINGS,...(saved.bindings||{})};if((saved.bindingVersion||0)<2){bindings.upgrade='KeyQ';bindings.heal='KeyR';}if((saved.bindingVersion||0)<3){bindings.recall='KeyB';bindings.shop='KeyG';}
+  return {scale,reducedMotion:saved.reducedMotion===true,bindingVersion:3,bindings};
 }
 function save(){try{storage()?.setItem(STORAGE_KEY,JSON.stringify(preferences));}catch{}applyPreferences();return getPreferences();}
 export function getPreferences(){return {scale:preferences.scale,reducedMotion:preferences.reducedMotion,bindings:{...preferences.bindings}};}
@@ -37,7 +37,7 @@ export function setBinding(action,code){
   if(other)bindings[other]=bindings[action];
   bindings[action]=code;preferences={...preferences,bindings};save();return {ok:true,swapped:other||null};
 }
-export function resetPreferences(){preferences={scale:1,reducedMotion:false,bindingVersion:2,bindings:{...DEFAULT_BINDINGS}};return save();}
+export function resetPreferences(){preferences={scale:1,reducedMotion:false,bindingVersion:3,bindings:{...DEFAULT_BINDINGS}};return save();}
 export function keyLabel(code){
   if(!code)return '—';
   const names={Space:'Espaço',Tab:'Tab',ShiftLeft:'Shift',ShiftRight:'Shift',ArrowUp:'↑',ArrowDown:'↓',ArrowLeft:'←',ArrowRight:'→',Backquote:'`',Semicolon:';',Quote:"'",Comma:',',Period:'.',Slash:'/',Backslash:'\\',BracketLeft:'[',BracketRight:']'};

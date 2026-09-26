@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdir,writeFile } from 'node:fs/promises';
 import { createGameServer } from '../server/index.js';
 import { BALANCE as B,STATES } from '../shared/config.js';
+import { DEFAULT_BINDINGS } from '../client/preferences.js';
 
 const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false,devMode:true});
 const channel=process.env.PLAYWRIGHT_CHANNEL||(process.platform==='win32'?'msedge':undefined);
@@ -18,8 +19,8 @@ try{
   const room=[...app.sessions.rooms.values()][0],m=room.match,t=m.units.find(u=>u.role==='troll');room.state=m.state=STATES.ACTIVE;m.time=60;Object.assign(t,{...m.map.trollSpawn,hp:t.maxHp*.3,lastHit:50});
   await page.mouse.click(720,450);await page.waitForFunction(()=>document.pointerLockElement?.id==='world');
   await page.mouse.click(720,450,{button:'middle'});assert.equal(await page.evaluate(()=>document.pointerLockElement?.id),'world');
-  await page.keyboard.press('KeyB');await page.locator('#shop').waitFor();assert.equal(await page.evaluate(()=>document.pointerLockElement?.id),'world');
-  const focusedBefore=await page.evaluate(()=>document.activeElement?.dataset?.do||'');await page.keyboard.press('ArrowDown');const focusedAfter=await page.evaluate(()=>document.activeElement?.dataset?.do||'');assert.notEqual(focusedAfter,focusedBefore);await page.keyboard.press('KeyB');
+  await page.keyboard.press(DEFAULT_BINDINGS.shop);await page.locator('#shop').waitFor();assert.equal(await page.evaluate(()=>document.pointerLockElement?.id),'world');
+  const focusedBefore=await page.evaluate(()=>document.activeElement?.dataset?.do||'');await page.keyboard.press('ArrowDown');const focusedAfter=await page.evaluate(()=>document.activeElement?.dataset?.do||'');assert.notEqual(focusedAfter,focusedBefore);await page.keyboard.press(DEFAULT_BINDINGS.shop);
   await page.keyboard.press('KeyH');await page.getByRole('dialog',{name:'Como jogar'}).waitFor();assert.equal(await page.evaluate(()=>document.pointerLockElement?.id),'world');await page.keyboard.press('KeyH');report.permanentAimAndKeyboardShop=true;
   await until(()=>page.locator('#objective').textContent().then(text=>text.includes('Santuário')),'Sanctuary guidance did not reach HUD');
   const effects=page.locator('#status-effects');await until(()=>effects.textContent().then(text=>text.includes('Santuário ancestral')),'Sanctuary effect did not reach HUD');const before=t.hp;await page.waitForTimeout(350);assert.ok(t.hp>before+t.maxHp*B.troll.sanctuaryRegenRate*.2,'Sanctuary did not heal through live server ticks');

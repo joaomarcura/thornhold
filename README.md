@@ -128,7 +128,11 @@ npm run audit:progression -- 6 artifacts/progression-current-20hz.json
 - `npm run simulate -- 100`: baseline determinístico exclusivamente no lobby padrão 1 Troll × 5 Elfos, dificuldade Normal. Gera `artifacts/simulations.json`, incluindo win rate, duração, dano, renda, primeira ruptura, melhorias e sobreviventes. Cenários menores existem somente em testes funcionais isolados e nunca entram na medição de balanceamento.
 - Patrulha do Troll, preferência de refúgios, perfil econômico/defensivo e layout das construções élficas variam com a seed. A mesma seed continua reproduzindo exatamente o mesmo plano para diagnóstico.
 - Bots Elfos incluem Barricada 2 na abertura e não iniciam novas Torres sob cerco visível. Descobrir uma base pela visão concede 75 de ouro ao Troll; quando a exploração se esgota, a patrulha volta a percorrer os marcos públicos sem revelar inimigos ocultos.
-- O servidor grava resultados reais em `telemetry/matches.jsonl`.
+- Localmente, o servidor grava resultados reais em `telemetry/matches.jsonl`. Em produção, `TELEMETRY_MODE=stdout` envia partidas e métricas no formato estruturado/CloudWatch EMF, sem depender do filesystem efêmero do container.
+- `npm run test:load` abre oito salas 1×5 reais por WebSocket e falha se o loop exceder continuamente o orçamento de 50 ms ou descartar mensagens.
+- O endpoint `/metrics` expõe percentis do tick, memória e tráfego; configure `METRICS_TOKEN` em ambientes públicos.
+- O processo de release para ECS está documentado em `docs/AWS-RELEASE.md`.
+- O caminho recomendado usa Azure Container Apps Consumption e está documentado em `docs/AZURE-RELEASE.md`; o pipeline Azure publica imagens imutáveis em ACR Basic, usa identidade gerenciada para pull e autentica no Azure por OIDC.
 - `npm run audit:combat`: 126 cenários controlados com o combate real, reparo, habilidades e exposição. Gera `artifacts/combat-audit.json`; a arena sintética não representa uma clareira legal.
 - `npm run audit:economy -- CAMINHO`: separa geração, estoque e investimento dos Elfos por checkpoint, perfil e resultado.
 - `npm run audit:sensitivity -- N CAMINHO`: executa seeds 1×5 Normal pareadas com variações de ±5% e ±10%, calcula fragilidade e inclui o Balance Quality Score. Use `SENS_MODE=candidates` para comparar pacotes declarados, `SENS_CANDIDATES=nome-a,nome-b` para filtrá-los ou `SENS_MODE=ablation` para desligar isoladamente Exposure, Santuário, cura, Threat Income e Lendários.

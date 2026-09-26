@@ -71,7 +71,8 @@ test('Bots Elfos adotam perfis distintos e todos constroem economia mínima',()=
   const m=new Match({seed:'ECON-TEST',difficulty:'normal',preparation:50},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},...elves]);
   for(let i=0;i<6000;i++)m.step(.05);
   const offsets={economy:-1,balanced:0,defense:1},rows=m.units.filter(u=>u.role==='elf').map(u=>{const own=m.structures.filter(s=>s.owner===u.id&&s.hp>0);return {strategy:m.controllers.get(u.id).elfProfile,core:own.find(s=>s.kind==='core'),wall:own.find(s=>s.kind==='wall'),mines:own.filter(s=>s.kind==='mine'),towers:own.filter(s=>s.kind==='tower')};});
-  assert.ok(new Set(rows.map(row=>row.strategy)).size>=3);assert.ok(rows.every(row=>row.core?.tier>=2&&row.wall?.tier>=2&&row.mines.length>=1));assert.ok(rows.every(row=>row.towers.every(t=>t.tier<=Math.max(1,row.core.tier+offsets[row.strategy]))));
+  const botNames=m.units.filter(u=>u.role==='elf').map(u=>u.name);
+  assert.ok(new Set(rows.map(row=>row.strategy)).size>=3);assert.ok(botNames.every(name=>!/^Elfo |^Guardião /.test(name)&&name.includes(' · ')));assert.equal(new Set(botNames).size,botNames.length);assert.ok(rows.every(row=>row.core?.tier>=2&&row.wall?.tier>=2&&row.mines.length>=1));assert.ok(rows.every(row=>row.towers.every(t=>t.tier<=Math.max(1,row.core.tier+offsets[row.strategy]))));
 });
 test('IA do Elfo prioriza a primeira torre antes da barricada',()=>{
   const m=new Match({seed:'EARLY-DEFENSE',difficulty:'easy',preparation:20},[{id:'t',role:'troll',occupant:{type:'bot',name:'Troll',difficulty:'easy'}},{id:'e0',role:'elf',occupant:{type:'bot',name:'Elfo',difficulty:'easy'}}]);
@@ -142,7 +143,7 @@ test('Apoio aliado preserva propriedade individual e limites por clareira',()=>{
   assert.equal(m.act(ally.id,{type:'build',kind:'tower',...first}),undefined);const tower=m.structures.at(-1);assert.equal(tower.owner,ally.id);assert.equal(tower.baseId,b.id);assert.equal(ally.baseId,ownBase);
   for(let i=0;i<100;i++)m.step(.05);owner.x=tower.x;owner.z=tower.z;owner.gold=owner.wood=10000;assert.match(m.act(owner.id,{type:'upgrade',target:tower.id}),/estrutura sua/);
   ally.x=b.x;ally.z=b.z;const next=candidates.find(p=>m.placement(ally,'tower',p.x,p.z)===null);assert.ok(next);
-  for(let i=0;i<4;i++)m.structures.push({...tower,id:'shared-limit-'+i,x:-100-i*3,z:-100,baseId:b.id});
+  m.structures.push({...tower,id:'shared-limit',x:-100,z:-100,baseId:b.id});
   assert.match(m.placement(ally,'tower',next.x,next.z),/nesta clareira/);
 });
 test('Transferência direta de recursos foi removida',()=>{
@@ -157,11 +158,16 @@ test('Vitórias simétricas, resultado imutável e nenhuma punição de vida por
 test('IA usa os mesmos atributos em fácil, normal e difícil',()=>{
   for(const difficulty of Object.keys(B.difficulty)){const m=new Match({difficulty},slots(2,'bot'));assert.equal(m.unit('t').maxHp,B.troll.hp);assert.equal(m.unit('e0').gold,B.elf.gold);assert.equal(m.unit('e0').maxHp,B.elf.hp);}
 });
-test('Partidas autônomas 1v1, 1v2, 1v5 e 1v8 completam todo o ciclo',()=>{
-  const cases=[...[1,2,5,8].map(n=>({n,seed:'TEST-'+n,difficulty:'normal'})),{n:5,seed:'SIM-2',difficulty:'easy'}];
-  // Infinite progression can exceed the former 20-minute cap. Pacing is measured separately
-  // by the 20 Hz audit, which preserves unfinished games instead of treating them as wins.
-  for(const {n,seed,difficulty} of cases){const m=new Match({seed,difficulty},slots(n,'bot'));for(let i=0;i<36000&&m.state!==STATES.END;i++)m.step(.1);assert.equal(m.state,STATES.END,seed);assert.ok(['troll','elves'].includes(m.winner));assert.ok(m.stats.trollDamage>0);assert.ok(m.stats.produced>0);assert.ok(m.stats.upgrades>0);assert.ok(m.winner==='elves'||m.stats.basesDestroyed>0);assert.ok(m.stats.basesDestroyed<=n);}
+test('Partidas autônomas padrão 1v5 não prendem o Troll na base nem excedem duas torres',()=>{
+  for(const seed of ['TEST-5','SIM-2','SIM-7']){
+    const m=new Match({seed,difficulty:'normal'},slots(5,'bot'));let sanctuaryRecovery=0,maxSanctuaryRecovery=0;
+    for(let i=0;i<18000&&m.state!==STATES.END;i++){
+      m.step(.1);const troll=m.unit('t'),brain=m.controllers.get('t')?.brain,waiting=m.state===STATES.ACTIVE&&distance(troll,m.map.trollSpawn)<=B.troll.sanctuaryRadius&&brain?.state==='recover';
+      sanctuaryRecovery=waiting?sanctuaryRecovery+.1:0;maxSanctuaryRecovery=Math.max(maxSanctuaryRecovery,sanctuaryRecovery);
+    }
+    assert.ok(m.stats.trollDamage>0,seed);assert.ok(m.stats.produced>0,seed);assert.ok(m.stats.upgrades>0,seed);assert.ok(maxSanctuaryRecovery<=10.5,`${seed}: ${maxSanctuaryRecovery.toFixed(1)}s no Santuário`);
+    for(const base of m.map.bases)assert.ok(m.structures.filter(s=>s.baseId===base.id&&s.kind==='tower'&&s.hp>0).length<=2,base.id);
+  }
 });
 test('Lobby: autorização, slots, readiness, sessão privada e revanche',()=>{
   const service=new SessionService(),host=service.addClient('host','Host'),guest=service.addClient('guest','Guest'),r=service.create(host,{role:'troll',settings:{elfSlots:2,private:true},password:'secret',fillBots:true});

@@ -95,11 +95,11 @@ function wispModel(){
 
 export class WorldRenderer {
   constructor(canvas){
-    this.canvas=canvas;this.renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=T.PCFSoftShadowMap;this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.22;
+    this.canvas=canvas;this.renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.35));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=T.PCFSoftShadowMap;this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.22;
     this.scene=new T.Scene();this.scene.background=new T.Color(0x233e41);this.scene.fog=new T.FogExp2(0x233e41,.012);
     this.camera=new T.PerspectiveCamera(52,innerWidth/innerHeight,.1,400);this.scene.add(new T.HemisphereLight(0xdce8c9,0x253c41,2.6));
-    this.sun=new T.DirectionalLight(0xffe3ad,3.4);this.sun.position.set(25,60,-15);this.sun.castShadow=true;this.sun.shadow.mapSize.set(2048,2048);Object.assign(this.sun.shadow.camera,{left:-30,right:30,top:30,bottom:-30,near:1,far:150});this.sun.shadow.bias=-.0005;this.scene.add(this.sun,this.sun.target);
-    this.terrain=group(this.scene);this.dynamic=group(this.scene);this.effects=group(this.scene);this.entities=new Map();this.treeMeshes=new Map();this.towerDebugRings=new Map();this.particles=[];this.projectiles=[];this.ray=new T.Raycaster();this.pointer=new T.Vector2();this.plane=new T.Plane(new T.Vector3(0,1,0),0);this.yaw=0;this.pitch=.55;this.zoom=13;this.target=new T.Vector3();this.isMenu=true;this.eventId=0;this.lastTime=0;this.elapsed=0;this.buildMode=false;this.buildCameraBlend=0;
+    this.sun=new T.DirectionalLight(0xffe3ad,3.4);this.sun.position.set(25,60,-15);this.sun.castShadow=true;this.sun.shadow.mapSize.set(1024,1024);Object.assign(this.sun.shadow.camera,{left:-30,right:30,top:30,bottom:-30,near:1,far:150});this.sun.shadow.bias=-.0005;this.scene.add(this.sun,this.sun.target);
+    this.terrain=group(this.scene);this.dynamic=group(this.scene);this.effects=group(this.scene);this.entities=new Map();this.treeMeshes=new Map();this.visibleTreeIds=new Set();this.towerDebugRings=new Map();this.particles=[];this.projectiles=[];this.ray=new T.Raycaster();this.pointer=new T.Vector2();this.plane=new T.Plane(new T.Vector3(0,1,0),0);this.yaw=0;this.pitch=.55;this.zoom=13;this.target=new T.Vector3();this.projectVector=new T.Vector3();this.worldVector=new T.Vector3();this.motionQuery=matchMedia('(prefers-reduced-motion: reduce)');this.isMenu=true;this.eventId=0;this.lastTime=0;this.elapsed=0;this.buildMode=false;this.buildCameraBlend=0;
     this.selection=new T.Mesh(new T.RingGeometry(1.2,1.28,40),new T.MeshBasicMaterial({color:palette.gold,side:T.DoubleSide,transparent:true,opacity:.8}));this.selection.rotation.x=-Math.PI/2;this.selection.position.y=.08;this.selection.visible=false;this.contextTarget=null;this.scene.add(this.selection);
     this.range=new T.Mesh(new T.RingGeometry(16.92,17,80),new T.MeshBasicMaterial({color:palette.teal,side:T.DoubleSide,transparent:true,opacity:.25}));this.range.rotation.x=-Math.PI/2;this.range.visible=false;this.scene.add(this.range);this.buildRange=new T.Mesh(new T.RingGeometry(6.42,6.5,80),new T.MeshBasicMaterial({color:palette.teal,side:T.DoubleSide,transparent:true,opacity:.22}));this.buildRange.rotation.x=-Math.PI/2;this.buildRange.visible=false;this.scene.add(this.buildRange);
     this.resize();addEventListener('resize',()=>this.resize());this.menuScene();
@@ -143,11 +143,11 @@ export class WorldRenderer {
     for(const[id,g]of this.entities)if(!ids.has(id)){this.dynamic.remove(g);this.entities.delete(id);}
     for(const e of all){let g=this.entities.get(e.id);const signature=e.kind?e.kind+Math.min(B.visualTier,e.tier)+e.branch+!!e.legendary+!!e.epic:e.role+JSON.stringify(e.equipment||{})+(e.ghost?'-ghost':'');
       if(!g||g.userData.signature!==signature){if(g)this.dynamic.remove(g);g=e.kind?building(e.kind,e.tier,e.branch,e.owner?playerColor(e.owner):null,e.legendary,e.epic):e.role==='wisp'?wispModel():character(e.role,e.equipment,playerColor(e.id));g.userData.signature=signature;g.position.set(e.x,heightAt(this.map,e.x,e.z),e.z);if(e.kind){const scars=group(g);for(const sign of [-1,1]){part(scars,'sphere',0x333b35,sign*.65,.14,.85,.55,.23,.48);part(scars,'box',0x313e38,sign*.4,1,.55,.09,1.3,.12).rotation.z=sign*.35;}scars.visible=false;g.userData.scars=scars;}this.dynamic.add(g);this.entities.set(e.id,g);}
-      g.userData.entity=e;g.userData.target=new T.Vector3(e.x,heightAt(this.map,e.x,e.z),e.z);if(e.kind==='wall'){const b=this.map.bases.find(b=>b.id===e.baseId);g.rotation.y=b.gate.axis==='x'?Math.PI/2:0;}else if(e.kind)g.rotation.y=e.rotation||0;
+      g.userData.entity=e;(g.userData.target??=new T.Vector3()).set(e.x,heightAt(this.map,e.x,e.z),e.z);if(e.kind==='wall'){const b=this.map.bases.find(b=>b.id===e.baseId);g.rotation.y=b.gate.axis==='x'?Math.PI/2:0;}else if(e.kind)g.rotation.y=e.rotation||0;
       if(e.ghost&&!g.userData.ghostStyled){g.traverse(o=>{if(o.isMesh){o.material=o.material.clone();o.material.transparent=true;o.material.opacity=.52;o.material.depthWrite=false;}});g.userData.ghostStyled=true;}
       g.visible=e.alive!==false||e.ghost;if(e.kind){g.scale.y=(e.kind==='wall'?1+(Math.min(B.visualTier,e.tier)-1)*.12:1)*(.15+.85*e.progress);g.userData.scars.visible=e.progress>=1&&e.hp/e.maxHp<.55;g.rotation.z=e.progress>=1&&e.hp/e.maxHp<.25?.055:0;}
     }
-    const occupied=new Set((snapshot.wisps||[]).map(w=>w.treeId));
+    const occupied=new Set((snapshot.wisps||[]).map(w=>w.treeId));this.visibleTreeIds=new Set(snapshot.trees.map(t=>t.id));
     for(const t of snapshot.trees){const g=this.treeMeshes.get(t.id);if(!g)continue;g.visible=t.amount>0;g.userData.entity={...t,kind:'tree'};
       for(const leaf of g.children.slice(1)){if(!leaf.userData.ownMaterial){leaf.material=leaf.material.clone();leaf.material.transparent=true;leaf.material.depthWrite=false;leaf.userData.ownMaterial=true;}leaf.material.opacity=occupied.has(t.id)?.38:1;}
     }
@@ -178,8 +178,8 @@ export class WorldRenderer {
   }
   groundPoint(clientX,clientY){this.pointer.set(clientX/innerWidth*2-1,-clientY/innerHeight*2+1);this.ray.setFromCamera(this.pointer,this.camera);return this.ground?this.ray.intersectObject(this.ground,false)[0]?.point||null:null;}
   constructionPoint(origin){const p=boundedConstructionPoint(origin,this.groundPoint(innerWidth/2,innerHeight/2),this.yaw);return{x:p.x,y:heightAt(this.map,p.x,p.z),z:p.z};}
-  pick(clientX,clientY,ignoreId){this.pointer.set(clientX/innerWidth*2-1,-clientY/innerHeight*2+1);this.ray.setFromCamera(this.pointer,this.camera);const visibleTrees=[...this.treeMeshes.values()].filter(g=>g.visible&&this.snapshot?.trees.some(t=>t.id===g.userData.entity?.id));const hits=this.ray.intersectObjects([...this.entities.values()].filter(g=>g.visible&&g.userData.entity.id!==ignoreId).concat(visibleTrees),true);for(const hit of hits){let o=hit.object;while(o){if(o.userData.entity)return o.userData.entity;o=o.parent;}}return null;}
-  entityPoint(e){const g=this.entities.get(e.id);if(e.role==='wisp'&&g?.userData.spirit){const v=g.userData.spirit.getWorldPosition(new T.Vector3());return this.project(v.x,v.y+.55,v.z);}return this.project(e.x,heightAt(this.map,e.x,e.z)+(e.kind==='tower'?6:e.kind?3.6:e.role==='troll'?4.4:2.6),e.z);}
+  pick(clientX,clientY,ignoreId){this.pointer.set(clientX/innerWidth*2-1,-clientY/innerHeight*2+1);this.ray.setFromCamera(this.pointer,this.camera);const visibleTrees=[...this.treeMeshes.values()].filter(g=>g.visible&&this.visibleTreeIds.has(g.userData.entity?.id));const hits=this.ray.intersectObjects([...this.entities.values()].filter(g=>g.visible&&g.userData.entity.id!==ignoreId).concat(visibleTrees),true);for(const hit of hits){let o=hit.object;while(o){if(o.userData.entity)return o.userData.entity;o=o.parent;}}return null;}
+  entityPoint(e){const g=this.entities.get(e.id);if(e.role==='wisp'&&g?.userData.spirit){const v=g.userData.spirit.getWorldPosition(this.worldVector);return this.project(v.x,v.y+.55,v.z);}return this.project(e.x,heightAt(this.map,e.x,e.z)+(e.kind==='tower'?6:e.kind?3.6:e.role==='troll'?4.4:2.6),e.z);}
   ghostAt(kind,p,valid,rotation=0){
     if(!p){if(this.ghost)this.ghost.visible=false;return;}
     if(!this.ghost||this.ghost.userData.kind!==kind){if(this.ghost){this.ghost.traverse(o=>{if(o.isMesh)o.material.dispose();});this.scene.remove(this.ghost);}this.ghost=building(kind);this.ghost.userData.kind=kind;this.ghost.traverse(o=>{if(o.isMesh){o.material=new T.MeshBasicMaterial({color:0x87e4c1,transparent:true,opacity:.35,depthWrite:false});o.castShadow=false;}});this.scene.add(this.ghost);}
@@ -194,20 +194,20 @@ export class WorldRenderer {
     for(const[id,ring]of this.towerDebugRings)if(!keep.has(id)){this.scene.remove(ring);this.towerDebugRings.delete(id);}
     for(const tower of towers){let ring=this.towerDebugRings.get(tower.id);if(!ring){ring=new T.Mesh(new T.RingGeometry(16.92,17,64),new T.MeshBasicMaterial({color:0x75e0b0,side:T.DoubleSide,transparent:true,opacity:.2,depthWrite:false}));ring.rotation.x=-Math.PI/2;this.towerDebugRings.set(tower.id,ring);this.scene.add(ring);}const radius=B.structures.tower.range+towerProfile(tower).range;groundRing(ring,this.map,tower.x,tower.z,radius);const status=snapshot.debugTowers?.find(s=>s.id===tower.id);ring.material.color.setHex(status?.valid?0x79e2a8:0xe98775);ring.material.opacity=status?.valid?.34:.2;}
   }
-  reducedMotion(){return matchMedia('(prefers-reduced-motion: reduce)').matches||document.body.classList.contains('reduce-motion');}
+  reducedMotion(){return this.motionQuery.matches||document.body.classList.contains('reduce-motion');}
   render(time,viewerId,selected){
     this.viewerId=viewerId;
-    const dt=Math.min(.05,(time-this.lastTime)/1000||.016);this.lastTime=time;this.elapsed+=dt;
-    if(this.isMenu){const f=this.menuFocus,t=this.reducedMotion()?0:this.elapsed*.04;this.camera.position.set(f.x-23+Math.sin(t)*2,f.y+24,f.z-29+Math.cos(t)*2);this.camera.lookAt(f);this.menuTroll.userData.body.position.y=this.reducedMotion()?0:Math.sin(this.elapsed*1.6)*.06;}
+    const dt=Math.min(.05,(time-this.lastTime)/1000||.016),reduced=this.reducedMotion();this.lastTime=time;this.elapsed+=dt;
+    if(this.isMenu){const f=this.menuFocus,t=reduced?0:this.elapsed*.04;this.camera.position.set(f.x-23+Math.sin(t)*2,f.y+24,f.z-29+Math.cos(t)*2);this.camera.lookAt(f);this.menuTroll.userData.body.position.y=reduced?0:Math.sin(this.elapsed*1.6)*.06;}
     else if(this.snapshot){
       for(const g of this.entities.values()){
         const e=g.userData.entity;g.position.lerp(g.userData.target,1-Math.exp(-dt*16));g.position.y=heightAt(this.map,g.position.x,g.position.z);
         if(e.role==='wisp'){
-          const reduced=this.reducedMotion(),phase=(reduced?0:this.elapsed*.95)+e.x*.3,active=e.income>0,forming=e.readyAt>this.snapshot.time;
-          const orbit=(a)=>new T.Vector3(Math.cos(a)*1.7,2.05+(reduced?0:Math.sin(a*2)*.22),Math.sin(a)*1.7);
-          g.userData.spirit.position.copy(orbit(phase));g.userData.orb.rotation.y=this.elapsed;
+          const phase=(reduced?0:this.elapsed*.95)+e.x*.3,active=e.income>0,forming=e.readyAt>this.snapshot.time;
+          const orbit=(target,a)=>target.set(Math.cos(a)*1.7,2.05+(reduced?0:Math.sin(a*2)*.22),Math.sin(a)*1.7);
+          orbit(g.userData.spirit.position,phase);g.userData.orb.rotation.y=this.elapsed;
           g.userData.spirit.scale.setScalar(forming?.65:1);g.userData.glow.material.opacity=active?.8:.35;g.userData.ring.material.opacity=e.id===selected?.85:.25;
-          g.userData.tail.forEach((p,i)=>{p.position.copy(orbit(phase-(i+1)*.14));p.visible=active&&!reduced;});continue;
+          g.userData.tail.forEach((p,i)=>{orbit(p.position,phase-(i+1)*.14);p.visible=active&&!reduced;});continue;
         }
         if(e.kind){if(g.userData.hitUntil>this.elapsed)g.rotation.z=Math.sin(this.elapsed*85)*.035;continue;}
         let delta=(e.yaw-g.rotation.y+Math.PI*3)%(Math.PI*2)-Math.PI;g.rotation.y+=delta*Math.min(1,dt*16);
@@ -216,7 +216,7 @@ export class WorldRenderer {
         const pace=sprinting?14:9;g.userData.legs.forEach((l,i)=>l.rotation.x=moving?Math.sin(this.elapsed*pace+i*Math.PI)*(sprinting?.72:.5):0);
         g.userData.arms.forEach((a,i)=>a.rotation.x=strike?(i===1?arc:.25):healing?-1.25+Math.sin(this.elapsed*8+i)*.12:work?(i===1?-1.4+Math.sin(this.elapsed*16)*.9:.2):moving?Math.sin(this.elapsed*pace+i*Math.PI+Math.PI)*(sprinting?.58:.4):0);
         g.userData.body.rotation.z=strike?-arc*.08:0;g.userData.body.rotation.x=sprinting?-.18:0;g.userData.body.position.y=Math.sin(this.elapsed*(moving?(sprinting?24:18):2))*(moving?(sprinting?.09:.06):.025);
-        if(sprinting&&!this.reducedMotion()&&this.elapsed>(g.userData.nextRunDust||0)){g.userData.nextRunDust=this.elapsed+.14;const dust=new T.Mesh(geo.sphere,material(0xb4aa83));dust.scale.set(.12,.05,.12);dust.position.copy(g.position);dust.position.y+=.08;this.effects.add(dust);this.particles.push({mesh:dust,velocity:new T.Vector3((Math.random()-.5)*.5,.15,(Math.random()-.5)*.5),age:.58});}
+        if(sprinting&&!reduced&&this.elapsed>(g.userData.nextRunDust||0)){g.userData.nextRunDust=this.elapsed+.14;const dust=new T.Mesh(geo.sphere,material(0xb4aa83));dust.scale.set(.12,.05,.12);dust.position.copy(g.position);dust.position.y+=.08;this.effects.add(dust);this.particles.push({mesh:dust,velocity:new T.Vector3((Math.random()-.5)*.5,.15,(Math.random()-.5)*.5),age:.58});}
       }
       let me=this.entities.get(viewerId);if(!me||(!me.userData.entity.alive&&!me.userData.entity.ghost))me=this.entities.get(this.followId)||[...this.entities.values()].find(g=>!g.userData.entity.kind&&g.userData.entity.alive);
       if(this.focusPoint)this.target.lerp(new T.Vector3(this.focusPoint.x,heightAt(this.map,this.focusPoint.x,this.focusPoint.z)+1.25,this.focusPoint.z),Math.min(1,dt*9));
@@ -249,7 +249,7 @@ export class WorldRenderer {
         aim.lerp(buildAim,this.buildCameraBlend);
       }
       this.camera.lookAt(aim);
-      if(!this.reducedMotion()&&this.shakeUntil>this.elapsed&&!this.focusPoint)this.camera.position.x+=Math.sin(this.elapsed*110)*this.shakeStrength;
+      if(!reduced&&this.shakeUntil>this.elapsed&&!this.focusPoint)this.camera.position.x+=Math.sin(this.elapsed*110)*this.shakeStrength;
       const highlighted=this.contextTarget||selected,s=this.entities.get(highlighted)||this.treeMeshes.get(highlighted);if(!this.ghost?.visible){this.selection.visible=!!s;if(s)this.selection.position.set(s.position.x,s.position.y+.08,s.position.z);}const selectedMesh=this.entities.get(selected)||this.treeMeshes.get(selected);this.range.visible=!!selectedMesh&&selectedMesh.userData.entity?.kind==='tower';if(this.range.visible){const radius=B.structures.tower.range+towerProfile(selectedMesh.userData.entity).range,key=selectedMesh.userData.entity.id+':'+radius;if(this.rangeKey!==key){groundRing(this.range,this.map,selectedMesh.position.x,selectedMesh.position.z,radius);this.rangeKey=key;}}
     }
     this.sun.position.set(this.target.x+25,55,this.target.z-20);this.sun.target.position.copy(this.target);
@@ -257,5 +257,5 @@ export class WorldRenderer {
     for(const p of this.projectiles){p.age+=dt;p.mesh.position.lerpVectors(p.start,p.end,Math.min(1,p.age/.27));}this.projectiles=this.projectiles.filter(p=>{if(p.age>.27){this.effects.remove(p.mesh);return false;}return true;});
     this.renderer.render(this.scene,this.camera);
   }
-  project(x,y,z){const v=new T.Vector3(x,y,z).project(this.camera);return {x:(v.x*.5+.5)*innerWidth,y:(-.5*v.y+.5)*innerHeight,visible:v.z<1&&v.z>0};}
+  project(x,y,z){const v=this.projectVector.set(x,y,z).project(this.camera);return {x:(v.x*.5+.5)*innerWidth,y:(-.5*v.y+.5)*innerHeight,visible:v.z<1&&v.z>0};}
 }
