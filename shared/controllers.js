@@ -3,8 +3,23 @@ import { pathfind, toCell, index, lineOfSight, walkable, baseAt, randomFor } fro
 import { TrollBrain } from './troll-brain.js';
 import { availableTrees } from './wisps.js';
 import { requiredBarricadeTier, upgradeStatus } from './upgrade-rules.js';
+import { ELF_TECH_CARDS, pendingTechnology, specialization, technologyCost } from './elf-progression.js';
 
 const shuffled=(values,rng)=>{const result=[...values];for(let i=result.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[result[i],result[j]]=[result[j],result[i]];}return result;};
+
+// Keep seed variation without sending an entire Elf team through the same
+// opening corridor. Farthest-point ordering distributes the first refuges
+// around the map; the seeded first pick keeps consecutive matches different.
+export function distributedRefuges(map,seed=map.seed){
+  const remaining=[...map.bases],chosen=[],rng=randomFor(`${seed}:distributed-refuges-v2`);
+  if(!remaining.length)return chosen;
+  chosen.push(remaining.splice(Math.floor(rng()*remaining.length),1)[0]);
+  while(remaining.length){
+    const scored=remaining.map((base,i)=>({base,i,score:Math.min(...chosen.map(other=>distance(base,other)))+rng()*.001})).sort((a,b)=>b.score-a.score);
+    chosen.push(remaining.splice(scored[0].i,1)[0]);
+  }
+  return chosen;
+}
 
 // Controllers only choose intentions. Every cost, hit, cooldown and collision goes through Match.
 export class AIController {
@@ -114,7 +129,7 @@ export class AIController {
     if(!core){
       const elves=match.units.filter(a=>a.role==='elf'),offset=elves.findIndex(a=>a.id===u.id);
       const claimed=new Set(match.structures.filter(s=>s.kind==='core'&&s.hp>0).map(s=>s.baseId));
-      if(!this.refuges){const rng=randomFor(match.map.seed+'refuges');this.refuges=shuffled(match.map.bases,rng);this.metrics.refugeOrder=this.refuges.map(refuge=>refuge.id);}
+      if(!this.refuges){this.refuges=distributedRefuges(match.map);this.metrics.refugeOrder=this.refuges.map(refuge=>refuge.id);}
       base=Array.from({length:this.refuges.length},(_,i)=>this.refuges[(offset+i)%this.refuges.length]).find(b=>!claimed.has(b.id));if(!base)return;
       const p={x:base.x,z:base.z};
       const approaches=[[4.4,0],[-4.4,0],[0,4.4],[0,-4.4]].map(([x,z])=>({x:p.x+x,z:p.z+z})).filter(a=>baseAt(match.map,a)?.id===base.id&&match.positionValid(u,a.x,a.z)&&this.reachablePoint(match,u,a)).sort((a,b)=>distance(u,a)-distance(u,b));
@@ -125,6 +140,12 @@ export class AIController {
       match.act(u.id,{type:'build',kind:'core',...p});this.stop(u);return;
     }
     base=match.map.bases.find(b=>b.id===core.baseId);
+    if(!u.elfSpecialization&&core.tier>=B.elfProgression.unlockTier){
+      const preferred={economy:'industrial',defense:'fortress',balanced:'arcane'}[this.elfProfile],resourceFit={ancientWood:'industrial',crystal:'fortress',mana:'arcane'}[base.localResource],counts=Object.fromEntries(Object.keys(B.elfProgression.specializations).map(key=>[key,match.units.filter(a=>a.role==='elf'&&a.elfSpecialization===key).length]));
+      const rng=randomFor(`${match.map.seed}:specialization:${u.id}`),choice=Object.keys(B.elfProgression.specializations).map(key=>({key,score:(key===preferred?3:0)+(key===resourceFit?2:0)-counts[key]*.8+rng()})).sort((a,b)=>b.score-a.score)[0].key;
+      if(distance(u,core)<=B.interactRange){match.act(u.id,{type:'chooseElfSpecialization',key:choice});const label=B.elfProgression.specializations[choice].name,personality={economy:'Economista',balanced:'Adaptável',defense:'Guardião'}[this.elfProfile];u.name=`${label} — ${personality}`;this.stop(u);return;}
+      this.go(match,u,core,B.interactRange*.7);return;
+    }
     const wall=own.find(s=>s.kind==='wall'),towers=own.filter(s=>s.kind==='tower'),mines=own.filter(s=>s.kind==='mine');
     const threat=match.visibleEnemies(u).find(e=>e.role==='troll');
     const stun=match.elfStunStatus(u);
@@ -179,6 +200,17 @@ export class AIController {
     if(towers.length<desiredTowers&&u.gold>=B.structures.tower.gold+35&&u.wood>=B.structures.tower.wood){if(buildTower()!=='no-position')return;}
     const towerTierCeiling=Math.max(1,core.tier+strategy.towerTierOffset),tower=towers.sort((a,b)=>a.tier-b.tier).find(s=>s.tier<towerTierCeiling&&affordable(s));if(tower){upgrade(tower);return;}
     if(!own.some(s=>s.kind==='workshop')&&core.tier>=3&&u.gold>300&&u.wood>=B.structures.workshop.wood){if(buildUtility('workshop')!=='no-position')return;}
+    const signature=u.elfSpecialization&&B.elfProgression.specializations[u.elfSpecialization].structure;
+    if(signature&&!own.some(s=>s.kind===signature)&&core.tier>=B.elfProgression.unlockTier&&u.gold>=B.structures[signature].gold&&u.wood>=B.structures[signature].wood){if(buildUtility(signature)!=='no-position')return;}
+    const techMilestone=pendingTechnology(match,u),techResource=specialization(u.elfSpecialization)?.resource,specialWisps=wisps.filter(w=>w.specialNodeId);
+    if(!threat&&techMilestone){
+      const preference={economy:0,defense:1,balanced:2}[this.elfProfile],card=ELF_TECH_CARDS[techMilestone][preference],cost=technologyCost(techMilestone).resource;
+      if((u.specialResources[techResource]||0)>=cost){this.actNear(match,u,core,{type:'chooseElfTechnology',key:card.id});return;}
+      const node=match.specialNodes.filter(n=>n.resource===techResource&&n.amount>0&&!match.wisps.some(w=>w.alive&&w.specialNodeId===n.id)&&match.teamSee(u,n)).sort((a,b)=>Number(!a.local)-Number(!b.local)||distance(a,core)-distance(b,core))[0];
+      if(!specialWisps.length&&node&&u.gold>=B.elfProgression.specialWisp.gold&&u.wood>=B.elfProgression.specialWisp.wood){this.actNear(match,u,core,{type:'trainSpecialWisp',target:node.id});return;}
+    }
+    const ability=match.units.find(a=>a.id===u.id)?.elfSpecialization&&match.structures.find(s=>s.owner===u.id&&s.kind===signature&&s.hp>0&&s.progress>=1);
+    if(threat&&ability&&!(u.cooldowns.elfSpecialization>match.time)){match.act(u.id,{type:'elfSpecializationAbility'});return;}
     const worker=wisps.filter(w=>w.readyAt<=match.time&&!w.upgradingUntil&&w.level<core.tier+1).sort((a,b)=>a.level-b.level).find(w=>u.gold>=wispUpgradeCost(w.level).gold&&u.wood>=wispUpgradeCost(w.level).wood);
     if(worker&&!threat){this.actNear(match,u,core,{type:'upgradeWisp',target:worker.id});return;}
     const utility=own.find(s=>['mine','workshop'].includes(s.kind)&&s.tier<core.tier&&affordable(s));if(utility&&!threat){upgrade(utility);return;}

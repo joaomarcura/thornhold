@@ -79,6 +79,16 @@ try{
   const trees=m.trees.filter(t=>t.amount>0).slice(0,2);m.wisps.push(...trees.map((tree,i)=>({id:'ui-wisp-'+i,role:'wisp',name:'Wisp',owner:u.id,treeId:tree.id,rich:false,x:tree.x,z:tree.z,level:1,hp:B.wisps.hp,maxHp:B.wisps.hp,alive:true,readyAt:m.time-1,upgradingUntil:0,lastHit:-100,bounty:10})));
   await page.keyboard.press('KeyN');await page.locator('[data-do=upgrade-all-wisps]').waitFor();await page.keyboard.press('Shift+KeyQ');await until(()=>m.wisps.filter(w=>w.id.startsWith('ui-wisp-')).every(w=>w.upgradingUntil>m.time),'Shift+Q did not upgrade every eligible Wisp');report.upgradeAllWisps=true;
   core.tier=10;core.legendary=true;await until(()=>page.locator('.selection-heading h3').textContent().then(t=>t.includes('Núcleo Lendário')),'Legendary core heading missing');await page.screenshot({path:'artifacts/review-legendary-core.png'});report.legendaryIdentity=true;
+  core.tier=5;core.legendary=false;u.elfSpecialization=null;await page.keyboard.press('KeyN');
+  await page.locator('[data-do=choose-specialization]').first().waitFor();assert.equal(await page.locator('[data-do=choose-specialization]').count(),3);
+  await page.keyboard.press('Digit1');await until(()=>u.elfSpecialization==='industrial','Keyboard specialization choice did not reach server');
+  await until(()=>page.locator('[data-kind=refinery]').count().then(n=>n===1),'Industrial signature building missing from hotbar');assert.equal(await page.locator('[data-kind=bastion]').count(),0);
+  assert.equal(await page.locator('.special-resource').count(),3);await page.screenshot({path:'artifacts/review-elf-specialization.png'});report.elfSpecialization=true;
+  core.tier=8;u.specialResources.ancientWood=30;await until(()=>page.locator('[data-do=choose-technology]').count().then(n=>n===3),'Technology milestone did not render three cards');
+  await page.screenshot({path:'artifacts/review-elf-technology.png'});await page.keyboard.press('Digit1');await until(()=>u.elfTechCards.includes('efficient-production'),'Keyboard technology choice did not reach server');report.elfTechnology=true;
+  const localNode=m.specialNodes.find(node=>node.baseId===base.id);assert.ok(localNode,'Clearing has no local special resource');Object.assign(u,{x:localNode.x,z:localNode.z});
+  await until(()=>page.locator(`.resource-node-label[data-id="${localNode.id}"]`).count().then(n=>n===1),'Local special resource has no world label');
+  await page.screenshot({path:'artifacts/review-clearing-resource.png'});report.clearingResource=true;
   // Central icon shapes must match HUD and menu at both desktop and narrow widths.
   for(const kind of ['gold','wood']){
     const shapes=await page.locator('.resource-'+kind+' path').evaluateAll(nodes=>[...new Set(nodes.map(n=>n.getAttribute('d')))]);

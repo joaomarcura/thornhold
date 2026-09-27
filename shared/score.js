@@ -12,5 +12,5 @@ export function playerSummary(u){
     kills:u.stats.kills||0,damage:Math.round(u.stats.damage||0),
     goldGenerated:Math.round(u.stats.goldGenerated||0),woodGenerated:Math.round(u.stats.woodGenerated||0),
     structuresBuilt:u.stats.structuresBuilt||0,structuresDestroyed:u.stats.structuresDestroyed||0,
-    upgrades:u.stats.upgrades||0,healing:Math.round(u.stats.healing||0),stuns:u.stats.stuns||0,relocations:u.stats.relocations||0,reveals:u.stats.reveals||0,ghostsDestroyed:u.stats.ghostsDestroyed||0};
+    upgrades:u.stats.upgrades||0,technologyCards:u.stats.technologyCards||0,healing:Math.round(u.stats.healing||0),stuns:u.stats.stuns||0,relocations:u.stats.relocations||0,reveals:u.stats.reveals||0,ghostsDestroyed:u.stats.ghostsDestroyed||0};
 }

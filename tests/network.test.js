@@ -79,6 +79,18 @@ test('Modo dev fica protegido por configuração e controla recursos e velocidad
   }finally{if(host)await closeClient(host);await app.close();}
 });
 
+test('Observador controla a velocidade dev da sala até 16× sem controlar personagem',async()=>{
+  const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false,devMode:true});let observer;
+  try{
+    observer=await client(app.port,'Observador dev');observer.send('create',{role:'elf',fillBots:true,settings:{elfSlots:5,private:true,difficulty:'hard'}});const {room}=await observer.wait('lobby');
+    observer.send('observe');await observer.wait('lobby',m=>!m.room.slots.some(s=>s.occupant?.clientId===observer.hello.id));
+    observer.send('ready',{ready:true});await observer.wait('lobby',m=>m.room.errors.length===0);observer.send('start');await observer.wait('map');
+    const live=app.sessions.rooms.get(room.id);assert.equal(live.settings.difficulty,'hard');assert.equal(live.slots.some(s=>s.occupant?.clientId===observer.hello.id),false);
+    for(const speed of [2,4,6,8,16,1]){observer.send('dev',{command:'speed',speed});await observer.wait('dev',m=>m.speed===speed);assert.equal(live.devSpeed,speed);assert.equal(live.match.devSpeed,speed);}
+    observer.send('dev',{command:'grant',gold:100});assert.match((await observer.wait('error')).message,/não controla um personagem/);
+  }finally{if(observer)await closeClient(observer);await app.close();}
+});
+
 test('MODE-204: fila ranqueada forma 1×5 humano e quatro Elfos podem se render após 10 minutos',async()=>{
   const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false}),clients=[];
   try{

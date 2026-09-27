@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Match } from '../shared/simulation.js';
 import { STATES, BALANCE as B, distance } from '../shared/config.js';
 import { toCell, index } from '../shared/map.js';
-import { AIController } from '../shared/controllers.js';
+import { AIController, distributedRefuges } from '../shared/controllers.js';
 import { TacticalMap } from '../client/tactical-map.js';
 const match=()=>new Match({seed:'TACTICS'},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},...['e0','e1'].map(id=>({id,role:'elf',occupant:{type:'human',name:id}}))]);
 
@@ -17,6 +17,15 @@ test('Seed varia patrulha do Troll, refúgios e planos de construção sem perde
   assert.deepEqual(plan('DYNAMIC-A'),plan('DYNAMIC-A'));
   const variants=Array.from({length:8},(_,i)=>JSON.stringify(plan(`DYNAMIC-${i}`)));
   assert.ok(new Set(variants).size>=6,JSON.stringify(variants));
+});
+
+test('Cinco Elfos começam em refúgios distribuídos pelo mapa, sem comboio para o mesmo setor',()=>{
+  for(const seed of ['THORNHOLD','DYNAMIC-1','DYNAMIC-2']){
+    const m=new Match({seed},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},...Array.from({length:5},(_,i)=>({id:`e${i}`,role:'elf',occupant:{type:'human',name:`Elfo ${i}`}}))]);
+    const opening=distributedRefuges(m.map).slice(0,5),pairDistances=opening.flatMap((base,i)=>opening.slice(i+1).map(other=>distance(base,other)));
+    assert.equal(new Set(opening.map(base=>base.id)).size,5);
+    assert.ok(Math.min(...pairDistances)>70,JSON.stringify(opening.map(base=>({id:base.id,x:base.x,z:base.z}))));
+  }
 });
 
 test('Pings validam coordenadas, respeitam equipe, cooldown e expiração',()=>{
