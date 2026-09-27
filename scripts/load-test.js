@@ -1,11 +1,11 @@
 import { WebSocket } from 'ws';
 import { createGameServer } from '../server/index.js';
 
-const roomCount=Math.max(2,Number(process.env.LOAD_ROOMS)||8),durationSeconds=Math.max(3,Number(process.env.LOAD_SECONDS)||10),speed=[1,2,4,8].includes(Number(process.env.LOAD_SPEED))?Number(process.env.LOAD_SPEED):1,p95LimitMs=Math.max(1,Number(process.env.LOAD_P95_LIMIT_MS)||25);
+const roomCount=Math.max(2,Number(process.env.LOAD_ROOMS)||8),clientsPerRoom=Math.max(1,Math.min(8,Number(process.env.LOAD_CLIENTS_PER_ROOM)||6)),durationSeconds=Math.max(3,Number(process.env.LOAD_SECONDS)||10),speed=[1,2,4,8].includes(Number(process.env.LOAD_SPEED))?Number(process.env.LOAD_SPEED):1,p95LimitMs=Math.max(1,Number(process.env.LOAD_P95_LIMIT_MS)||25);
 
 async function connect(port,index){
   const socket=new WebSocket(`ws://127.0.0.1:${port}`),queue=[],waiters=[],traffic={messages:0,bytes:0,snapshots:0};
-  socket.on('message',raw=>{traffic.messages++;traffic.bytes+=raw.length;const message=JSON.parse(raw);if(message.type==='snapshot')traffic.snapshots++;queue.push(message);for(const wake of [...waiters])wake();});
+  socket.on('message',raw=>{traffic.messages++;traffic.bytes+=raw.length;const message=JSON.parse(raw);if(message.type==='snapshot'||message.type==='snapshotDelta')traffic.snapshots++;queue.push(message);for(const wake of [...waiters])wake();});
   const send=(type,data={})=>socket.send(JSON.stringify({type,...data}));
   const wait=(type,predicate=()=>true,timeout=5000)=>new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>{waiters.splice(waiters.indexOf(check),1);reject(new Error(`Sala ${index}: timeout aguardando ${type}`));},timeout);
@@ -13,19 +13,26 @@ async function connect(port,index){
     waiters.push(check);check();
   });
   await new Promise((resolve,reject)=>{socket.once('open',resolve);socket.once('error',reject);});send('hello',{name:`Carga ${index+1}`});await wait('hello');
-  return {socket,send,wait,traffic};
+  return {socket,send,wait,traffic,resetTraffic(){traffic.messages=0;traffic.bytes=0;traffic.snapshots=0;}};
 }
 
+process.env.MAX_ROOMS=String(Math.max(roomCount,Number(process.env.MAX_ROOMS)||0));
+process.env.MAX_CONNECTIONS=String(Math.max(roomCount*clientsPerRoom+8,Number(process.env.MAX_CONNECTIONS)||0));
+process.env.MAX_CONNECTIONS_PER_IP=String(Math.max(roomCount*clientsPerRoom+8,Number(process.env.MAX_CONNECTIONS_PER_IP)||0));
 const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false,devMode:true}),clients=[];
 try{
   for(let i=0;i<roomCount;i++){
-    const client=await connect(app.port,i);clients.push(client);
-    client.send('create',{name:`Load room ${i+1}`,role:'observer',fillBots:true,settings:{mode:'custom',local:true,private:true,elfSlots:5,seed:`LOAD-${i+1}`}});await client.wait('lobby');
-    client.send('ready',{ready:true});await client.wait('lobby',message=>message.room.errors.length===0);client.send('start');await client.wait('map');await client.wait('snapshot');client.send('dev',{command:'speed',speed});await client.wait('dev',message=>message.speed===speed);
+    const host=await connect(app.port,clients.length);clients.push(host);
+    host.send('create',{name:`Load room ${i+1}`,role:'troll',fillBots:true,settings:{mode:'custom',local:false,private:true,elfSlots:5,seed:`LOAD-${i+1}`}});const created=await host.wait('lobby'),roomClients=[host];
+    for(let j=1;j<clientsPerRoom;j++){const guest=await connect(app.port,clients.length);clients.push(guest);roomClients.push(guest);guest.send('join',{code:created.room.id});await guest.wait('lobby');}
+    for(const client of roomClients)client.send('ready',{ready:true});
+    await host.wait('lobby',message=>message.room.errors.length===0&&message.room.members.every(member=>member.ready));host.send('start');
+    await Promise.all(roomClients.map(async client=>{await client.wait('map');await client.wait('snapshot');}));host.send('dev',{command:'speed',speed});await host.wait('dev',message=>message.speed===speed);
   }
+  for(const client of clients)client.resetTraffic();
   await new Promise(resolve=>setTimeout(resolve,durationSeconds*1000));
   const metrics=app.metrics(),traffic=clients.reduce((total,client)=>({messages:total.messages+client.traffic.messages,bytes:total.bytes+client.traffic.bytes,snapshots:total.snapshots+client.traffic.snapshots}),{messages:0,bytes:0,snapshots:0});
-  const report={rooms:roomCount,connections:clients.length,durationSeconds,simulationSpeed:speed,p95LimitMs,traffic,bytesPerSecond:Math.round(traffic.bytes/durationSeconds),metrics};
+  const report={rooms:roomCount,clientsPerRoom,connections:clients.length,durationSeconds,simulationSpeed:speed,p95LimitMs,traffic,bytesPerSecond:Math.round(traffic.bytes/durationSeconds),metrics};
   console.log(JSON.stringify(report,null,2));
   if(metrics.tick.p95Ms>=p95LimitMs)throw new Error(`Tick p95 ${metrics.tick.p95Ms}ms excedeu meta de ${p95LimitMs}ms`);
   if(metrics.tick.overruns/Math.max(1,metrics.tick.count)>.01)throw new Error(`${metrics.tick.overruns} ticks excederam o orçamento de ${metrics.tick.budgetMs}ms`);

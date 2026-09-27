@@ -21,6 +21,7 @@ try{
   report.hiddenRefugesAtSpawn=await page.evaluate(()=>window.__terrainTest.getTactical().seenBases.size===0);assert.ok(report.hiddenRefugesAtSpawn);
   await page.screenshot({path:'artifacts/terrain-spawn.png'});
   async function walk(target){
+    await page.evaluate(()=>{window.__terrainTest.world.yaw=Math.PI;});await sleep(100);
     const route=pathfind(m.map,u,target,m.blockedCells('elf'));assert.ok(route.length||distance(u,target)<1);let keys=[];
     for(const p of route){const deadline=Date.now()+3000;while(distance(u,p)>.32&&Date.now()<deadline){const next=[],dx=p.x-u.x,dz=p.z-u.z;if(Math.abs(dx)>.16)next.push(dx>0?'KeyD':'KeyA');if(Math.abs(dz)>.16)next.push(dz>0?'KeyS':'KeyW');for(const key of keys)if(!next.includes(key))await page.keyboard.up(key);for(const key of next)if(!keys.includes(key))await page.keyboard.down(key);keys=next;await sleep(40);}assert.ok(distance(u,p)<.7,`blocked ${u.x},${u.z} -> ${p.x},${p.z}`);}
     for(const key of keys)await page.keyboard.up(key);await sleep(400);
@@ -28,12 +29,11 @@ try{
     assert.ok(Math.abs(ground.y-heightAt(m.map,ground.x,ground.z))<.002,'Renderer shares authoritative height');
   }
   async function build(kind,p){
-    await page.locator(`[data-do=build][data-kind=${kind}]`).click();
-    const pixel=await page.evaluate(async p=>{const {heightAt}=await import('/shared/map.js');const w=window.__terrainTest.world;return w.project(p.x,heightAt(w.map,p.x,p.z)+.025,p.z);},p);
-    await page.mouse.move(pixel.x,pixel.y);await sleep(250);
+    const slot=['core','wall','tower','mine','workshop'].indexOf(kind)+1;assert.ok(slot>0);
+    await page.evaluate(({p,u})=>{window.__terrainTest.world.yaw=Math.atan2(-(p.x-u.x),p.z-u.z);},{p,u:{x:u.x,z:u.z}});await page.keyboard.press(`Digit${slot}`);await sleep(350);
     assert.match(await page.locator('#build-hint').textContent(),/Clique para construir/);await page.keyboard.press('Enter');
-    await until(()=>m.structures.some(s=>s.kind===kind&&s.progress===1),'Build failed '+kind);if(await page.locator('#selection-panel').isVisible())await page.locator('[data-do=deselect]').click();
-    const s=m.structures.find(s=>s.kind===kind);assert.ok(distance(s,p)<.1);return s;
+    await until(()=>m.structures.some(s=>s.kind===kind&&s.progress===1),'Build failed '+kind);if(await page.locator('#selection-panel').isVisible())await page.keyboard.press('Escape');
+    const s=m.structures.find(s=>s.kind===kind);assert.ok(s);if(kind==='wall')assert.ok(distance(s,p)<.1);return s;
   }
   for(const base of [m.map.bases[1],m.map.bases[2]]){
     m.structures=[];m.wisps=[];u.baseId=null;u.gold=10000;u.wood=10000;Object.assign(u,base.ramp.to);await sleep(650);

@@ -1,4 +1,4 @@
-import { BALANCE as B, distance, resourceProducer, wispCost, wispUpgradeCost, wispIncome, towerDamage, towerProfile } from '../shared/config.js';
+import { BALANCE as B, distance, resourceProducer, wispCost, wispUpgradeCost, wispIncome, towerDamage, towerProfile, essenceIncome, elfPath } from '../shared/config.js';
 import { baseAt } from '../shared/map.js';
 import { icon } from './icons.js';
 import { resource, resourceCost } from './resources.js';
@@ -32,6 +32,7 @@ export function selectionMarkup(e,{u,snapshot,map}){
   const def=B.structures[e.kind];
   const tower=towerProfile(e);
   html+=`<div class="structure-details"><span>Nível <b>${e.tier}${e.epic?' · ÉPICO':e.legendary?' · LENDÁRIO':''}</b></span><span>Construção <b>${price(e.constructionCost||def)}</b></span><span>Próxima melhoria <b>${e.tier>=B.maxTier?'MAX':price(cost,u)}</b></span>${producer?`<span>Produção <b>${resource('gold',producer.amount,{rate:'s',signed:true})}</b></span><span>Ritmo <b>${resource('gold',producer.perMinute,{rate:'min',signed:true})}</b></span>`:''}${e.kind==='mine'?`<span>Núcleo vinculado <b>Nv. ${e.coreTier||0}</b></span>`:''}${e.kind==='tower'?`<span>Dano <b>${(towerDamage(e.tier)*tower.damage).toFixed(1)}</b></span><span>Alcance <b>${(def.range+tower.range).toFixed(1)} m</b></span><span>Intervalo <b>${(def.interval*tower.interval).toFixed(2)} s</b></span>`:''}</div>`;
+  if(e.kind==='wall'&&e.breachStacks>0)html+=`<p class="context-note breach-pressure"><b>Pressão de cerco ×${e.breachStacks}</b> · dano recebido +${Math.round(e.breachStacks*B.breachMomentum.damagePerStack*100)}% · reparo −${Math.round(e.breachStacks*B.breachMomentum.repairPenaltyPerStack*100)}%. A pressão cai quando o Troll interrompe o ataque.</p>`;
   if(!ready){html+=meter(e.progress,`Construindo · ${Math.floor(e.progress*100)}%`)+`<small class="context-note">${near?'Permaneça perto para concluir.':'Aproxime-se para continuar a obra.'}</small>${u?.role==='elf'?'<button class="command-secondary" data-do="assist">Ajudar <kbd>E</kbd></button>':''}`;}
   else if(u?.role==='elf'){
     if(e.hp<e.maxHp&&(!u.ghost||e.kind==='wall'))html+=`<button class="command-secondary" data-do="repair" ${near?'':'disabled'}>Reparar <span>${e.kind==='wall'?'GRÁTIS':price({gold:3,wood:1})} <kbd>R</kbd></span></button>${e.kind==='wall'?`<small class="context-note">${u.ghost?'Espírito: 50% da velocidade-base · ':''}Primeiro reparador: 100% · ajudantes simultâneos: 25%.</small>`:''}`;
@@ -41,12 +42,19 @@ export function selectionMarkup(e,{u,snapshot,map}){
       if(!near)html+='<small class="context-note">Aproxime-se para gerenciar.</small>';
     }
   }
-  if(own&&!u?.ghost)html+=`<small id="upgrade-reasons" class="context-note upgrade-reasons" role="status">${status.reasons.filter(r=>!['gold','wood'].includes(r.code)).map(r=>escape(r.message)).join('<br>')}</small>`;
+  if(own&&!u?.ghost)html+=`<small id="upgrade-reasons" class="context-note upgrade-reasons" role="status">${status.reasons.filter(r=>!['gold','wood','essence'].includes(r.code)).map(r=>escape(r.message)).join('<br>')}</small>`;
   if(!u?.ghost)html+=cancel(e,u,time,near);
-  if(own&&!u?.ghost&&ready&&e.demolitionRefund)html+=`<button class="command-secondary demolition" data-do="demolish" data-id="${e.id}" ${!near||time-e.lastHit<5||e.upgrading?'disabled':''}>Demolir estrutura <span>+${price(e.demolitionRefund)}</span></button><small class="context-note">Recupera 75% do custo original${e.kind==='core'?' · demolir o último Núcleo pode encerrar a partida':''}.</small>`;
+  if(own&&!u?.ghost&&ready&&e.demolitionRefund)html+=`<button class="command-secondary demolition" data-do="demolish" data-id="${e.id}" ${!near||time-e.lastHit<5||e.upgrading?'disabled':''}>Demolir estrutura <span><kbd>Delete</kbd> +${price(e.demolitionRefund)}</span></button><small class="context-note">Atalho: <b>Delete</b> · recupera 75% do valor atual investido, incluindo melhorias${e.kind==='core'?' · demolir o último Núcleo pode encerrar a partida':''}.</small>`;
   if(own&&!u?.ghost&&e.kind==='core'&&ready)html+=coreWisps(e,{u,snapshot,map});
   if(e.legendary)html+=`<p class="context-note">${e.kind==='tower'?`Raio contínuo · dano cresce até ${B.legendary.maxRamp}× enquanto mantém linha de visão.`:e.kind==='core'?'Produção própria final ×2.':'Vida máxima final ×4.'}</p>`;
-  if(e.kind==='workshop')html+=`<p class="context-note">Coleta +${e.tier*30}% · reparo +${e.tier*20}%.</p>`;
+  if(e.kind==='workshop'){
+    const essenceRate=essenceIncome(e)*(elfPath(u?.elfPath)?.essence||1),unlocked=e.tier>=B.elfIncremental.essenceUnlockTier;
+    html+=`<p class="context-note">Coleta +${e.tier*30}% · reparo +${e.tier*20}% · ${unlocked?`produz ${resource('essence',essenceRate,{rate:'s',signed:true})}`:`Essência desbloqueada no nível ${B.elfIncremental.essenceUnlockTier}`}.</p>`;
+    if(own&&!u?.ghost&&ready){
+      if(u.elfPath){const path=elfPath(u.elfPath);html+=`<section class="elf-path chosen"><small>ESPECIALIZAÇÃO DA CLAREIRA</small><b>${escape(path.name)}</b><span>${escape(path.description)}</span></section>`;}
+      else html+=`<section class="elf-path"><small>ESCOLHA PERMANENTE · ${resource('essence',B.elfIncremental.pathCost)}</small>${Object.entries(B.elfIncremental.paths).map(([id,path])=>`<button class="command-secondary" data-do="elf-path" data-path="${id}" ${!near||!unlocked||u.essence<B.elfIncremental.pathCost?'disabled':''}><b>${escape(path.name)}</b><span>${escape(path.description)}</span></button>`).join('')}</section>`;
+    }
+  }
   return html;
 }
 function coreWisps(core,{u,snapshot,map}){

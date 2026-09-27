@@ -2,7 +2,7 @@ import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { createGameServer } from '../server/index.js';
-import { STATES } from '../shared/config.js';
+import { BALANCE as B, STATES } from '../shared/config.js';
 
 const channel=process.env.PLAYWRIGHT_CHANNEL||(process.platform==='win32'?'msedge':undefined);
 const browser = await chromium.launch({headless:true,args:['--enable-unsafe-swiftshader'],...(channel?{channel}:{})});
@@ -35,7 +35,12 @@ try {
   const room = server.sessions.rooms.get(code);
   assert.equal(room.match.units.length, 6);
   assert.ok(room.match.units.every(unit => unit.controller === 'bot'));
-  await host.locator('[data-do=dev]').click();
+  await host.getByRole('button', { name: 'Abrir menu dev' }).click();
+  const troll=room.match.units.find(unit=>unit.role==='troll');
+  await host.locator('#dev-target').selectOption(troll.id);
+  await host.locator('[data-do=dev-grant][data-gold="1000"]').click();
+  for(let attempt=0;attempt<40&&!room.match.events.some(event=>event.type==='dev-grant'&&event.unit===troll.id&&event.gold===1000);attempt++)await new Promise(resolve=>setTimeout(resolve,25));
+  assert.ok(room.match.events.some(event=>event.type==='dev-grant'&&event.unit===troll.id&&event.gold===1000));
   await host.locator('[data-do=dev-speed][data-speed="8"]').click();
   await host.locator('.dev-modal [data-do=close]').click();
   assert.equal(room.devSpeed,8);
@@ -45,7 +50,7 @@ try {
   // Pause the interval's contribution so it cannot interleave .4 s ticks with
   // the deterministic .05 s steps below. No gameplay state is overwritten.
   room.devSpeed=0;
-  while (room.match.state !== STATES.END && room.match.time < 1800) {
+  while (room.match.state !== STATES.END && room.match.time <= B.matchHardLimit) {
     for (let i = 0; i < 100; i++) room.match.step(.05);
     await new Promise(resolve => setTimeout(resolve, 5));
   }
@@ -69,7 +74,7 @@ try {
   assert.equal(room.members.size, 1);
   assert.deepEqual(errors, []);
 
-  const report = { allBots: true, standardLobby: room.match.units.length===6, observerOnly: room.slots.every(slot=>slot.occupant?.type==='bot'||slot.closed), devSpeed: devSpeedValidated, naturalVictory: true,
+  const report = { allBots: true, standardLobby: room.match.units.length===6, observerOnly: room.slots.every(slot=>slot.occupant?.type==='bot'||slot.closed), observerDevGrant: true, devSpeed: devSpeedValidated, naturalVictory: result.endReason!=='score-limit',
     sameLobbyRetained: true, readyReset: true, newSeedOnRematch: true,
     winner: result.winner, duration: result.duration, errors };
   await writeFile('artifacts/browser-lifecycle.json', JSON.stringify(report, null, 2));

@@ -8,6 +8,15 @@ export const world=(map,x,z)=>({x:x*map.cell,z:z*map.cell});
 export const index=(map,x,z)=>z*map.size+x;
 export const walkable=(map,x,z)=>x>=0&&z>=0&&x<map.size&&z<map.size&&map.grid[index(map,x,z)]===0;
 export function baseAt(map,p){const c=toCell(map,p);return map.bases.find(b=>Math.abs(c.x-b.cx)<b.rx&&Math.abs(c.z-b.cz)<b.rz&&walkable(map,c.x,c.z));}
+export function baseZone(map,base,p){
+  const b=typeof base==='string'?map.bases.find(candidate=>candidate.id===base):base,c=toCell(map,p);
+  if(!b||Math.abs(c.x-b.cx)>=b.rx||Math.abs(c.z-b.cz)>=b.rz||!walkable(map,c.x,c.z))return null;
+  const rules=b.zones||{coreRadius:2.75,frontlineDepth:4},coreDistance=Math.hypot(c.x-b.cx,c.z-b.cz);
+  if(coreDistance<=rules.coreRadius)return 'core';
+  const depth=b.gate.axis==='x'?(c.x-b.gate.cx)*-b.gate.sign:(c.z-b.gate.cz)*-b.gate.sign;
+  return depth<=rules.frontlineDepth?'frontline':'industrial';
+}
+export function baseUsableCells(map,b){let count=0;for(let z=b.cz-b.rz;z<=b.cz+b.rz;z++)for(let x=b.cx-b.rx;x<=b.cx+b.rx;x++)if(walkable(map,x,z))count++;return count;}
 
 // Server, ground picking and rendering share this triangular field (diagonal 00→11).
 export function heightAt(map,x,z){
@@ -24,7 +33,7 @@ export function traversable(map,x,z,nx,nz){return walkable(map,nx,nz)&&Math.abs(
 
 export function generateMap(seed='THORNHOLD',mapSize='compact'){
   const rng=randomFor(seed),size=mapSize==='large'?125:109,cell=BALANCE.cell,mid=(size-1)/2,offset=(size-109)/2;
-  const map={seed:String(seed),version:2,size,cell,grid:Array(size*size).fill(1),heights:Array(size*size).fill(0),bases:[],trees:[],decor:[],pois:[],trails:[]};
+  const map={seed:String(seed),version:3,size,cell,grid:Array(size*size).fill(1),heights:Array(size*size).fill(0),bases:[],trees:[],decor:[],pois:[],trails:[]};
   const carve=(x,z,r=1)=>{for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++)if(x+dx>1&&z+dz>1&&x+dx<size-2&&z+dz<size-2)map.grid[index(map,x+dx,z+dz)]=0;};
   const trail=(points,width=1)=>{map.trails.push(points.map(([x,z])=>world(map,x,z)));for(let i=1;i<points.length;i++){let [x,z]=points[i-1];const [tx,tz]=points[i];carve(x,z,width);while(x!==tx||z!==tz){if(x!==tx)x+=Math.sign(tx-x);else z+=Math.sign(tz-z);carve(x,z,width);}}};
   // Connected woodland loops, turns and blind branches replace radial sight lines.
@@ -40,6 +49,7 @@ export function generateMap(seed='THORNHOLD',mapSize='compact'){
   }
   for(let z=mid-8;z<=mid+7;z++)for(let x=mid-7;x<=mid+7;x++)if(Math.abs(x-mid)+Math.abs(z-mid)<13)carve(x,z,0);
   map.elfSpawn=world(map,mid,mid+3);map.trollSpawn=world(map,mid,mid-5);
+  map.trollShop={id:'troll-shop',name:'Forja Ancestral',...world(map,mid+2,mid-5)};
   const lo=12,hi=size-13,inner1=40+offset,inner2=68+offset;
   const slots=[[lo,lo,'x',1],[inner1,lo,'z',1],[inner2,lo,'z',1],[hi,lo,'x',-1],[hi,inner1,'x',-1],[hi,inner2,'x',-1],[hi,hi,'x',-1],[inner2,hi,'z',-1],[inner1,hi,'z',-1],[lo,hi,'x',1],[lo,inner2,'x',1],[lo,inner1,'x',1]];
   const names=['Vale Âmbar','Bosque do Orvalho','Refúgio Lunar','Pedra Serena','Jardim Cinzento','Clareira Rubra','Ninho de Musgo','Vigília Azul','Grota das Raízes','Terraço Antigo','Recanto Velado','Bacia das Névoas'];
@@ -47,13 +57,15 @@ export function generateMap(seed='THORNHOLD',mapSize='compact'){
   const shift=Math.floor(rng()*3),levels=[0,3.6,-3.6,5.4,-2.4,0,-4.4,3.2,0,4.8,-3.2,2.4];
   for(let i=0;i<slots.length;i++){
     const [sx,sz,axis,sign]=slots[i],cx=sx+Math.floor(rng()*3)-1,cz=sz+Math.floor(rng()*3)-1,profile=profiles[(i+shift)%3];
-    const {rx,rz}=profile,gx=cx+(axis==='x'?rx*sign:0),gz=cz+(axis==='z'?rz*sign:0),dx=axis==='x'?sign:0,dz=axis==='z'?sign:0;
+    // V3.1 expands sideways, not toward the trail: gates and approach distance
+    // remain unchanged while each refuge gains roughly 30–50% usable space.
+    const lateralExpansion=2,rx=profile.rx+(axis==='z'?lateralExpansion:0),rz=profile.rz+(axis==='x'?lateralExpansion:0),gx=cx+(axis==='x'?profile.rx*sign:0),gz=cz+(axis==='z'?profile.rz*sign:0),dx=axis==='x'?sign:0,dz=axis==='z'?sign:0;
     const end={x:gx+dx*5,z:gz+dz*5},junction={x:Math.max(a,Math.min(c,end.x)),z:Math.max(a,Math.min(c,end.z))};
     trail([[junction.x,junction.z],[end.x,junction.z],[end.x,end.z],[gx+dx*2,gz+dz*2]]);
     const nearest=lanes.reduce((best,n)=>Math.abs(n-junction.x)<Math.abs(best-junction.x)?n:best,lanes[0]);
     const nearestZ=lanes.reduce((best,n)=>Math.abs(n-junction.z)<Math.abs(best-junction.z)?n:best,lanes[0]);
     trail([[junction.x,junction.z],[nearest,junction.z],[nearest,nearestZ]]);
-    const b={id:'base'+i,name:names[i],cx,cz,rx,rz,...world(map,cx,cz),height:levels[i],profile:profile.label,capacity:profile.trees,wood:BALANCE.economy.treeStock*profile.trees,gate:{...world(map,gx,gz),cx:gx,cz:gz,axis,sign},outside:world(map,gx+dx*3,gz+dz*3),ramp:{from:world(map,gx+dx,gz+dz),to:world(map,junction.x,junction.z)}};
+    const b={id:'base'+i,name:names[i],cx,cz,rx,rz,...world(map,cx,cz),height:levels[i],profile:profile.label,capacity:profile.trees,wood:BALANCE.economy.treeStock*profile.trees,zones:{coreRadius:2.75,frontlineDepth:4,lateralExpansion,legacyRx:profile.rx,legacyRz:profile.rz},gate:{...world(map,gx,gz),cx:gx,cz:gz,axis,sign},outside:world(map,gx+dx*3,gz+dz*3),ramp:{from:world(map,gx+dx,gz+dz),to:world(map,junction.x,junction.z)}};
     map.bases.push(b);
     for(let z=cz-rz;z<=cz+rz;z++)for(let x=cx-rx;x<=cx+rx;x++)map.grid[index(map,x,z)]=(Math.abs(x-cx)===rx||Math.abs(z-cz)===rz||(Math.abs(x-cx)>rx-3&&Math.abs(z-cz)>rz-3))?1:0;
     carve(gx,gz,0);carve(gx+dx,gz+dz,0);
@@ -66,11 +78,17 @@ export function generateMap(seed='THORNHOLD',mapSize='compact'){
     b.capacity=map.trees.filter(t=>t.baseId===b.id).length;b.wood=b.capacity*BALANCE.economy.treeStock;
   }
   // Later approach trails may brush a neighbouring refuge; enforce every perimeter last.
-  for(const b of map.bases){for(let z=b.cz-b.rz;z<=b.cz+b.rz;z++)for(let x=b.cx-b.rx;x<=b.cx+b.rx;x++)if(Math.abs(x-b.cx)===b.rx||Math.abs(z-b.cz)===b.rz)map.grid[index(map,x,z)]=1;carve(b.gate.cx,b.gate.cz,0);}
+  for(const b of map.bases){for(let z=b.cz-b.rz;z<=b.cz+b.rz;z++)for(let x=b.cx-b.rx;x<=b.cx+b.rx;x++)if(Math.abs(x-b.cx)===b.rx||Math.abs(z-b.cz)===b.rz)map.grid[index(map,x,z)]=1;carve(b.gate.cx,b.gate.cz,0);b.usableCells=baseUsableCells(map,b);}
   // Flat platforms and continuous eight-cell earth ramps; no visual-only steps.
   for(let z=0;z<size;z++)for(let x=0;x<size;x++){
     let y=0;for(const b of map.bases){const d=Math.max(0,Math.abs(x-b.cx)-b.rx-1,Math.abs(z-b.cz)-b.rz-1);y+=b.height*Math.max(0,1-d/8);}
     map.heights[index(map,x,z)]=Math.round(y*10000)/10000;
+  }
+  // Lateral expansion can make two elevation fields overlap at a gate. Give
+  // the three-cell approach corridor one continuous local ramp so Barricade
+  // foundations remain level without introducing a traversal cliff.
+  for(const b of map.bases){const dx=b.gate.axis==='x'?b.gate.sign:0,dz=b.gate.axis==='z'?b.gate.sign:0;
+    for(let step=0;step<=9;step++){const longitudinal=step<=1?1:Math.max(0,1-(step-1)/8);for(let side=-4;side<=4;side++){const lateral=Math.abs(side)<=1?1:Math.max(0,1-(Math.abs(side)-1)/3),blend=longitudinal*lateral,x=b.gate.cx+dx*step+(b.gate.axis==='z'?side:0),z=b.gate.cz+dz*step+(b.gate.axis==='x'?side:0);if(x>=0&&z>=0&&x<size&&z<size){const k=index(map,x,z),y=map.heights[k]*(1-blend)+b.height*blend;map.heights[k]=Math.round(y*10000)/10000;}}}
   }
   for(const b of map.bases){const axis=b.gate.axis,sign=b.gate.sign;
     for(const side of [-1,1]){const x=b.gate.cx+(axis==='x'?sign*4:side),z=b.gate.cz+(axis==='z'?sign*4:side);if(walkable(map,x,z))map.trees.push({id:'tree'+map.trees.length,...world(map,x,z),amount:BALANCE.economy.treeStock,rich:true,style:1});}

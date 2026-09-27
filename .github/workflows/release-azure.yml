@@ -52,6 +52,7 @@ jobs:
         run: npm run test:load
         env:
           LOAD_ROOMS: 8
+          LOAD_CLIENTS_PER_ROOM: 6
           LOAD_SECONDS: 10
           LOAD_SPEED: 1
           LOAD_P95_LIMIT_MS: 25

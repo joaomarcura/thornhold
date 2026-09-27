@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Match } from '../shared/simulation.js';
-import { BALANCE as B, STATES, distance, wispCost, wispIncome, structureHP, structureRewardHP, tierScale, lateTierScale, wallTierScale, trollLateThreatIncome, trollCost, upgradeCost, mineEconomy, resourceProducer } from '../shared/config.js';
-import { combatStats, ITEMS } from '../shared/equipment.js';
+import { BALANCE as B, STATES, distance, wispCost, wispIncome, structureHP, structureRewardHP, tierScale, combatTierScale, lateTierScale, wallTierScale, towerDamage, trollLateThreatIncome, trollCost, upgradeCost, mineEconomy, resourceProducer, essenceIncome, repairPower } from '../shared/config.js';
+import { combatStats, ITEMS, EQUIPMENT_SLOTS, ITEM_RARITIES, itemEffects, itemRarity, itemUpgradeCost } from '../shared/equipment.js';
 import { jobRefund } from '../shared/jobs.js';
 import { availableTrees } from '../shared/wisps.js';
+import { siegeParity } from '../shared/siege-balance.js';
+import { shopMarkup } from '../client/shop.js';
+import { applySnapshotDelta, createSnapshotDelta } from '../shared/snapshot-delta.js';
 
 function match(){return new Match({seed:'PROGRESSION'},[
   {id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},
@@ -12,6 +15,10 @@ function match(){return new Match({seed:'PROGRESSION'},[
   {id:'ally',role:'elf',occupant:{type:'human',name:'Aliado'}}
 ]);}
 function advance(m,seconds){for(let i=0;i<Math.ceil(seconds*20);i++)m.step(.05);}
+test('Reparo percentual mantém o early e recebe retorno decrescente após tier 8',()=>{
+  const tier8={kind:'wall',tier:8,maxHp:10000},tier9={...tier8,tier:9},tier16={...tier8,tier:16};
+  assert.equal(repairPower(tier8),B.elf.repair+tier8.maxHp*B.elf.wallRepairRate);assert.ok(repairPower(tier9)<repairPower(tier8));assert.ok(repairPower(tier16)<repairPower(tier9));assert.ok(repairPower(tier16)>B.elf.repair);
+});
 function baseFixture(m){
   const e=m.unit('e'),b=m.map.bases[0];Object.assign(e,{x:b.x+4.4,z:b.z,gold:1000000,wood:1000000});
   assert.equal(m.act('e',{type:'build',kind:'core',x:b.x,z:b.z}),undefined);advance(m,5);
@@ -30,8 +37,16 @@ test('Barricadas preservam o early game e limitam a curva tardia',()=>{
   for(let tier=1;tier<=9;tier++)assert.equal(structureHP('wall',tier),2310*tierScale(B.structures.wall.growth,tier));
   for(let tier=2;tier<=B.maxTier;tier++)assert.ok(structureHP('wall',tier)>structureHP('wall',tier-1));
   assert.equal(structureHP('wall',10),2310*wallTierScale(10)*B.legendary.wallHealth);
-  assert.ok(structureHP('wall',10)<structureHP('wall',9)*2);
+  assert.ok(structureHP('wall',10)<structureHP('wall',9)*1.35);
   assert.ok(structureHP('wall',20)<150000);
+});
+test('V3.3 preserva níveis 1–9 e suaviza combate e fortificações após o Lendário',()=>{
+  for(let tier=1;tier<=9;tier++)assert.equal(combatTierScale(B.structures.tower.growth,tier),tierScale(B.structures.tower.growth,tier));
+  assert.ok(towerDamage(10)/towerDamage(9)<=1.071);
+  assert.ok(structureHP('tower',10)/structureHP('tower',9)<=1.071);
+  const normalTier9=towerDamage(9)*B.tower.standard.damage/B.structures.tower.interval;
+  assert.ok(B.legendary.towerDps/normalTier9<1.5);
+  assert.ok(B.legendary.towerDps*B.legendary.maxRamp/normalTier9<4);
 });
 test('Economia tardia desacelera sem alterar os níveis 1–9',()=>{
   const core=tier=>resourceProducer({kind:'core',tier}).amount,mine=tier=>resourceProducer({kind:'mine',tier,coreTier:5}).amount,wisp=level=>wispIncome({level,rich:false});
@@ -46,15 +61,44 @@ test('Economia tardia desacelera sem alterar os níveis 1–9',()=>{
 });
 test('Renda de ameaça do Troll cresce somente no late game',()=>{
   assert.equal(trollLateThreatIncome(899,439,1),null);assert.equal(trollLateThreatIncome(900,439,0),null);
-  assert.equal(trollLateThreatIncome(900,0,1),8);assert.ok(Math.abs(trollLateThreatIncome(900,439,1)-40.925)<1e-9);assert.equal(trollLateThreatIncome(900,1000,1),45);
+  assert.equal(trollLateThreatIncome(900,0,1),16);
+  const raw=B.economy.trollLateThreatBase+B.economy.trollLateThreatLogScale*Math.log1p(439/B.economy.trollLateThreatReference)+B.economy.trollLateThreatMatureBase+3*B.economy.trollLateThreatLegendary;
+  const expected=raw<=B.economy.trollLateThreatSoftCap?raw:B.economy.trollLateThreatSoftCap+(raw-B.economy.trollLateThreatSoftCap)*B.economy.trollLateThreatOverflowRate;
+  assert.ok(Math.abs(trollLateThreatIncome(900,439,1,3)-expected)<1e-9);assert.equal(trollLateThreatIncome(900,100000,5,20),B.economy.trollLateThreatCap);
 });
 test('Breach Momentum aumenta dano contínuo e reduz reparo da Barricada',()=>{
   const m=match(),t=m.unit('t'),e=m.unit('e'),wall={id:'breach-wall',kind:'wall',owner:e.id,baseId:'breach-base',x:t.x,z:t.z+2,hp:231000,maxHp:231000,tier:B.legendary.tier,progress:1,bounty:500,lastHit:-100};m.settings.breachEnabled=true;m.state=STATES.ACTIVE;m.time=80;m.structures.push(wall);Object.assign(e,m.map.bases[0]);Object.assign(m.unit('ally'),m.map.bases[1]);t.yaw=0;
   m.setController(t.id,'bot');m.controllers.get(t.id).brain={state:'breach'};
   assert.equal(m.addBreachMomentum(wall,true,t).stacks,0);m.time+=3.1;assert.equal(m.addBreachMomentum(wall,true,t).stacks,1,'heavy não pula múltiplos stacks');
-  const before=wall.hp,base=m.trollStats(t).damage*m.trollStats(t).siege;m.damage(wall,base*1.04,t,'melee');assert.ok(Math.abs((before-wall.hp)-base*1.04)<.01);
-  wall.hp-=100;Object.assign(e,{x:wall.x,z:wall.z});const damaged=wall.hp;m.act(e.id,{type:'repair',target:wall.id});assert.ok(Math.abs((wall.hp-damaged)-B.elf.repair*.98)<.01);
+  const before=wall.hp,base=m.trollStats(t).damage*m.trollStats(t).siege,damageScale=1+B.breachMomentum.damagePerStack;m.damage(wall,base*damageScale,t,'melee');assert.ok(Math.abs((before-wall.hp)-base*damageScale)<.01);
+  wall.hp-=10000;Object.assign(e,{x:wall.x,z:wall.z});const damaged=wall.hp,repairScale=1-B.breachMomentum.repairPenaltyPerStack,repairBase=repairPower(wall);m.act(e.id,{type:'repair',target:wall.id});assert.ok(Math.abs((wall.hp-damaged)-repairBase*repairScale)<.01);
   m.time+=B.breachMomentum.decayDelay+B.breachMomentum.decaySeconds+.01;assert.equal(m.breachMomentum(wall).stacks,0);
+});
+test('Duelo final libera pressão de cerco para Troll humano sem ativar o early game',()=>{
+  const m=match(),t=m.unit('t'),wall={id:'final-wall',kind:'wall',owner:'e',baseId:'final-base',x:t.x,z:t.z+2,hp:231000,maxHp:231000,tier:10,progress:1,lastHit:-100};m.state=STATES.ACTIVE;m.structures.push(wall);m.unit('ally').alive=false;
+  m.time=m.preparation+719;assert.equal(m.addBreachMomentum(wall,true,t).stacks,0);
+  m.time=m.preparation+720;assert.equal(m.addBreachMomentum(wall,true,t).stacks,0);m.time+=B.breachMomentum.firstStackSeconds+.1;assert.equal(m.addBreachMomentum(wall,true,t).stacks,1);
+  const snapshot=m.snapshot(t.id),visible=snapshot.structures.find(s=>s.id===wall.id);assert.equal(visible.breachStacks,1);assert.ok(visible.effects.some(effect=>effect.id==='breach-pressure'));
+});
+test('Barricada Lendária acumula pressão tardia sem exigir duelo final',()=>{
+  const m=match(),t=m.unit('t'),wall={id:'late-wall',kind:'wall',owner:'e',baseId:'late-base',x:t.x,z:t.z+2,hp:50000,maxHp:50000,tier:10,legendary:true,progress:1,lastHit:-100};m.state=STATES.ACTIVE;m.structures.push(wall);
+  m.time=m.preparation+B.breachMomentum.unlockSeconds-1;assert.equal(m.addBreachMomentum(wall,true,t).stacks,0);
+  m.time=m.preparation+B.breachMomentum.unlockSeconds;assert.equal(m.addBreachMomentum(wall,true,t).stacks,0);m.time+=B.breachMomentum.firstStackSeconds+.1;assert.equal(m.addBreachMomentum(wall,true,t).stacks,1);
+  assert.equal(wall.breachLateActive,true);m.time+=B.breachMomentum.decayDelay-1;assert.equal(m.breachMomentum(wall).stacks,1);
+});
+test('Siege Parity cai com torres e reparo e mede uma fortaleza real',()=>{
+  const m=match(),t=m.unit('t'),e=m.unit('e'),base=m.map.bases[0];m.state=STATES.ACTIVE;Object.assign(t.levels,{damage:10,speed:10,health:10,armor:10,regen:10,movement:10,siege:10,utility:10});t.maxHp=m.trollStats(t).maxHp;t.hp=t.maxHp;e.elfPath='defense';
+  const wall={id:'parity-wall',kind:'wall',owner:e.id,baseId:base.id,x:base.gate.x,z:base.gate.z,hp:structureHP('wall',10)*1.15,maxHp:structureHP('wall',10)*1.15,tier:10,legendary:true,progress:1},tower=id=>({id,kind:'tower',owner:e.id,baseId:base.id,x:base.x,z:base.z,hp:1000,maxHp:1000,tier:10,legendary:true,branch:'power',progress:1}),workshop={id:'parity-workshop',kind:'workshop',owner:e.id,baseId:base.id,x:base.x,z:base.z,hp:1000,maxHp:1000,tier:10,progress:1};m.structures.push(wall,workshop,tower('tower-a'),tower('tower-b'));
+  const none=siegeParity(m,t,wall,{towers:[],assumeRepair:false}),one=siegeParity(m,t,wall,{towers:[m.entity('tower-a')],assumeRepair:false}),two=siegeParity(m,t,wall,{towers:[m.entity('tower-a'),m.entity('tower-b')],assumeRepair:true});
+  assert.ok(none.parity>one.parity);assert.ok(one.parity>two.parity);assert.ok(two.breakSeconds>one.breakSeconds);assert.equal(two.towerCount,2);
+});
+test('Recompensa escalável fica restrita ao Lendário ou ao período após 15 minutos',()=>{
+  const m=match(),t=m.unit('t'),before=t.stats.goldFromDamage,multiplier=m.trollStats(t).objectiveGold;m.objectiveReward(t,{id:'cheap',kind:'wall',tier:1,x:0,z:0,investmentCost:{gold:50000,wood:12000,essence:30}});const cheap=t.stats.goldFromObjectives;
+  assert.ok(Math.abs(cheap-B.economy.trollObjective.wall*multiplier)<1e-9,'estrutura comum não escala no early/mid game');
+  m.objectiveReward(t,{id:'fortress',kind:'wall',tier:15,legendary:true,x:0,z:0,investmentCost:{gold:50000,wood:12000,essence:30}});const fortress=t.stats.goldFromObjectives-cheap;
+  m.time=m.preparation+B.economy.trollLateThreatStart;const beforeLate=t.stats.goldFromObjectives;m.objectiveReward(t,{id:'late-mine',kind:'mine',tier:2,x:0,z:0,investmentCost:{gold:1000,wood:500}});const late=t.stats.goldFromObjectives-beforeLate;
+  m.settings.objectiveScalingMode='legendary';const beforeAblation=t.stats.goldFromObjectives;m.objectiveReward(t,{id:'legendary-only-mine',kind:'mine',tier:2,x:0,z:0,investmentCost:{gold:1000,wood:500}});const legendaryOnly=t.stats.goldFromObjectives-beforeAblation;
+  assert.ok(fortress>cheap*20);assert.ok(late>B.economy.trollObjective.mine*multiplier);assert.ok(Math.abs(legendaryOnly-B.economy.trollObjective.mine*multiplier)<1e-9);assert.equal(t.stats.goldFromDamage,before);
 });
 
 test('Melhorias são compromissos; apenas obra e formação podem ser canceladas',()=>{
@@ -85,6 +129,37 @@ test('Cura do Troll usa cargas, persiste sob dano e recarrega lentamente',()=>{
   m.time=t.healRechargeAt; m.step(.05);assert.equal(t.healCharges,2);
 });
 
+test('Melhorias fundamentais do Troll entregam poder relevante nos níveis 1–4',()=>{
+  const t=match().unit('t');Object.assign(t.levels,{damage:4,speed:4,health:4,armor:4,siege:4});const stats=combatStats(t);
+  assert.ok(Math.abs(stats.damage-B.troll.damage*1.2**4)<1e-9);
+  assert.ok(Math.abs(stats.interval-B.troll.interval*.87**4)<1e-9);
+  assert.equal(stats.maxHp,B.troll.hp+4*B.troll.healthPerLevel);
+  assert.equal(stats.armor,B.troll.armor+4*B.troll.armorPerLevel);
+  assert.equal(stats.siege,1+4*B.troll.siegeFoundationPerLevel);
+});
+
+test('Regeneração base e cada nível de Vigor usam a curva reforçada',()=>{
+  const m=match(),t=m.unit('t'),base=combatStats(t);assert.equal(base.combatRegen,.0012);assert.equal(base.restRegen,.0036);
+  t.levels.regen=1;const upgraded=combatStats(t);assert.ok(Math.abs(upgraded.combatRegen-base.combatRegen-.00075)<1e-12);assert.ok(Math.abs(upgraded.restRegen-base.restRegen-.0015)<1e-12);
+});
+
+test('Fogo de torre reduz somente a regeneração de combate do Troll',()=>{
+  const setup=()=>{const m=match(),t=m.unit('t');m.state=STATES.ACTIVE;m.time=80;t.hp=t.maxHp*.5;t.lastHit=m.time;return {m,t};};
+  const pressured=setup();pressured.t.lastTowerHit=pressured.m.time;const pressuredHp=pressured.t.hp;pressured.m.step(.05);const pressuredHeal=pressured.t.hp-pressuredHp;
+  const normal=setup(),normalHp=normal.t.hp;normal.m.step(.05);const normalHeal=normal.t.hp-normalHp;
+  assert.ok(normalHeal>0);assert.ok(Math.abs(pressuredHeal/normalHeal-B.troll.towerCombatRegenMultiplier)<1e-9);
+  assert.ok(pressured.m.telemetry.healing.combatRegen>0);assert.equal(pressured.m.telemetry.healing.restRegen,0);assert.ok(pressured.m.telemetry.healing.towerSuppressed>0);
+  pressured.t.lastHit=pressured.m.time-10;pressured.t.lastTowerHit=-100;pressured.m.step(.05);assert.ok(pressured.m.telemetry.healing.restRegen>0);
+});
+
+test('Barricada se recompõe levemente somente fora de cerco',()=>{
+  const m=match(),t=m.unit('t'),{wall}=baseFixture(m);m.state=STATES.ACTIVE;m.time=100;wall.hp=wall.maxHp*.5;wall.lastHit=m.time;
+  const damaged=wall.hp;advance(m,B.wallRecovery.delay-.1);assert.equal(wall.hp,damaged,'não regenera durante a janela de dano');
+  Object.assign(t,{x:wall.x+2,z:wall.z});m.time=wall.lastHit+B.wallRecovery.delay+.1;const before=wall.hp;m.step(.05);const expected=wall.maxHp*B.wallRecovery.rate*.05;
+  assert.ok(Math.abs((wall.hp-before)-expected)<1e-8);assert.equal(wall.passiveRegenerating,true);assert.ok(m.stats.wallRegeneration>0);assert.ok(m.snapshot('e').structures.find(s=>s.id===wall.id).effects.some(effect=>effect.id==='wall-recovery'));
+  m.damage(wall,1,t,'melee');const hitHp=wall.hp;m.step(.05);assert.equal(wall.hp,hitHp,'novo ataque reinicia a supressão');
+});
+
 test('Santuário do Troll acelera cura somente fora de combate e dentro da base',()=>{
   const m=match(),t=m.unit('t');m.state=STATES.ACTIVE;m.time=80;t.hp=t.maxHp*.4;t.lastHit=70;Object.assign(t,m.map.trollSpawn);
   const before=t.hp;advance(m,1);assert.ok(t.hp-before>t.maxHp*B.troll.sanctuaryRegenRate*.95);assert.ok(m.telemetry.healing.sanctuary>0);assert.ok(m.snapshot(t.id).units.find(u=>u.id===t.id).effects.some(e=>e.id==='sanctuary'));
@@ -92,16 +167,115 @@ test('Santuário do Troll acelera cura somente fora de combate e dentro da base'
   Object.assign(t,m.map.trollSpawn);t.lastHit=m.time;advance(m,1);assert.equal(m.telemetry.healing.sanctuary,sanctuary);
 });
 
-test('Retorno do Troll desbloqueia no late game, canaliza, pode ser interrompido e concede ímpeto ao sair',()=>{
-  const m=match(),t=m.unit('t'),elf=m.unit('e');m.state=STATES.ACTIVE;m.time=m.preparation+B.troll.recallUnlock-1;Object.assign(t,{x:m.map.trollSpawn.x+35,z:m.map.trollSpawn.z,hp:t.maxHp*.4});
-  assert.match(m.act(t.id,{type:'trollRecall'}),/Disponível em/);m.time+=1;assert.equal(m.act(t.id,{type:'trollRecall'}),undefined);assert.equal(t.recallUntil,m.time+B.troll.recallChannel);
+test('Âmbar vampírico rouba vida de unidades e estruturas com teto próprio',()=>{
+  const unitArena=arena(),{m,t,e}=unitArena;t.inventory.push('amber');t.equipment.helmet='amber';t.hp=t.maxHp*.5;
+  const stats=m.trollStats(t);assert.equal(stats.drain,.08);assert.equal(stats.drainCap,.02);
+  const targetHp=e.hp,trollHp=t.hp;t.pendingStrike={heavy:false,yaw:0,at:m.time};m.resolveStrike(t);const unitDamage=targetHp-e.hp;
+  assert.ok(Math.abs((t.hp-trollHp)-Math.min(t.maxHp*.02,unitDamage*.08))<1e-9);
+
+  const structureArena=arena(),sm=structureArena.m,st=structureArena.t;st.inventory.push('amber');st.equipment.helmet='amber';st.hp=st.maxHp*.5;
+  Object.assign(structureArena.e,{x:st.x+100,z:st.z+100});
+  const wall={id:'drain-wall',kind:'wall',owner:'e',baseId:'drain-base',x:st.x,z:st.z+2,hp:10000,maxHp:10000,tier:1,progress:1,lastHit:-100};sm.structures.push(wall);
+  const wallHp=wall.hp,structureTrollHp=st.hp;st.pendingStrike={heavy:false,yaw:0,at:sm.time};sm.resolveStrike(st);const structureDamage=wallHp-wall.hp;
+  assert.ok(Math.abs((st.hp-structureTrollHp)-Math.min(st.maxHp*.01,structureDamage*.015))<1e-9);
+});
+
+test('Retorno do Troll fica disponível desde o início, pode ser interrompido e concede ímpeto ao sair',()=>{
+  const m=match(),t=m.unit('t'),elf=m.unit('e');m.state=STATES.ACTIVE;m.time=m.preparation;Object.assign(t,{x:m.map.trollSpawn.x+35,z:m.map.trollSpawn.z,hp:t.maxHp*.4});
+  assert.equal(m.act(t.id,{type:'trollRecall'}),undefined);assert.equal(t.recallUntil,m.time+B.troll.recallChannel);
   m.damage(t,1,elf,'tower','interrupt');assert.equal(t.recallUntil,0);assert.equal(t.stats.recalls,0);
   assert.equal(m.act(t.id,{type:'trollRecall'}),undefined);advance(m,B.troll.recallChannel+.1);assert.ok(distance(t,m.map.trollSpawn)<.01);assert.equal(t.stats.recalls,1);assert.ok(t.cooldowns.recall-m.time>B.troll.recallCooldown-.2&&t.cooldowns.recall-m.time<=B.troll.recallCooldown);
   Object.assign(t,{x:m.map.trollSpawn.x+B.troll.sanctuaryRadius+1,z:m.map.trollSpawn.z,input:{x:1,z:0,sprint:true}});m.movement(t,.05);assert.ok(t.recallSpeedUntil>m.time);assert.ok(m.snapshot(t.id).units.find(u=>u.id===t.id).effects.some(e=>e.id==='recall-speed'));
 });
 
+test('Forja Ancestral é física e o servidor bloqueia compras remotas',()=>{
+  const m=match(),t=m.unit('t');m.state=STATES.ACTIVE;m.time=m.preparation;t.gold=2000;
+  Object.assign(t,{x:m.map.trollSpawn.x+30,z:m.map.trollSpawn.z});
+  assert.equal(m.snapshot(t.id).trollShop.available,false);
+  assert.match(m.act(t.id,{type:'buy',key:'damage'}),/Forja/);
+  assert.match(m.act(t.id,{type:'buyItem',item:'maul'}),/Forja/);
+  Object.assign(t,m.map.trollShop);const before=t.gold;
+  assert.equal(m.snapshot(t.id).trollShop.available,true);
+  assert.equal(m.act(t.id,{type:'buy',key:'damage'}),undefined);assert.equal(t.gold,before-trollCost('damage',0));
+  assert.equal(m.act(t.id,{type:'buyItem',item:'maul'}),undefined);assert.equal(t.equipment.weapon,'maul');
+});
+
+test('Loja possui quatro categorias, três itens por categoria e nenhum item reduz atributos',()=>{
+  assert.deepEqual(Object.keys(EQUIPMENT_SLOTS),['weapon','helmet','armor','boots']);
+  for(const slot of Object.keys(EQUIPMENT_SLOTS))assert.equal(Object.values(ITEMS).filter(item=>item.slot===slot).length,3,`${slot} deve oferecer três itens`);
+  const m=match(),t=m.unit('t'),baseline=combatStats(t),lowerIsBetter=new Set(['interval','regenDelay','dashCooldown']);
+  const metrics=['damage','interval','armor','combatRegen','restRegen','regenDelay','siege','movement','maxHp','range','heavy','dashCooldown','roarDuration','opening','drain','structureDrain'];
+  for(const [id,item] of Object.entries(ITEMS))for(let level=1;level<=ITEM_RARITIES.length;level++){
+    const equipped={weapon:null,helmet:null,armor:null,boots:null,[item.slot]:id},stats=combatStats({...t,equipment:equipped,itemLevels:{[id]:level}});let improved=false;
+    for(const metric of metrics){const good=lowerIsBetter.has(metric)?stats[metric]<=baseline[metric]:stats[metric]>=baseline[metric];assert.ok(good,`${id} ${itemRarity(level).name} não pode piorar ${metric}: ${baseline[metric]} → ${stats[metric]}`);if(stats[metric]!==baseline[metric])improved=true;}
+    assert.ok(improved,`${id} ${itemRarity(level).name} precisa conceder ao menos um bônus real`);
+  }
+});
+
+test('Inventário expõe atributos reais e identifica claramente o loadout equipado',()=>{
+  const m=match(),t=m.unit('t');m.state=STATES.ACTIVE;m.time=m.preparation;Object.assign(t,m.map.trollShop);t.gold=5000;
+  assert.equal(m.act(t.id,{type:'buyItem',item:'amber'}),undefined);
+  const unit=m.snapshot(t.id).units.find(u=>u.id===t.id),effects=itemEffects('amber',1),markup=shopMarkup(unit,m.time,'gear','sustain','helmet','amber');
+  assert.ok(effects.some(effect=>effect.key==='drain'&&effect.display==='+8%'));
+  assert.match(markup,/ATRIBUTOS REAIS/);assert.match(markup,/Roubo de vida/);assert.match(markup,/\+8%/);
+  assert.match(markup,/loadout-slot[^>]*rarity-common/);assert.match(markup,/Coroa de Âmbar Vivo/);assert.match(markup,/Equipado/);
+  assert.match(markup,/troll-loadout-preview/);assert.doesNotMatch(markup,/shop-core-stats/);
+  assert.match(markup,/Todos os valores exibidos são os modificadores reais usados pelo servidor/);
+});
+
+test('Catálogo sempre mostra preços e explica quando falta ouro para comprar',()=>{
+  const m=match(),t=m.unit('t');m.state=STATES.ACTIVE;m.time=m.preparation;Object.assign(t,m.map.trollShop);t.gold=0;
+  const poor=m.snapshot(t.id).units.find(u=>u.id===t.id),poorMarkup=shopMarkup(poor,m.time,'gear','siege','weapon','maul');
+  assert.match(poorMarkup,/Inspecionar Machado Quebra-Muralha; 220 ouro/);assert.match(poorMarkup,/catalog-action unaffordable[^]*?Faltam/);assert.match(poorMarkup,/<span>220<\/span>/);assert.match(poorMarkup,/Seu saldo/);
+  t.gold=220;const ready=m.snapshot(t.id).units.find(u=>u.id===t.id),readyMarkup=shopMarkup(ready,m.time,'gear','siege','weapon','maul');
+  assert.match(readyMarkup,/data-do="buy-item" data-item="maul"/);assert.match(readyMarkup,/<span>220<\/span><\/span> · Comprar/);
+});
+
+test('Ouro conquistado por dano compra equipamento diretamente no card',()=>{
+  const m=match(),t=m.unit('t');m.state=STATES.ACTIVE;m.time=m.preparation+10;Object.assign(t,m.map.trollShop);m.grantTrollGold(t,ITEMS.maul.cost,'damage');
+  assert.equal(t.stats.goldFromDamage,ITEMS.maul.cost);assert.equal(m.act(t.id,{type:'buyItem',item:'maul'}),undefined);
+  assert.equal(t.gold,0);assert.equal(t.equipment.weapon,'maul');assert.ok(t.inventory.includes('maul'));
+  const unit=m.snapshot(t.id).units.find(u=>u.id===t.id),markup=shopMarkup(unit,m.time,'gear','siege','weapon','maul');
+  assert.match(markup,/catalog-action[^]*?✓ Equipado/);assert.match(markup,/data-do="upgrade-item" data-item="maul"/);assert.match(markup,/Arma · Comum 1/);
+});
+
+test('Card equipado evolui diretamente e atualiza raridade, custo e atributo',()=>{
+  const m=match(),t=m.unit('t');m.state=STATES.ACTIVE;m.time=m.preparation+10;Object.assign(t,m.map.trollShop);t.gold=1000;
+  assert.equal(m.act(t.id,{type:'buyItem',item:'maul'}),undefined);const cost=itemUpgradeCost('maul',1),before=t.gold;
+  assert.equal(m.act(t.id,{type:'upgradeItem',item:'maul'}),undefined);assert.equal(t.gold,before-cost);assert.equal(t.itemLevels.maul,2);
+  const unit=m.snapshot(t.id).units.find(u=>u.id===t.id),markup=shopMarkup(unit,m.time,'gear','siege','weapon','maul');
+  assert.match(markup,/Incomum · Nv. 2/);assert.match(markup,new RegExp(`Evoluir[^]*${itemUpgradeCost('maul',2)}`));
+});
+
+test('Árvore usa nomes objetivos e Roubo de Vida concede sustain real',()=>{
+  const m=match(),t=m.unit('t');m.state=STATES.ACTIVE;m.time=m.preparation;Object.assign(t,m.map.trollShop);t.gold=1000;
+  const before=m.trollStats(t).drain;assert.equal(m.act(t.id,{type:'buy',key:'lifesteal'}),undefined);assert.ok(m.trollStats(t).drain>before);
+  const unit=m.snapshot(t.id).units.find(u=>u.id===t.id),markup=shopMarkup(unit,m.time,'levels');
+  assert.match(markup,/Dano Físico/);assert.match(markup,/Velocidade de Ataque/);assert.match(markup,/Velocidade de Movimento/);assert.match(markup,/Roubo de Vida/);assert.doesNotMatch(markup,/>Fúria</);
+});
+
+test('Equipamentos evoluem de Comum a Épico com custo autoritativo e preservam vida proporcional',()=>{
+  const m=match(),t=m.unit('t');m.state=STATES.ACTIVE;m.time=m.preparation;Object.assign(t,m.map.trollShop);t.gold=100000;
+  assert.equal(m.act(t.id,{type:'buyItem',item:'maul'}),undefined);assert.equal(t.itemLevels.maul,1);t.hp=t.maxHp*.43;
+  for(let level=1;level<ITEM_RARITIES.length;level++){const before=t.gold,cost=itemUpgradeCost('maul',level),siege=m.trollStats(t).siege;assert.equal(m.act(t.id,{type:'upgradeItem',item:'maul'}),undefined);assert.equal(t.itemLevels.maul,level+1);assert.equal(t.gold,before-cost);assert.ok(m.trollStats(t).siege>siege);assert.ok(Math.abs(t.hp/t.maxHp-.43)<1e-9);}
+  assert.equal(itemRarity(t.itemLevels.maul).id,'epic');assert.match(m.act(t.id,{type:'upgradeItem',item:'maul'}),/máximo/);assert.equal(m.snapshot(t.id).units.find(unit=>unit.id===t.id).itemLevels.maul,5);
+});
+
+test('Loja reflete custo, nível e atributos autoritativos depois de uma compra',()=>{
+  const m=match(),t=m.unit('t');m.state=STATES.ACTIVE;m.time=m.preparation;Object.assign(t,m.map.trollShop);t.gold=2000;
+  const before=m.snapshot(t.id).units.find(u=>u.id===t.id),beforeMarkup=shopMarkup(before,m.time,'levels');
+  assert.match(beforeMarkup,/data-key="speed" data-level="0" data-cost="90"/);const beforeInterval=before.combat.interval;
+  assert.equal(m.act(t.id,{type:'buy',key:'speed'}),undefined);
+  const after=m.snapshot(t.id).units.find(u=>u.id===t.id),afterMarkup=shopMarkup(after,m.time,'levels');
+  assert.equal(before.levels.speed,0,'O snapshot anterior não pode compartilhar levels mutáveis com a simulação');
+  assert.match(afterMarkup,new RegExp(`data-key="speed" data-level="1" data-cost="${trollCost('speed',1)}"`));
+  assert.ok(after.combat.interval<beforeInterval);assert.match(afterMarkup,new RegExp(`${after.combat.interval.toFixed(2)} →`));
+  const beforeSnapshot=m.snapshot(t.id);assert.equal(m.act(t.id,{type:'buy',key:'damage'}),undefined);const afterSnapshot=m.snapshot(t.id),delta=createSnapshotDelta(beforeSnapshot,afterSnapshot,2),patched=applySnapshotDelta(beforeSnapshot,delta);
+  assert.equal(patched.units.find(u=>u.id===t.id).levels.damage,1,'O delta precisa transportar a compra para o navegador');
+});
+
 test('Nível 10 é Lendário, nível 20 é Épico e somente 20 bloqueia novas melhorias',()=>{
-  const m=match(),{e,core,wall}=baseFixture(m);Object.assign(e,{gold:1000000,wood:1000000});wall.tier=5;
+  const m=match(),{e,core,wall}=baseFixture(m);Object.assign(e,{gold:1000000,wood:1000000,essence:1000000});wall.tier=5;
   core.tier=9;core.maxHp=structureHP('core',9);core.hp=core.maxHp*.75;Object.assign(e,{x:core.x+2,z:core.z});const income9=resourceProducer(core).amount;
   assert.equal(m.act(e.id,{type:'upgrade',target:core.id}),undefined);advance(m,11);assert.equal(core.tier,10);assert.equal(core.legendary,true);assert.ok(Math.abs(core.hp/core.maxHp-.75)<.001);assert.ok(Math.abs(resourceProducer(core).amount/income9-B.legendary.coreIncome*lateTierScale(B.structures.core.growth,10)/lateTierScale(B.structures.core.growth,9))<1e-9);
   wall.tier=20;wall.maxHp=structureHP('wall',20);wall.hp=wall.maxHp;for(let tier=11;tier<=20;tier++){assert.equal(m.act(e.id,{type:'upgrade',target:core.id}),undefined);advance(m,11);assert.equal(core.tier,tier);}assert.equal(core.epic,true);assert.match(m.act(e.id,{type:'upgrade',target:core.id}),/máximo/);
@@ -116,12 +290,13 @@ test('Torre | Portão | Torre cabe com respiro e não fecha a passagem aberta',(
   wall.hp=0;const troll=m.unit('t');Object.assign(troll,b.gate);assert.equal(m.positionValid(troll,b.gate.x,b.gate.z),true);
 });
 
-test('Demolição de estrutura pronta devolve 75% do custo original e respeita combate',()=>{
-  const m=match(),{e,wall}=baseFixture(m),cost=wall.constructionCost;Object.assign(e,{x:wall.x,z:wall.z});
+test('Demolição devolve 75% do valor atual investido e respeita combate',()=>{
+  const m=match(),{e,wall}=baseFixture(m),construction={...wall.constructionCost};Object.assign(e,{x:wall.x,z:wall.z,gold:100000,wood:100000});
+  const upgrade=upgradeCost(wall);assert.equal(m.act(e.id,{type:'upgrade',target:wall.id}),undefined);advance(m,5);assert.equal(wall.tier,2);assert.deepEqual(wall.investmentCost,{gold:construction.gold+upgrade.gold,wood:construction.wood+upgrade.wood});
   const gold=e.gold,wood=e.wood;wall.lastHit=m.time;
   assert.match(m.act('e',{type:'demolish',target:wall.id}),/5 s/);wall.lastHit=-100;
   assert.equal(m.act('e',{type:'demolish',target:wall.id}),undefined);assert.equal(wall.hp,0);
-  assert.equal(e.gold,gold+Math.floor(cost.gold*.75));assert.equal(e.wood,wood+Math.floor(cost.wood*.75));
+  assert.equal(e.gold,gold+Math.floor((construction.gold+upgrade.gold)*.75));assert.equal(e.wood,wood+Math.floor((construction.wood+upgrade.wood)*.75));
   assert.match(m.act('e',{type:'demolish',target:wall.id}),/concluída/);
 });
 
@@ -150,7 +325,7 @@ test('Cancelamento respeita proprietário, distância, combate e obra concluída
 });
 
 test('Estruturas e atributos continuam evoluindo após tier 4 sem custo grátis',()=>{
-  const m=match(),{e,core,wall}=baseFixture(m),t=m.unit('t');m.time=0;m.state=STATES.ACTIVE;t.gold=1000000;wall.tier=10;
+  const m=match(),{e,core,wall}=baseFixture(m),t=m.unit('t');m.time=0;m.state=STATES.ACTIVE;t.gold=1000000;e.essence=1000000;wall.tier=10;
   for(let i=0;i<9;i++){
     const before=e.gold,cost=upgradeCost(core),oldHP=core.maxHp;
     assert.equal(m.act('e',{type:'upgrade',target:core.id}),undefined);assert.equal(e.gold,before-cost.gold);advance(m,11);assert.ok(core.maxHp>oldHP);
@@ -250,15 +425,28 @@ test('Defesa de torres mata Troll exposto e encerra partida com vitória dos Elf
   const end=m.time;advance(m,2);assert.equal(m.time,end);
 });
 test('Progressão lendária resolve estruturas e aumenta o raio enquanto mantém contato',()=>{
-  const sword=arena(),{m,t,e}=sword,structure={id:'execute-me',kind:'core',owner:'e',baseId:'base-x',x:t.x,z:t.z+2,tier:1,hp:140,maxHp:1000,progress:1,bounty:100,lastHit:-100};Object.assign(e,{x:t.x+20,z:t.z+20});m.structures.push(structure);t.yaw=0;t.levels.damage=5;t.levels.siege=5;t.levels.health=6;
-  assert.equal(m.legendarySword(t),true);m.act(t.id,{type:'attack'});m.time=t.pendingStrike.at;m.resolveStrike(t);assert.equal(structure.hp,0);assert.ok(m.events.some(e=>e.type==='legendary-execute'));
+  const sword=arena(),{m,t,e}=sword,structure={id:'execute-me',kind:'core',owner:'e',baseId:'base-x',x:t.x,z:t.z+2,tier:1,hp:140,maxHp:1000,progress:1,bounty:100,lastHit:-100};Object.assign(e,{x:t.x+20,z:t.z+20});m.structures.push(structure);t.yaw=0;t.levels.damage=6;t.levels.siege=6;t.levels.health=11;
+  assert.equal(m.legendarySword(t),false);t.levels.health=12;assert.equal(m.legendarySword(t),true);m.act(t.id,{type:'attack'});m.time=t.pendingStrike.at;m.resolveStrike(t);assert.equal(structure.hp,0);assert.ok(m.events.some(e=>e.type==='legendary-execute'));const executions=m.telemetry.result(m).legendaryExecutions;assert.equal(executions.count,1);assert.ok(executions.hpRemoved>0&&executions.hpRemoved<=140);assert.equal(executions.byKind.core.count,1);assert.equal(executions.events[0].id,structure.id);
 
   const beam=match(),troll=beam.unit('t'),elf=beam.unit('e');beam.state=STATES.ACTIVE;beam.time=80;troll.hp=troll.maxHp=10000;Object.assign(elf,{x:troll.x+8,z:troll.z+8});
   const tower={id:'legend',kind:'tower',owner:elf.id,baseId:'b',x:troll.x,z:troll.z+5,tier:10,hp:1000,maxHp:1000,progress:1,branch:'pierce',lastShot:-100,lastHit:-100,bounty:100};beam.structures.push(tower);
-  advance(beam,.1);assert.equal(tower.legendary,true);const hp0=troll.hp;advance(beam,1);const first=hp0-troll.hp,hp1=troll.hp;advance(beam,1);const second=hp1-troll.hp;assert.ok(second>first);assert.ok(beam.events.some(e=>e.type==='beam'));
+  advance(beam,.1);assert.equal(tower.legendary,true);const hp0=troll.hp;advance(beam,1);const first=hp0-troll.hp,hp1=troll.hp;advance(beam,1);const second=hp1-troll.hp;assert.ok(second>first);assert.ok(beam.events.some(e=>e.type==='beam'));const beamDiagnostic=beam.telemetry.result(beam).towerDiagnostics.find(row=>row.id===tower.id);assert.ok(beamDiagnostic.beamSeconds>0);assert.ok(beamDiagnostic.beamDamage>0);
   tower.disabledUntil=beam.time+1;advance(beam,.5);assert.equal(tower.beamStartedAt,0);const paused=troll.hp;advance(beam,.4);assert.ok(troll.hp>paused,'sustentação de combate continua enquanto a torre está silenciada');
 });
-test('Partida não termina por relógio e resultado registra diagnóstico de impasse',()=>{
-  const m=match(),{core}=baseFixture(m);m.state=STATES.ACTIVE;m.time=B.matchSeconds+30;m.elfBasesClaimed.add(core.baseId);m.checkEndState();assert.equal(m.state,STATES.ACTIVE);
-  const diagnostics=m.result().stallDiagnostics;assert.equal(diagnostics.liveCores,1);assert.ok(diagnostics.secondsWithoutCombat>=B.matchSeconds);assert.ok(Number.isFinite(diagnostics.economyPerSecond));
+test('V3.2 produz Essência e especializa clareiras em Economia, Defesa ou Tecnologia',()=>{
+  const setup=()=>{const m=match(),{e,core,wall}=baseFixture(m),workshop={id:'essence-workshop',kind:'workshop',owner:e.id,baseId:core.baseId,x:core.x+2,z:core.z,tier:4,hp:1000,maxHp:1000,progress:1,upgrading:0,lastHit:-100,bounty:100};m.state=STATES.ACTIVE;m.structures.push(workshop);Object.assign(e,{x:workshop.x,z:workshop.z,essence:B.elfIncremental.pathCost});return {m,e,core,wall,workshop};};
+  const economy=setup(),gold=economy.e.gold;assert.equal(essenceIncome(economy.workshop),B.elfIncremental.essenceBaseRate);assert.equal(economy.m.act(economy.e.id,{type:'chooseElfPath',target:economy.workshop.id,path:'economy'}),null);advance(economy.m,1);assert.equal(economy.e.elfPath,'economy');assert.ok(economy.e.gold-gold>resourceProducer(economy.core).amount);assert.ok(economy.e.essence>0);assert.match(economy.m.act(economy.e.id,{type:'chooseElfPath',target:economy.workshop.id,path:'defense'}),/já possui/);
+  const defense=setup(),hp=defense.core.maxHp;assert.equal(defense.m.act(defense.e.id,{type:'chooseElfPath',target:defense.workshop.id,path:'defense'}),null);assert.ok(Math.abs(defense.core.maxHp/hp-B.elfIncremental.paths.defense.structureHp)<.001);
+  const technology=setup();assert.equal(technology.m.act(technology.e.id,{type:'chooseElfPath',target:technology.workshop.id,path:'technology'}),null);assert.equal(upgradeCost({kind:'core',tier:9},'technology').essence,Math.ceil(B.elfIncremental.legendaryCost*.75));technology.core.tier=4;technology.wall.tier=2;technology.e.gold=technology.e.wood=1000000;technology.e.x=technology.core.x;technology.e.z=technology.core.z;assert.equal(technology.m.act(technology.e.id,{type:'upgrade',target:technology.core.id}),undefined);assert.ok(technology.core.upgradeDuration<(B.construction.upgradeSeconds+4));
+});
+test('Limite de 60 minutos encerra por soma de pontos da equipe',()=>{
+  const trollWin=match(),troll=trollWin.unit('t');trollWin.state=STATES.ACTIVE;troll.stats.damage=5000;trollWin.time=B.matchHardLimit;trollWin.checkEndState();
+  assert.equal(trollWin.state,STATES.END);assert.equal(trollWin.winner,'troll');assert.equal(trollWin.endReason,'score-limit');assert.equal(trollWin.scoreLimit.at,3600);assert.ok(trollWin.result().teamScores.troll>trollWin.result().teamScores.elves);
+
+  const elfWin=match(),elf=elfWin.unit('e');elfWin.state=STATES.ACTIVE;elf.stats.goldGenerated=25000;elfWin.time=B.matchHardLimit-.01;elfWin.step(.05);
+  assert.equal(elfWin.time,B.matchHardLimit);assert.equal(elfWin.state,STATES.END);assert.equal(elfWin.winner,'elves');assert.equal(elfWin.endReason,'score-limit');assert.ok(elfWin.result().teamScores.elves>elfWin.result().teamScores.troll);
+
+  const tie=match();tie.state=STATES.ACTIVE;tie.time=B.matchHardLimit;tie.checkEndState();assert.equal(tie.winner,'elves');assert.equal(tie.scoreLimit.tieBreaker,'defenders-hold');
+
+  const drift=match();drift.state=STATES.ACTIVE;drift.time=B.matchHardLimit-.3;drift.step(.1);drift.step(.1);drift.step(.1);assert.equal(drift.state,STATES.END);assert.equal(drift.time,B.matchHardLimit);
 });

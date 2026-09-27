@@ -5,7 +5,7 @@ Implementação de 22/09/2026. A meta permanece **12–18 minutos, com fases cla
 ## Como usar
 
 - **Elfo:** construa e conclua o núcleo; pressione **N** perto dele. Forme Wisps, evolua os existentes ou selecione um para trocar sua árvore. O recurso madeira também abre esse painel.
-- **Troll:** **B** abre Equipamentos e Atributos ∞. As sugestões Cerco, Caçador e Sustentação destacam combinações, sem impedir misturas.
+- **Troll:** perto da Forja, **G** abre a loja com mouse livre. Equipamentos possuem quatro categorias — Capacete, Armadura, Arma e Botas — com cinco opções positivas em cada uma. A Árvore de crescimento fica em uma página separada; Cerco, Caçador e Sustentação são sugestões, sem impedir misturas.
 - **Combate:** segure o clique para leves, **Q** para pesado, **Espaço** para esquiva e **F** para rugido. O terceiro leve consecutivo no mesmo alvo recebe bônus. Esquivar cancela a preparação e fortalece o próximo acerto por 1,2 segundo.
 
 ## Árvores como espaço econômico
@@ -46,7 +46,7 @@ São nove itens em **arma, proteção e relíquia**, um equipado por espaço. It
 |---|---|---|
 | Cerco | Marreta de cerco, Couraça de pedra, Totem do silêncio | Romper defesa durante rugido; ataques e movimento mais lentos |
 | Caçador | Garras da caça, Manto do vento, Selo da caça | Reposicionar e aproveitar abertura após esquiva; menos vida e dano a estruturas |
-| Sustentação | Lâmina longa, Musgo vivo, Âmbar vital | Alcance, recuperação e cura por dano efetivo; musgo reduz armadura |
+| Sustentação | Lâmina longa, Musgo vivo, Âmbar vampírico | Alcance, recuperação e roubo de vida por dano efetivo; musgo reduz armadura |
 
 Itens custam entre 180 e 240 ouro. A loja mostra vantagens, penalidades, equipamento atual e preço. O Troll também muda visualmente conforme sua arma/proteção/relíquia. Não há consumíveis, venda nem compra automática de uma build nesta entrega.
 

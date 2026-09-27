@@ -53,6 +53,7 @@ try{
   await page.keyboard.press('KeyN');
   const upgrade=page.locator('[data-do=upgrade]');await upgrade.waitFor();
   const demolish=page.locator('[data-do=demolish]');await demolish.waitFor();let demolitionPrompt='';page.once('dialog',async dialog=>{demolitionPrompt=dialog.message();await dialog.dismiss();});await demolish.dispatchEvent('click');assert.match(demolitionPrompt,/75|receberá|Demolir/);assert.ok(core.hp>0);report.demolitionConfirmation=true;
+  let deletePrompt='';page.once('dialog',async dialog=>{deletePrompt=dialog.message();await dialog.dismiss();});await page.keyboard.press('Delete');assert.match(deletePrompt,/receberá|Demolir/);assert.ok(core.hp>0);report.demolitionHotkey=true;
   await until(()=>upgrade.isEnabled(),'Affordable core upgrade disabled');
   await page.screenshot({path:'artifacts/review-core-affordable.png'});
   await page.keyboard.press('KeyQ');await until(()=>core.upgrading>0,'Q upgrade command did not reach server');

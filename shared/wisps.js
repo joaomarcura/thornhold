@@ -1,4 +1,4 @@
-import { BALANCE as B, distance, wispCost, wispIncome, wispUpgradeCost } from './config.js';
+import { BALANCE as B, distance, wispCost, wispIncome, wispUpgradeCost, elfPath } from './config.js';
 import { baseAt } from './map.js';
 import { recordSpend } from './economy.js';
 
@@ -21,7 +21,7 @@ export function commandWisp(m,u,cmd){
     u.gold-=cost.gold;u.wood-=cost.wood;recordSpend(u,cost,'economy','training');
     const w={id:'w'+m.nextId++,role:'wisp',name:'Wisp',owner:u.id,treeId:tree.id,rich:tree.rich,x:tree.x,z:tree.z,
       level:1,hp:B.wisps.hp,maxHp:B.wisps.hp,alive:true,readyAt:m.time+B.wisps.trainSeconds,upgradingUntil:0,lastHit:-100,bounty:cost.gold*.3};
-    w.job={type:'train',...cost,duration:B.wisps.trainSeconds,until:w.readyAt};m.wisps.push(w);m.emit('wisp-trained',{entity:w.id,unit:u.id,x:w.x,z:w.z});return;
+    w.job={type:'train',...cost,duration:B.wisps.trainSeconds,until:w.readyAt};m.wisps.push(w);m.wispById?.set(w.id,w);m.emit('wisp-trained',{entity:w.id,unit:u.id,x:w.x,z:w.z});return;
   }
   if(cmd.type==='upgradeAllWisps'){
     const core=m.structures.find(s=>s.id===cmd.target&&s.kind==='core'&&s.owner===u.id&&s.hp>0&&s.progress===1);
@@ -66,8 +66,8 @@ export function stepWisps(m,dt){
     if(w.job&&w.job.until<=m.time)delete w.job;
     if(w.upgradingUntil&&w.upgradingUntil<=m.time){w.upgradingUntil=0;w.level++;w.maxHp+=5;w.hp=Math.min(w.maxHp,w.hp+5);m.emit('complete',{entity:w.id,x:w.x,z:w.z});}
     if(wispActive(m,w)){
-      const amount=wispIncome(w)*dt;owner.wood+=amount;owner.stats.woodGenerated=(owner.stats.woodGenerated||0)+amount;w.productionPulse=(w.productionPulse||0)+amount;
-      if((w.productionPulseAt??m.time)<=m.time){m.emit('resource',{unit:owner.id,entity:w.id,x:w.x,z:w.z,resource:'wood',amount:w.productionPulse,rate:wispIncome(w)*60});w.productionPulse=0;w.productionPulseAt=m.time+1;}
+      const rate=wispIncome(w)*(elfPath(owner.elfPath)?.wood||1),amount=rate*dt;owner.wood+=amount;owner.stats.woodGenerated=(owner.stats.woodGenerated||0)+amount;w.productionPulse=(w.productionPulse||0)+amount;
+      if((w.productionPulseAt??m.time)<=m.time){m.emit('resource',{unit:owner.id,entity:w.id,x:w.x,z:w.z,resource:'wood',amount:w.productionPulse,rate:rate*60});w.productionPulse=0;w.productionPulseAt=m.time+1;}
     }
   }
 }

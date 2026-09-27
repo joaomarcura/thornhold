@@ -63,8 +63,8 @@ try{
   await page.locator('[data-do=return]').click();
   await page.locator('[data-do=slot][data-slot=t0][data-action=claim]').click();
   const ready=page.locator('[data-do=ready]');if((await ready.innerText()).includes('Ready up'))await ready.click();
-  await page.locator('[data-do=start]').click();await page.getByText('FOREST TROLL',{exact:true}).waitFor();
-  await page.locator('#hotbar [data-do=shop]').click();await page.getByText('FOREST ARSENAL',{exact:true}).waitFor();
+  await page.locator('[data-do=start]').click();await page.getByText('FOREST TROLL',{exact:true}).waitFor();await page.locator('.card-modal').waitFor();await page.keyboard.press('Digit1');await page.locator('.card-modal').waitFor({state:'detached'});
+  await page.locator('#hotbar [data-do=shop]').click();await page.getByText('ANCESTRAL FORGE · SANCTUARY',{exact:true}).waitFor();
   const shopText=await page.locator('#shop').innerText();assert.doesNotMatch(shopText,/\b(Equipamentos|Proteção|Relíquia|Espaço livre|Cerco|Caçador|Sustentação)\b/i);report.shop=true;
   assert.deepEqual(errors,[]);report.errors=errors;
   console.log(report);

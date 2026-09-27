@@ -73,7 +73,7 @@ test('Selection changes at resource threshold without a clock tick and explains 
 
 test('Seleção oferece demolição pronta com reembolso e confirmação no cliente',()=>{
   const {m,u,core}=fixture(),snapshot=m.snapshot('e'),entity=snapshot.structures.find(s=>s.id===core.id),html=selectionMarkup(entity,{u,snapshot,map:m.map});
-  assert.match(html,/data-do="demolish"/);assert.match(html,/75% do custo original/);assert.match(html,/Demolir estrutura/);
+  assert.match(html,/data-do="demolish"/);assert.match(html,/75% do valor atual investido/);assert.match(html,/incluindo melhorias/);assert.match(html,/Demolir estrutura/);assert.match(html,/<kbd>Delete<\/kbd>/);
 });
 test('Selection identifies free barricade repair and diminishing assistance',()=>{
   const {m,u,core}=fixture(),wall={...core,id:'wall-ui',kind:'wall',hp:core.maxHp-50};
@@ -131,7 +131,7 @@ test('V2.1 registra estado, setores, cercos, trade, pressão e economia sem diri
   const economy=v2.economyCheckpoints.find(c=>c.time===180).elves;assert.ok(Object.hasOwn(economy,'netSpentGold'));assert.ok(Object.hasOwn(economy,'goldUtilization'));assert.ok(economy.spendByPurpose.economy);assert.ok(economy.spendByPurpose.defense);assert.ok(Array.isArray(economy.players));
   const frozen=economy.players[0].spendByPurpose;m.unit('e').stats.spendByPurpose.economy={gold:999,wood:999};assert.notDeepEqual(frozen,m.unit('e').stats.spendByPurpose);
   assert.equal(Object.hasOwn(v2.matchState,'elfPower'),true);assert.equal(Object.hasOwn(v2.matchState,'volatility'),true);
-  assert.equal(m.result().telemetry.schema,7);assert.equal(v2.maxWallHp,20);assert.ok(Array.isArray(v2.repeatedTargets));assert.ok(Object.hasOwn(v2,'worstRepeatedTarget'));assert.ok(Object.hasOwn(v2,'maxFailedSiegesTarget'));assert.ok(Array.isArray(v2.decisionDiagnostics.targetFailures));assert.ok(Array.isArray(v2.decisionDiagnostics.blockedBases));assert.deepEqual(Object.keys(v2.outcomeMilestones),['firstElfDeathAt','thirdElfDeathAt','finalElfPhaseAt']);assert.equal(v2.formulaVersion,'v2.15-endgame-resolution-1');
+  const report=m.result();assert.equal(report.telemetry.schema,14);assert.equal(report.telemetry.legendaryExecutions.count,0);assert.ok(Array.isArray(report.telemetry.chases));assert.ok(report.telemetry.chaseSummary);assert.equal(v2.maxWallHp,20);assert.ok(Array.isArray(v2.repeatedTargets));assert.ok(Object.hasOwn(v2,'worstRepeatedTarget'));assert.ok(Object.hasOwn(v2,'maxFailedSiegesTarget'));assert.ok(Array.isArray(v2.decisionDiagnostics.targetFailures));assert.ok(Array.isArray(v2.decisionDiagnostics.blockedBases));assert.ok(Object.hasOwn(v2.decisionDiagnostics,'recoveryPlan'));assert.ok(Object.hasOwn(v2.decisionDiagnostics,'repositionStreak'));assert.ok(Array.isArray(v2.finalSiegeParity));assert.deepEqual(Object.keys(v2.outcomeMilestones),['firstElfDeathAt','thirdElfDeathAt','finalElfPhaseAt']);assert.equal(v2.formulaVersion,'v3.9-strategic-rotation');
 });
 test('Stun defensivo só funciona na própria base rompida e bloqueia o Troll por 3s',()=>{
   const m=new Match({seed:'STUN'},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},{id:'e0',role:'elf',occupant:{type:'human',name:'A'}},{id:'e1',role:'elf',occupant:{type:'human',name:'B'}}]);
@@ -154,6 +154,7 @@ test('Placar ao vivo não vaza posição ou HP e MVP pertence ao time vencedor',
   Object.assign(guardian.stats,{damage:1200,kills:1,stuns:2});Object.assign(troll.stats,{damage:9000,structuresDestroyed:4});
   assert.ok(playerScore(guardian)>playerScore(builder));
   const live=m.snapshot(builder.id).scoreboard;assert.equal(live.length,3);assert.ok(!Object.hasOwn(live[0],'x'));assert.ok(!Object.hasOwn(live[0],'hp'));
+  assert.equal(live.find(player=>player.role==='troll').trollLevel,1);assert.equal(m.snapshot(builder.id).units.find(unit=>unit.role==='troll').trollLevel,1);
   m.winner='elves';m.state=STATES.END;const result=m.result();
   assert.equal(result.mvp.id,guardian.id);assert.equal(result.players.length,3);
   assert.ok(result.players.every(p=>Number.isFinite(p.score)&&Object.hasOwn(p,'structuresBuilt')&&Object.hasOwn(p,'stuns')));
@@ -168,12 +169,27 @@ test('Núcleo destruído abre uma janela de reassentamento antes da derrota',()=
   assert.equal(u.gold,0);assert.equal(u.wood,0);assert.equal(u.relocationVouchers,0);assert.equal(u.stats.relocations,1);
   assert.equal(u.relocationUntil,0);assert.equal(m.state,STATES.ACTIVE);
   const replacement=m.structures.at(-1);replacement.progress=1;replacement.hp=replacement.maxHp;
-  m.damage(replacement,replacement.hp,troll,'melee');assert.equal(u.relocationUntil,0);assert.equal(m.state,STATES.END);
+  m.damage(replacement,replacement.hp,troll,'melee');assert.equal(u.relocationUntil,0);assert.equal(u.alive,false);assert.equal(u.ghost,true);assert.equal(m.state,STATES.END);assert.equal(m.endReason,'army-eliminated');
 
   const expired=fixture();expired.m.state=STATES.ACTIVE;expired.m.time=60;
   expired.m.damage(expired.core,expired.core.hp,expired.m.unit('t'),'melee');
   expired.m.time=expired.u.relocationUntil+.01;expired.m.checkEndState();
   assert.equal(expired.m.state,STATES.END);assert.equal(expired.m.endReason,'all-elf-bases-destroyed');
+});
+test('Cada Elfo pode fundar no máximo dois Núcleos durante a partida',()=>{
+  const {m,u,core}=fixture(),troll=m.unit('t');m.state=STATES.ACTIVE;m.time=60;
+  assert.equal(u.coreFoundations,1);m.damage(core,core.hp,troll,'melee');
+  const next=m.map.bases.find(base=>base.id!==core.baseId);Object.assign(u,{x:next.x+4.4,z:next.z,gold:1000,wood:1000});
+  assert.equal(m.act(u.id,{type:'build',kind:'core',x:next.x,z:next.z}),undefined);assert.equal(u.coreFoundations,2);
+  const replacement=m.structures.at(-1);replacement.hp=0;u.baseId=null;u.alive=true;u.ghost=false;
+  const third=m.map.bases.find(base=>base.id!==core.baseId&&base.id!==next.id);Object.assign(u,{x:third.x+4.4,z:third.z});
+  assert.match(m.placement(u,'core',third.x,third.z),/único reassentamento/);
+});
+test('Troll bot usa sprint em CHASE e a telemetria registra conversão da perseguição',()=>{
+  const m=create(),troll=m.unit('t'),elf=m.unit('e'),controller=new AIController('normal');m.state=STATES.ACTIVE;m.time=60;m.controllers.set(troll.id,controller);
+  Object.assign(elf,{x:troll.x+12,z:troll.z});controller.brain={state:'chase',targetId:elf.id,chase:{targetId:elf.id}};controller.go(m,troll,elf,2);controller.follow(m,troll,.1);assert.equal(troll.input.sprint,true);
+  m.telemetry.step(m,.1);troll.x+=5;m.damage(elf,elf.hp,troll,'melee');m.time+=1;controller.brain.state='rotate';controller.brain.targetId=null;m.telemetry.step(m,.1);
+  const report=m.telemetry.result(m);assert.equal(report.chases.length,1);assert.equal(report.chases[0].targetId,elf.id);assert.ok(report.chases[0].endDistance<report.chases[0].startDistance);assert.equal(report.chases[0].outcome,'killed');assert.equal(report.chases[0].targetHpRemoved,B.elf.hp);assert.equal(report.chaseSummary.count,1);
 });
 test('Morte do Elfo colapsa patrimônio, paga 25% e libera a clareira após 15s',()=>{
   const m=new Match({seed:'COLLAPSE'},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},{id:'e0',role:'elf',occupant:{type:'human',name:'Dono'}},{id:'e1',role:'elf',occupant:{type:'human',name:'Herdeiro'}}]);
@@ -193,7 +209,7 @@ test('Espírito move, revela, repara a 50% e uma segunda morte vira observação
   assert.equal(ghost.alive,false);assert.equal(ghost.ghost,true);assert.equal(ghost.hp,B.ghost.hp);assert.equal(m.state,STATES.ACTIVE);assert.match(m.act(ghost.id,{type:'build',kind:'tower',x:base.x,z:base.z}),/espírito/);
   Object.assign(ghost,{x:base.x,z:base.z});Object.assign(ally,m.map.bases.at(-1));Object.assign(troll,{x:base.x+14,z:base.z});assert.equal(m.teamSee(ally,troll),false);
   assert.equal(m.act(ghost.id,{type:'ghostReveal'}),undefined);assert.equal(m.teamSee(ally,troll),true);assert.equal(m.reveals[0].until,m.time+B.ghost.revealDuration);assert.match(m.act(ghost.id,{type:'ghostReveal'}),/recarregando/);
-  const wall={id:'ghost-wall',kind:'wall',owner:ally.id,baseId:base.id,x:ghost.x+1,z:ghost.z,tier:1,hp:400,maxHp:500,progress:1,bounty:100,lastHit:-100};m.structures.push(wall);assert.equal(m.act(ghost.id,{type:'repair',target:wall.id}),undefined);assert.equal(wall.hp,421);
+  const wall={id:'ghost-wall',kind:'wall',owner:ally.id,baseId:base.id,x:ghost.x+1,z:ghost.z,tier:1,hp:400,maxHp:500,progress:1,bounty:100,lastHit:-100};m.structures.push(wall);assert.equal(m.act(ghost.id,{type:'repair',target:wall.id}),undefined);assert.equal(wall.hp,400+(B.elf.repair+wall.maxHp*B.elf.wallRepairRate)*.5);
   const x=ghost.x;m.input(ghost.id,{x:-1,z:0});m.movement(ghost,.1);assert.notEqual(ghost.x,x);
   const gold=troll.gold,kills=m.stats.kills,eliminations=m.telemetry.eliminations.length;m.damage(ghost,ghost.hp,troll,'melee');assert.equal(ghost.ghost,false);assert.equal(ghost.observer,true);assert.equal(troll.gold,gold+B.ghost.goldReward);assert.equal(m.stats.kills,kills);assert.equal(m.telemetry.eliminations.length,eliminations);assert.equal(troll.stats.ghostsDestroyed,1);
 });

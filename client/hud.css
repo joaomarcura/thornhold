@@ -144,6 +144,10 @@
 .playing:has(#shop:not([hidden])) .minimap-wrap,
 .playing:has(#shop:not([hidden])) .cursor-mode,
 .playing:has(#shop:not([hidden])) .hud-shortcuts { visibility: hidden; }
+.shop-open #world { cursor: default!important; }
+.shop-open.mouse-look #hud .shop,
+.shop-open.mouse-look #hud .shop button,
+.shop-open.mouse-look #hud .shop [data-do] { pointer-events: auto; }
 .shop { width: min(760px,calc(100vw - 64px)); right: 24px; top: 68px; max-height: calc(100vh - 96px); padding: 21px; border: 1px solid #bba37488; border-top: 3px solid #b59c66; background: linear-gradient(115deg,#232a1ffb,#111a13fc); border-radius: 1px; box-shadow: -20px 0 100px #0005,inset 0 1px #e9d39b22; scrollbar-width: thin; }
 .shop .modal-close { display: flex; align-items: center; gap: 4px; right: 14px; top: 13px; }
 .shop .modal-close svg { width: 18px; height: 18px; }
@@ -154,6 +158,9 @@
 .shop-tabs { border-bottom: 1px solid #b29c634f; margin: 0 0 14px; gap: 20px; }
 .shop-tabs button { padding: 9px 0; border: 0; border-bottom: 2px solid transparent; border-radius: 0; font-size: 13px; color: #adbb9f; }
 .shop-tabs [aria-selected=true] { background: none; color: #f1d997; border-bottom-color: #d8b76f; }
+.shop-stats { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 6px; margin: 13px 0 15px; }
+.shop-stats span { display: flex; flex-direction: column; gap: 3px; padding: 7px 8px; border: 1px solid #9b98652d; background: #0c130c55; color: #9fac96; font-size: 9px; text-transform: uppercase; letter-spacing: .45px; }
+.shop-stats b { color: #eadbb8; font-size: 12px; letter-spacing: 0; text-transform: none; }
 .build-choices button { padding: 6px 12px; font-size: 12px; border-radius: 1px; border-color: #938a6255; }
 .build-choices [aria-pressed=true] { background: #9581493b; color: #ecd39a; border-color: #baa168; }
 .shop>p.build-description { color: #c2cbb6; font-size: 12px; margin: 10px 0 14px; }
@@ -188,6 +195,7 @@
   .selection-panel { max-height: calc(100vh - 244px); }
   .wisp-roster { max-height: 110px; }
 }
+@media(max-width:760px) { .shop-stats { grid-template-columns: repeat(3,1fr); } }
 @media(max-width:1100px) {
   .health-panel { width: 182px; padding: 10px; }
   .hotbar button { width: 61px; height: 67px; }

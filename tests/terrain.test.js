@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateMap, heightAt, flatGround, pathfind, toCell, index, lineOfSight } from '../shared/map.js';
+import { generateMap, baseZone, heightAt, flatGround, pathfind, toCell, index, lineOfSight, walkable } from '../shared/map.js';
 import { Match } from '../shared/simulation.js';
 import { BALANCE, STATES, distance } from '../shared/config.js';
 import { TacticalMap } from '../client/tactical-map.js';
@@ -8,12 +8,29 @@ import { TacticalMap } from '../client/tactical-map.js';
 test('Refúgios variam em espaço, madeira e altura; núcleos e portões permanecem planos',()=>{
   for(const size of ['compact','large'])for(let seed=0;seed<20;seed++){
     const map=generateMap('terrain-'+seed,size);
-    assert.equal(map.bases.length,12);assert.equal(new Set(map.bases.map(b=>b.rx*b.rz)).size,3);
+    assert.equal(map.version,3);assert.equal(map.bases.length,12);assert.ok(new Set(map.bases.map(b=>b.rx*b.rz)).size>=3);
     assert.equal(new Set(map.bases.map(b=>b.wood)).size,3);
     assert.ok(map.trees.every(t=>t.amount===BALANCE.economy.treeStock));
     assert.ok(map.bases.some(b=>b.height<0)&&map.bases.some(b=>b.height>0));
     for(const b of map.bases){assert.ok(flatGround(map,b.x,b.z,4.5),`core ${seed} ${b.id}`);assert.ok(flatGround(map,b.gate.x,b.gate.z,1.55),`gate ${seed} ${b.id}`);assert.ok(Math.abs(heightAt(map,b.x,b.z)-b.height)<.001);assert.equal(map.trees.filter(t=>t.baseId===b.id).length,b.capacity);}
     for(const d of map.decor){const c=toCell(map,d);assert.equal(map.grid[index(map,c.x,c.z)],1,'Cenário sólido não invade o corredor');}
+  }
+});
+
+test('V3.1 amplia lateralmente as bases e organiza Core, Industrial e Frontline sem mover o portão',()=>{
+  const legacyUsable=(rx,rz)=>{let cells=1;for(let z=-rz+1;z<rz;z++)for(let x=-rx+1;x<rx;x++)if(!(Math.abs(x)>rx-3&&Math.abs(z)>rz-3))cells++;return cells;};
+  for(const size of ['compact','large'])for(let seed=0;seed<20;seed++){
+    const map=generateMap(`expanded-${seed}`,size);
+    for(const b of map.bases){
+      const {legacyRx,legacyRz,lateralExpansion}=b.zones;
+      assert.equal(lateralExpansion,2);
+      if(b.gate.axis==='x'){assert.equal(b.rx,legacyRx);assert.equal(b.rz,legacyRz+2);assert.equal(Math.abs(b.gate.cx-b.cx),legacyRx);}
+      else{assert.equal(b.rx,legacyRx+2);assert.equal(b.rz,legacyRz);assert.equal(Math.abs(b.gate.cz-b.cz),legacyRz);}
+      const gain=b.usableCells/legacyUsable(legacyRx,legacyRz)-1;assert.ok(gain>=.28&&gain<=.55,`${b.profile} ganhou ${(gain*100).toFixed(1)}%`);
+      const zones={core:0,industrial:0,frontline:0};
+      for(let z=b.cz-b.rz+1;z<b.cz+b.rz;z++)for(let x=b.cx-b.rx+1;x<b.cx+b.rx;x++)if(walkable(map,x,z))zones[baseZone(map,b,{x:x*map.cell,z:z*map.cell})]++;
+      assert.ok(zones.core>=16&&zones.industrial>=24&&zones.frontline>=16,`${b.id}: ${JSON.stringify(zones)}`);
+    }
   }
 });
 

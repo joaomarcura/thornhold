@@ -11,7 +11,7 @@ export function unitEffects(u, time, state, preparation) {
   if(u.dashUntil>time)add('dash','Esquiva','buff',u.dashUntil,'Movimento acelerado');
   if(u.role!=='troll')return effects;
   const stats=combatStats(u);
-  if(state===STATES.PREP){add('seal','Selo de preparação','debuff',preparation,'Aguarde a libertação');return effects;}
+  if(state===STATES.PREP){add('seal','Selo de preparação','debuff',preparation,'Explore o Santuário · a barreira ainda impede a caçada');return effects;}
   if(u.recallUntil>time)add('recall-channel','Retorno ao Santuário','buff',u.recallUntil,'Canalizando · dano, movimento ou habilidade interrompe');
   if(u.recallSpeedUntil>time)add('recall-speed','Ímpeto do Santuário','buff',u.recallSpeedUntil,'Movimento +20%');
   if(time-u.lastHit<stats.regenDelay)add('regen-delay','Regeneração plena bloqueada','debuff',u.lastHit+stats.regenDelay,'Sustentação de combate permanece ativa');
@@ -24,5 +24,9 @@ export function unitEffects(u, time, state, preparation) {
 }
 
 export function structureEffects(s,time){
-  return s.disabledUntil>time?[{id:'silenced',label:'Rugido · desativada',kind:'debuff',until:s.disabledUntil,detail:'Torre não pode disparar'}]:[];
+  const effects=[];
+  if(s.disabledUntil>time)effects.push({id:'silenced',label:'Rugido · desativada',kind:'debuff',until:s.disabledUntil,detail:'Torre não pode disparar'});
+  if(s.kind==='wall'&&s.passiveRegenerating)effects.push({id:'wall-recovery',label:'Barricada se recompondo',kind:'buff',until:null,detail:`+${(s.maxHp*B.wallRecovery.rate).toFixed(1)} vida/s · após 8s sem dano`});
+  if(s.kind==='wall'&&(s.breachStacks||0)>0)effects.push({id:'breach-pressure',label:`Pressão de cerco ×${s.breachStacks}`,kind:'debuff',until:s.breachDecayAt||null,detail:`Dano recebido +${Math.round(s.breachStacks*B.breachMomentum.damagePerStack*100)}% · reparo −${Math.round(s.breachStacks*B.breachMomentum.repairPenaltyPerStack*100)}%`});
+  return effects;
 }

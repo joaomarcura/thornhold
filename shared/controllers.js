@@ -1,5 +1,5 @@
-import { BALANCE as B, distance, mineEconomy, upgradeCost, wispCost, wispUpgradeCost, placementRadius } from './config.js';
-import { pathfind, toCell, index, lineOfSight, walkable, baseAt, randomFor } from './map.js';
+import { STATES, BALANCE as B, distance, mineEconomy, upgradeCost, wispCost, wispUpgradeCost, placementRadius } from './config.js';
+import { pathfind, toCell, index, lineOfSight, walkable, baseAt, baseZone, randomFor } from './map.js';
 import { TrollBrain } from './troll-brain.js';
 import { availableTrees } from './wisps.js';
 import { requiredBarricadeTier, upgradeStatus } from './upgrade-rules.js';
@@ -77,7 +77,7 @@ export class AIController {
       if(target.entityId){if(this.lastNavigationEntity!==target.entityId||match.time-this.lastNavigationAt>15){this.metrics.failedNavigation++;this.recordNavigationFailure(match,target,'noRoute');}this.lastNavigationEntity=target.entityId;this.lastNavigationAt=match.time;}else this.metrics.failedExploration++;this.navigationFailure=target.entityId||'point';this.navigationFailureTarget={...target};this.destination=null;this.route=[];this.routeAt=-100;u.input={x:0,z:0};return;
     }
     const traveling=u.role==='troll'&&!this.retreating&&['explore','hunt','rotate'].includes(this.brain?.state),travelFactor=traveling?B.troll.travelSpeed:1;
-    const sprint=u.role==='elf'?B.movement.elfSprint:B.movement.sprint,d=distance(u,next),speed=(u.role==='elf'?B.elf.speed:match.trollStats(u).movement)*sprint*(u.dashUntil>match.time?B.troll.dashSpeed:1)*travelFactor,divisor=Math.max(.001,d,speed*dt);u.input={x:(next.x-u.x)/divisor,z:(next.z-u.z)/divisor,sprint:u.role==='elf'||this.retreating||this.brain?.state==='reposition',travel:traveling};u.yaw=Math.atan2(u.input.x,u.input.z);
+    const sprint=u.role==='elf'?B.movement.elfSprint:B.movement.sprint,d=distance(u,next),speed=(u.role==='elf'?B.elf.speed:match.trollStats(u).movement)*sprint*(u.dashUntil>match.time?B.troll.dashSpeed:1)*travelFactor,divisor=Math.max(.001,d,speed*dt);u.input={x:(next.x-u.x)/divisor,z:(next.z-u.z)/divisor,sprint:u.role==='elf'||this.retreating||['reposition','chase'].includes(this.brain?.state),travel:traveling};u.yaw=Math.atan2(u.input.x,u.input.z);
   }
   actNear(match,u,target,cmd,reach=B.interactRange){
     if(cmd.type==='build'&&cmd.kind!=='wall'&&distance(u,target)<B.structures[cmd.kind].radius+.5){
@@ -96,17 +96,19 @@ export class AIController {
     if(!(u.cooldowns.ghostReveal>match.time)){match.act(u.id,{type:'ghostReveal'});this.stop(u);return;}
     const ally=match.units.filter(a=>a.role==='elf'&&a.alive).sort((a,b)=>distance(u,a)-distance(u,b))[0];if(ally)this.go(match,u,ally,4);else this.stop(u);
   }
-  elfEscapePoint(match,u,base){
-    if(this.elfEvade?.baseId===base.id&&this.elfEvade.destination)return this.elfEvade.destination;
+  elfEscapePoint(match,u,base,threat=null){
+    const cached=this.elfEvade?.baseId===base.id?this.elfEvade.destination:null;
+    if(cached&&(!threat||distance(cached,threat)>=B.elf.evacuationThreatRange))return cached;
     // Refuges have a single gate. Once the Troll is inside, another corner of
     // the same refuge is a trap, so continue through the gate toward the
     // nearest reachable refuge trail.
     const alternatives=match.map.bases.filter(candidate=>candidate.id!==base.id)
-      .sort((a,b)=>distance(base.ramp.to,a.outside)-distance(base.ramp.to,b.outside));
+      .sort((a,b)=>threat?distance(b.outside,threat)-distance(a.outside,threat):distance(base.ramp.to,a.outside)-distance(base.ramp.to,b.outside));
     const destination=alternatives.map(candidate=>candidate.outside)
-      .find(point=>this.reachablePoint(match,u,point))||base.ramp.to||base.outside;
-    this.elfEvade={baseId:base.id,destination:{x:destination.x,z:destination.z},until:match.time+12};
-    this.metrics.evacuations=(this.metrics.evacuations||0)+1;
+      .find(point=>(!threat||distance(point,threat)>=B.elf.evacuationThreatRange)&&this.reachablePoint(match,u,point))||base.ramp.to||base.outside;
+    const first=!this.elfEvade||this.elfEvade.baseId!==base.id;
+    this.elfEvade={...(first?{startedAt:match.time,minimumUntil:match.time+B.elf.evacuationMinSeconds,lastThreatAt:match.time}:this.elfEvade),baseId:base.id,destination:{x:destination.x,z:destination.z}};
+    if(first)this.metrics.evacuations=(this.metrics.evacuations||0)+1;
     return this.elfEvade.destination;
   }
   elf(match,u){
@@ -128,6 +130,14 @@ export class AIController {
       this.metrics.strategy=this.elfProfile;this.metrics.personalityName=u.name;this.metrics.buildPlan={...this.buildPlan};
     }
     const strategy={economy:{mineRatio:1,towerBase:1,towerGrowth:.25,towerTierOffset:-1,wispTarget:4},balanced:{mineRatio:.75,towerBase:1,towerGrowth:.5,towerTierOffset:0,wispTarget:3},defense:{mineRatio:.5,towerBase:2,towerGrowth:.75,towerTierOffset:1,wispTarget:2}}[this.elfProfile];
+    // Troll spawn is a public landmark. Bots still inside its immediate area at
+    // the end of preparation must clear it before the seal opens instead of
+    // waiting for the first live threat update and fleeing one decision late.
+    const preparationRemaining=match.preparation-match.time;
+    if(match.state===STATES.PREP&&preparationRemaining<=B.elf.preparationClearSeconds&&distance(u,match.map.trollSpawn)<B.elf.preparationTrollClearRadius){
+      const destination=[...match.map.bases].sort((a,b)=>distance(b.outside,match.map.trollSpawn)-distance(a.outside,match.map.trollSpawn)).map(base=>base.outside).find(point=>distance(point,match.map.trollSpawn)>=B.elf.preparationTrollClearRadius&&this.reachablePoint(match,u,point));
+      if(destination){this.metrics.preparationEvacuations=(this.metrics.preparationEvacuations||0)+1;this.go(match,u,destination,2);return;}
+    }
     const avoidedEntity=e=>(this.elfAvoidEntities?.get(e.id)||0)>match.time;
     const own=match.structures.filter(s=>s.owner===u.id&&s.hp>0),core=own.find(s=>s.kind==='core');
     if(own.some(s=>s.progress<1&&!avoidedEntity(s))){const work=own.find(s=>s.progress<1&&!avoidedEntity(s));this.actNear(match,u,work,{type:'assist',target:work.id});return;}
@@ -136,7 +146,17 @@ export class AIController {
       const elves=match.units.filter(a=>a.role==='elf'),offset=elves.findIndex(a=>a.id===u.id);
       const claimed=new Set(match.structures.filter(s=>s.kind==='core'&&s.hp>0).map(s=>s.baseId));
       if(!this.refuges){const rng=randomFor(match.map.seed+'refuges');this.refuges=shuffled(match.map.bases,rng);this.metrics.refugeOrder=this.refuges.map(refuge=>refuge.id);}
-      base=Array.from({length:this.refuges.length},(_,i)=>this.refuges[(offset+i)%this.refuges.length]).find(b=>!claimed.has(b.id));if(!base)return;
+      const ordered=Array.from({length:this.refuges.length},(_,i)=>this.refuges[(offset+i)%this.refuges.length]),previousBaseId=u.displacedBaseId||null;
+      const visibleThreat=match.visibleEnemies(u).find(e=>e.role==='troll'),rememberedThreat=(u.relocationThreat?.until||0)>match.time?u.relocationThreat:null,relocationThreat=visibleThreat||rememberedThreat;
+      let candidates=ordered.filter(b=>!claimed.has(b.id)&&(match.reclaimUntil.get(b.id)||0)<=match.time&&b.id!==previousBaseId);
+      if(!candidates.length)candidates=ordered.filter(b=>!claimed.has(b.id)&&(match.reclaimUntil.get(b.id)||0)<=match.time);
+      const current=candidates.find(b=>b.id===this.relocationBaseId&&(!relocationThreat||distance(b,relocationThreat)>=B.elf.evacuationThreatRange));
+      if(current)base=current;else{
+        if(relocationThreat)candidates.sort((a,b)=>(distance(b,relocationThreat)-distance(u,b)*.15)-(distance(a,relocationThreat)-distance(u,a)*.15));
+        base=candidates[0];this.relocationBaseId=base?.id||null;
+      }
+      if(!base){this.stop(u);return;}
+      this.metrics.relocationTarget=base.id;this.metrics.relocationAvoidedBase=previousBaseId;
       const p={x:base.x,z:base.z};
       const approaches=[[4.4,0],[-4.4,0],[0,4.4],[0,-4.4]].map(([x,z])=>({x:p.x+x,z:p.z+z})).filter(a=>baseAt(match.map,a)?.id===base.id&&match.positionValid(u,a.x,a.z)&&this.reachablePoint(match,u,a)).sort((a,b)=>distance(u,a)-distance(u,b));
       // Reach the interior before laying a foundation, then stand off its footprint.
@@ -145,8 +165,9 @@ export class AIController {
       if(!match.freeRelocation(u)&&(u.gold<B.structures.core.gold||u.wood<B.structures.core.wood)){this.gather(match,u,base);return;}
       match.act(u.id,{type:'build',kind:'core',...p});this.stop(u);return;
     }
+    this.relocationBaseId=null;
     base=match.map.bases.find(b=>b.id===core.baseId);
-    const wall=own.find(s=>s.kind==='wall'),towers=own.filter(s=>s.kind==='tower'),mines=own.filter(s=>s.kind==='mine');
+    const wall=own.find(s=>s.kind==='wall'),towers=own.filter(s=>s.kind==='tower'),mines=own.filter(s=>s.kind==='mine'),workshop=own.find(s=>s.kind==='workshop');
     const threat=match.visibleEnemies(u).find(e=>e.role==='troll');
     const response={economy:{range:14,repairFloor:.45,reserve:0},balanced:{range:20,repairFloor:.6,reserve:0},defense:{range:28,repairFloor:.75,reserve:120}}[this.elfProfile];
     const approaching=threat&&(distance(threat,base.gate)<=response.range||(wall&&match.time-wall.lastHit<5));
@@ -154,20 +175,28 @@ export class AIController {
     const defenseMode=approaching||(this.elfThreatUntil||0)>match.time;
     const stun=match.elfStunStatus(u);
     const trollInside=threat&&baseAt(match.map,threat)?.id===base.id;
-    if(trollInside){
-      const destination=this.elfEscapePoint(match,u,base);this.elfEvade.until=match.time+12;
+    const evade=this.elfEvade?.baseId===base.id?this.elfEvade:null;
+    const threatNear=!!threat&&(distance(threat,u)<B.elf.evacuationThreatRange||distance(threat,base.gate)<B.elf.evacuationThreatRange);
+    if(trollInside||evade&&threatNear){
+      const destination=this.elfEscapePoint(match,u,base,threat);this.elfEvade.minimumUntil=Math.max(this.elfEvade.minimumUntil||0,match.time+B.elf.evacuationMinSeconds);this.elfEvade.lastThreatAt=match.time;this.elfEvade.clearSince=null;
       if(stun.available)match.act(u.id,{type:'elfStun'});
       this.go(match,u,destination,2);return;
     }
-    if(this.elfEvade?.baseId===base.id&&match.time<this.elfEvade.until){this.go(match,u,this.elfEvade.destination,2);return;}
-    if(this.elfEvade?.baseId===base.id)this.elfEvade=null;
+    if(evade){
+      const outside=baseAt(match.map,u)?.id!==base.id||distance(u,base.gate)>=B.elf.evacuationDistance;
+      const breachActive=(match.breachUntil.get(base.id)||0)>match.time;
+      if(!threatNear&&outside)evade.clearSince??=match.time;else evade.clearSince=null;
+      const clearFor=evade.clearSince===null?0:match.time-evade.clearSince,safeToReturn=outside&&!breachActive&&match.time>=(evade.minimumUntil||0)&&clearFor>=B.elf.evacuationClearSeconds;
+      if(!safeToReturn){this.metrics.evacuationHolds=(this.metrics.evacuationHolds||0)+1;this.go(match,u,evade.destination,2);return;}
+      this.metrics.evacuationReturns=(this.metrics.evacuationReturns||0)+1;this.metrics.evacuationLastSeconds=match.time-(evade.startedAt||match.time);this.elfEvade=null;
+    }
     const gateDistance=distance(base,base.gate),ix=(base.x-base.gate.x)/gateDistance*match.map.cell,iz=(base.z-base.gate.z)/gateDistance*match.map.cell;
     const towerPositions=[];for(const depth of this.buildPlan.towerDepths)for(const side of this.buildPlan.towerSides)towerPositions.push({x:base.gate.x+ix*depth+side*iz,z:base.gate.z+iz*depth-side*ix});
     const avoidedPoint=p=>this.elfAvoid?.some(a=>a.until>match.time&&distance(a,p)<3);
-    const towerPosition=towerPositions.find(p=>!avoidedPoint(p)&&baseAt(match.map,p)?.id===base.id&&match.positionValid(u,p.x,p.z)&&!match.structures.some(s=>s.hp>0&&distance(s,p)<placementRadius(s.kind)+placementRadius('tower')+B.construction.placementGap)&&!match.trees.some(t=>t.amount>0&&distance(t,p)<B.structures.tower.radius+.55));
+    const towerPosition=towerPositions.find(p=>!avoidedPoint(p)&&baseAt(match.map,p)?.id===base.id&&baseZone(match.map,base,p)==='frontline'&&match.positionValid(u,p.x,p.z)&&!match.structures.some(s=>s.hp>0&&distance(s,p)<placementRadius(s.kind)+placementRadius('tower')+B.construction.placementGap)&&!match.trees.some(t=>t.amount>0&&distance(t,p)<B.structures.tower.radius+.55));
     const buildTower=()=>{const p=towerPosition;if(p)return this.actNear(match,u,p,{type:'build',kind:'tower',...p});return 'no-position';};
-    const utilityPositions=[];for(const radius of [4.4,6.6,8.8])for(let step=0;step<8;step++){const i=(this.buildPlan.utilityOffset+this.buildPlan.utilityDirection*step+8)%8;utilityPositions.push({x:base.x+Math.sin(i*Math.PI/4)*radius,z:base.z+Math.cos(i*Math.PI/4)*radius});}
-    const buildUtility=kind=>{const def=B.structures[kind],p=utilityPositions.find(p=>!avoidedPoint(p)&&baseAt(match.map,p)?.id===base.id&&match.positionValid(u,p.x,p.z)&&!match.structures.some(s=>s.hp>0&&distance(s,p)<placementRadius(s.kind)+placementRadius(kind)+B.construction.placementGap)&&!match.trees.some(t=>t.amount>0&&distance(t,p)<def.radius+.55));if(p)return this.actNear(match,u,p,{type:'build',kind,...p});return 'no-position';};
+    const utilityPositions=[];for(const radius of [4.4,6.6,8.8,11])for(let step=0;step<8;step++){const i=(this.buildPlan.utilityOffset+this.buildPlan.utilityDirection*step+8)%8;utilityPositions.push({x:base.x+Math.sin(i*Math.PI/4)*radius,z:base.z+Math.cos(i*Math.PI/4)*radius});}
+    const buildUtility=kind=>{const def=B.structures[kind],p=utilityPositions.find(p=>!avoidedPoint(p)&&baseAt(match.map,p)?.id===base.id&&baseZone(match.map,base,p)==='industrial'&&match.positionValid(u,p.x,p.z)&&!match.structures.some(s=>s.hp>0&&distance(s,p)<placementRadius(s.kind)+placementRadius(kind)+B.construction.placementGap)&&!match.trees.some(t=>t.amount>0&&distance(t,p)<def.radius+.55));if(p)return this.actNear(match,u,p,{type:'build',kind,...p});return 'no-position';};
     const upgrade=s=>this.actNear(match,u,s,{type:'upgrade',target:s.id});
     // Distance is an execution requirement, not a strategic blocker. Treat a
     // sole distance reason as a valid plan so actNear can walk to the target.
@@ -179,6 +208,8 @@ export class AIController {
     if(wall&&!avoidedEntity(wall)&&wall.hp<wall.maxHp&&distance(u,wall)<=maintenanceRange)match.repair(u,wall.id,maintenanceRange);
     if(defenseMode&&wall&&!avoidedEntity(wall)&&wall.hp/wall.maxHp<response.repairFloor&&distance(u,wall)>B.interactRange){this.go(match,u,wall,B.interactRange);return;}
     if(u.wood<45){this.gather(match,u,base);return;}
+    const desiredPath=this.elfProfile==='economy'?'economy':this.elfProfile==='defense'?'defense':'technology';
+    if(!defenseMode&&workshop?.tier>=B.elfIncremental.essenceUnlockTier&&!u.elfPath&&u.essence>=B.elfIncremental.pathCost){this.actNear(match,u,workshop,{type:'chooseElfPath',target:workshop.id,path:desiredPath});return;}
     // The first defensive tower is the bot's opening combat insurance. Building
     // the wall first leaves no reaction window when the Troll arrives early.
     if((!threat||(defenseMode&&wall&&wall.hp/wall.maxHp>=response.repairFloor))&&!towers.length&&u.gold>=B.structures.tower.gold&&u.wood>=B.structures.tower.wood){if(buildTower()!=='no-position')return;}
@@ -225,15 +256,22 @@ export class AIController {
     if(u.wood>reserve&&wisps.length){this.stop(u);return;}
     this.gather(match,u,base);
   }
-  gather(match,u,base){const trees=match.trees.filter(t=>t.amount>0&&(this.elfAvoidEntities?.get(t.id)||0)<=match.time&&!match.wisps.some(w=>w.alive&&w.treeId===t.id)&&(baseAt(match.map,t)?.id===base.id||match.canSee(u,t))).sort((a,b)=>distance(u,a)-distance(u,b));const t=trees[0];if(t)this.actNear(match,u,t,{type:'gather',target:t.id});else this.stop(u);}
+  gather(match,u,base){const occupied=new Set(match.wisps.filter(w=>w.alive).map(w=>w.treeId));let target=null,best=Infinity;for(const tree of match.trees){if(tree.amount<=0||(this.elfAvoidEntities?.get(tree.id)||0)>match.time||occupied.has(tree.id)||(baseAt(match.map,tree)?.id!==base.id&&!match.canSee(u,tree)))continue;const d=distance(u,tree);if(d<best){best=d;target=tree;}}if(target)this.actNear(match,u,target,{type:'gather',target:target.id});else this.stop(u);}
   troll(match,u){this.brain??=new TrollBrain();this.brain.tick(this,match,u);}
   explore(match,u){
     const map=match.map,c=toCell(map,u),key=index(map,c.x,c.z),radius=Math.ceil(B.vision.troll/map.cell);
-    // The central release point is shared map knowledge, not hidden enemy
-    // information. Check it once before committing to the full frontier scan;
-    // this prevents the Troll from spending the whole match circling empty
-    // woodland after the Elves have already left for their refuges.
-    if(!this.searchStarted){this.searchStarted=true;this.go(match,u,map.elfSpawn,3);return;}
+    // Refuges are public landmarks. Live matches receive a server-generated
+    // route variant so consecutive rounds start on another side and reverse
+    // direction; direct simulations remain deterministic for the same seed.
+    if(!this.searchBases){
+      const rng=randomFor(`${map.seed}:troll-patrol:${match.settings.routeVariant||'seed-default'}`),center={x:(map.size-1)*map.cell/2,z:(map.size-1)*map.cell/2};
+      let ring=[...map.bases].sort((a,b)=>Math.atan2(a.z-center.z,a.x-center.x)-Math.atan2(b.z-center.z,b.x-center.x));
+      const direction=match.settings.trollPatrolDirection??(rng()<.5?-1:1);if(direction<0)ring.reverse();
+      const requested=match.settings.trollPatrolStart,start=Number.isInteger(requested)?((requested%ring.length)+ring.length)%ring.length:Math.floor(rng()*ring.length);
+      this.searchBases=[...ring.slice(start),...ring.slice(0,start)];this.searchBaseIndex=0;
+      this.metrics.patrolOrder=this.searchBases.map(base=>base.id);this.metrics.patrolStart=this.searchBases[0]?.id||null;this.metrics.patrolDirection=direction<0?'counterclockwise':'clockwise';this.metrics.routeVariant=match.settings.routeVariant||null;
+    }
+    if(!this.searchStarted){this.searchStarted=true;const landmark=this.searchBases[this.searchBaseIndex++].outside;this.go(match,u,landmark,3);return;}
     // Discover navigation cells by actual line of sight. No base registry or hidden entity positions.
     if(this.lastExploreCell!==key){
       this.lastExploreCell=key;
@@ -242,15 +280,6 @@ export class AIController {
       }
     }
     if(this.exploreTarget&&match.time-this.exploreAt<16){if(!this.go(match,u,this.exploreTarget,.8))return;this.exploreTarget=null;}
-    // Refuges are strategic landmarks, not hidden entity observations. Each
-    // match gets a reproducible patrol direction and starting sector so bots
-    // do not reveal the same base order to returning players.
-    if(!this.searchBases){
-      const rng=randomFor(`${map.seed}:troll-patrol`),center={x:(map.size-1)*map.cell/2,z:(map.size-1)*map.cell/2};
-      let ring=[...map.bases].sort((a,b)=>Math.atan2(a.z-center.z,a.x-center.x)-Math.atan2(b.z-center.z,b.x-center.x));
-      if(rng()<.5)ring.reverse();const start=Math.floor(rng()*ring.length);this.searchBases=[...ring.slice(start),...ring.slice(0,start)];this.searchBaseIndex=0;
-      this.metrics.patrolOrder=this.searchBases.map(base=>base.id);
-    }
     if(this.searchBaseIndex<this.searchBases.length){const landmark=this.searchBases[this.searchBaseIndex].outside;if(!this.go(match,u,landmark,3)){return;}this.searchBaseIndex++;return;}
     const blocked=this.navigationBlocks(match,u),queue=[c],seen=new Set([key]);let head=0,target=null;
     while(head<queue.length&&!target){const p=queue[head++];for(const[dx,dz]of[[1,0],[0,1],[-1,0],[0,-1]]){

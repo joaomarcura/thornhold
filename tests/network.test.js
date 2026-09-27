@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { WebSocket } from 'ws';
 import { createGameServer } from '../server/index.js';
-import { STATES } from '../shared/config.js';
+import { BALANCE as B, STATES } from '../shared/config.js';
+import { SessionService } from '../server/sessions.js';
 
 async function client(port,name,token){
   const socket=new WebSocket(`ws://127.0.0.1:${port}`),queue=[],waiters=[];
@@ -17,6 +18,12 @@ async function client(port,name,token){
 }
 const closeClient=c=>new Promise(resolve=>{if(c.socket.readyState===WebSocket.CLOSED)return resolve();c.socket.once('close',resolve);c.socket.close();});
 const nextTurn=()=>new Promise(resolve=>setTimeout(resolve,70));
+
+test('Revanche alterna lado inicial e sentido da patrulha do Troll',()=>{
+  const sessions=new SessionService(),host=sessions.addClient('host','Host'),room=sessions.create(host,{role:'troll',fillBots:true,settings:{elfSlots:5,seed:'SAME-WORLD'}});room.members.get(host.id).ready=true;
+  const first=sessions.start(room,host).settings;room.state=STATES.LOBBY;room.members.get(host.id).ready=true;const second=sessions.start(room,host).settings;
+  assert.notEqual(first.routeVariant,second.routeVariant);assert.notEqual(first.trollPatrolStart,second.trollPatrolStart);assert.equal(first.trollPatrolDirection,-second.trollPatrolDirection);
+});
 
 for(const scenario of [
   {name:'A: humano Troll contra 5 Elfos bots',role:'troll',elves:5,humans:1,bots:true},
@@ -45,7 +52,11 @@ test('E + G: lobby padrão 1×5 só com bots, fim real, retorno conjunto e revan
     host=await client(app.port,'Observador');host.send('create',{role:'elf',fillBots:true,settings:{elfSlots:5,private:true,seed:'THORNHOLD'}});const {room}=await host.wait('lobby');
     guest=await client(app.port,'Observador 2');guest.send('join',{code:room.id});await guest.wait('lobby');host.send('observe');await host.wait('lobby',m=>!m.room.slots.some(s=>s.occupant?.clientId===host.hello.id));host.send('slot',{slot:'e0',action:'bot'});await host.wait('lobby',m=>m.room.slots.filter(s=>s.occupant?.type==='bot').length===6);
     host.send('ready',{ready:true});guest.send('ready',{ready:true});await host.wait('lobby',m=>m.room.errors.length===0);host.send('start');await host.wait('map');await guest.wait('map');
-    const live=app.sessions.rooms.get(room.id);for(let i=0;i<18000&&live.match.state!==STATES.END;i++)live.match.step(.1);
+    const live=app.sessions.rooms.get(room.id);for(let i=0;i<6000&&live.match.state!==STATES.END;i++)live.match.step(.1);
+    // This is a network lifecycle test, not a balance simulation. If the bots
+    // have not produced a natural result in ten minutes, validate the official
+    // 60-minute score resolution directly instead of requiring an early win.
+    if(live.match.state!==STATES.END){live.match.time=B.matchHardLimit;live.match.checkEndState();}
     const results=await Promise.all([host.wait('result'),guest.wait('result')]);assert.deepEqual(results[0],results[1]);assert.ok(results[0].result.trollDamage>0);assert.ok(results[0].result.towerDamage>0);
     host.send('return');await Promise.all([host.wait('lobby',m=>m.room.state===STATES.LOBBY&&!m.room.members.some(p=>p.ready)),guest.wait('lobby',m=>m.room.state===STATES.LOBBY&&!m.room.members.some(p=>p.ready))]);
     host.send('settings',{settings:{seed:'REMATCH-2'}});await host.wait('lobby',m=>m.room.settings.seed==='REMATCH-2');host.send('ready',{ready:true});guest.send('ready',{ready:true});await host.wait('lobby',m=>m.room.errors.length===0&&m.room.settings.seed==='REMATCH-2');host.send('start');const maps=await Promise.all([host.wait('map'),guest.wait('map')]);assert.ok(maps.every(m=>m.map.seed==='REMATCH-2'));assert.equal(live.members.size,2);
@@ -58,7 +69,8 @@ test('Partida local permite host observador com lobby padrão 1×5 somente de bo
     host=await client(app.port,'Observador');host.send('create',{role:'observer',fillBots:true,settings:{mode:'custom',local:true,private:true,elfSlots:5,seed:'BOT-WATCH'}});const {room}=await host.wait('lobby');const live=app.sessions.rooms.get(room.id);
     assert.equal(live.slots.filter(s=>s.occupant?.type==='human').length,0);assert.equal(live.slots.filter(s=>s.occupant?.type==='bot').length,6);assert.ok(!live.slots.some(s=>s.occupant?.clientId===host.hello.id));
     host.send('ready',{ready:true});await host.wait('lobby',m=>m.room.errors.length===0);host.send('start');const map=await host.wait('map');assert.equal(map.viewerId,null);assert.equal(live.match.units.length,6);assert.ok(live.match.units.every(unit=>unit.controller==='bot'));
-    const snapshot=await host.wait('snapshot',m=>m.snapshot.units.length===6);assert.equal(snapshot.snapshot.viewerId,null);assert.equal(snapshot.snapshot.units.length,6);host.send('dev',{command:'speed',speed:8});await host.wait('dev',m=>m.speed===8);assert.equal(live.devSpeed,8);host.send('dev',{command:'grant',gold:100});assert.match((await host.wait('error')).message,/não controla/);
+    const snapshot=await host.wait('snapshot',m=>m.snapshot.units.length===6);assert.equal(snapshot.snapshot.viewerId,null);assert.equal(snapshot.snapshot.units.length,6);host.send('dev',{command:'speed',speed:8});await host.wait('dev',m=>m.speed===8);assert.equal(live.devSpeed,8);
+    const troll=live.match.units.find(unit=>unit.role==='troll'),before=troll.gold;host.send('dev',{command:'grant',target:troll.id,gold:100});const grant=await host.wait('dev',m=>m.target===troll.id&&m.granted?.gold===100);assert.equal(grant.target,troll.id);assert.equal(troll.gold,before+100);
   }finally{if(host)await closeClient(host);await app.close();}
 });
 
@@ -70,6 +82,29 @@ test('F: desconexão, host migrado, IA no mesmo personagem e retomada por token'
     await closeClient(host);await guest.wait('lobby',m=>m.room.hostId===guest.hello.id);assert.equal(unit.controller,'bot');assert.equal(unit.gold,123);
     resumed=await client(app.port,'Host',host.hello.token);const map=await resumed.wait('map');assert.equal(map.viewerId,'t0');assert.equal(unit.controller,'human');assert.equal(unit.gold,123);assert.equal(live.hostId,guest.hello.id);
   }finally{for(const c of [host,guest,resumed])if(c)await closeClient(c);await app.close();}
+});
+
+test('Saída manual salva a partida abandonada com estado final e autor',async()=>{
+  const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false});let host;
+  try{
+    host=await client(app.port,'Troll manual');host.send('create',{role:'troll',fillBots:true,settings:{elfSlots:5,private:true,seed:'MANUAL-EXIT'}});const {room}=await host.wait('lobby');
+    host.send('ready',{ready:true});await host.wait('lobby',m=>m.room.errors.length===0);host.send('start');await host.wait('map');
+    const live=app.sessions.rooms.get(room.id);live.match.state=STATES.ACTIVE;live.state=STATES.ACTIVE;live.match.time=137;
+    host.send('leave');await host.wait('left');await nextTurn();
+    assert.equal(live.logged,true);assert.equal(live.resultRecord.completed,false);assert.equal(live.resultRecord.abandoned,true);assert.equal(live.resultRecord.winner,null);assert.equal(live.resultRecord.endReason,'manual-exit');
+    assert.equal(live.resultRecord.duration,137);assert.equal(live.resultRecord.seed,'MANUAL-EXIT');assert.equal(live.resultRecord.termination.type,'manual-exit');assert.equal(live.resultRecord.termination.clientId,host.hello.id);assert.equal(live.resultRecord.termination.playerName,'Troll manual');
+    assert.equal(live.resultRecord.finalState.state,STATES.ACTIVE);assert.equal(live.resultRecord.finalState.winner,null);assert.equal(live.resultRecord.finalState.endReason,'manual-exit');assert.equal(live.resultRecord.players.length,6);
+  }finally{if(host)await closeClient(host);await app.close();}
+});
+
+test('Saída manual de um jogador não encerra partida com outro humano conectado',async()=>{
+  const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false});let host,guest;
+  try{
+    host=await client(app.port,'Host online');guest=await client(app.port,'Aliado online');host.send('create',{role:'troll',fillBots:true,settings:{elfSlots:5,private:true,seed:'ONLINE-CONTINUES'}});const {room}=await host.wait('lobby');guest.send('join',{code:room.id});await guest.wait('lobby');guest.send('slot',{slot:'e0',action:'claim'});await guest.wait('lobby',m=>m.room.slots.find(s=>s.id==='e0').occupant?.clientId===guest.hello.id);
+    host.send('ready',{ready:true});guest.send('ready',{ready:true});await host.wait('lobby',m=>m.room.errors.length===0);host.send('start');await host.wait('map');await guest.wait('map');const live=app.sessions.rooms.get(room.id);
+    host.send('leave');await host.wait('left');await guest.wait('lobby',m=>m.room.members.some(member=>member.id===guest.hello.id&&member.connected));await nextTurn();
+    assert.equal(live.logged,false);assert.equal(live.resultRecord,undefined);assert.equal(live.match.state!==STATES.END,true);
+  }finally{if(host)await closeClient(host);if(guest)await closeClient(guest);await app.close();}
 });
 
 test('Servidor HTTP serve apenas assets permitidos; salas privadas não vazam no browser',async()=>{
@@ -93,6 +128,7 @@ test('Modo dev fica protegido por configuração e controla recursos e velocidad
     const live=app.sessions.rooms.get(room.id),unit=live.match.unit('t0'),gold=unit.gold,wood=unit.wood;
     host.send('dev',{command:'grant',gold:1000,wood:250});await host.wait('dev',m=>m.granted?.gold===1000);assert.equal(unit.gold,gold+1000);assert.equal(unit.wood,wood+250);
     host.send('dev',{command:'speed',speed:8});await host.wait('dev',m=>m.speed===8);assert.equal(live.devSpeed,8);assert.equal(live.match.devSpeed,8);
+    const before={x:unit.x,z:unit.z};host.send('input',{x:1,z:0});await nextTurn();assert.ok(Math.hypot(unit.x-before.x,unit.z-before.z)>.1,'WASD deve continuar ativo em velocidade DEV 8×');host.send('input',{x:0,z:0});
   }finally{if(host)await closeClient(host);await app.close();}
 });
 

@@ -49,7 +49,8 @@ O processo Node é o servidor da partida, não o navegador do host. O host tem p
 | Coletar árvore próxima / reparar Barricada | R; segure para repetir |
 | Ataque Troll / pesado | Clique ou segurar clique / Q |
 | Esquiva do Troll / habilidade de papel | Espaço / F |
-| Loja / atributos do Troll | B |
+| Retorno do Troll ao Santuário | B; canaliza por 5 s, desde o início da caçada |
+| Forja / atributos do Troll | G; somente perto da Forja Ancestral |
 | Abrir Núcleo e gerenciamento de Wisps | N ou clique no recurso madeira |
 | Evoluir seleção / formar Wisp no núcleo selecionado | Q / T |
 | Evoluir todos os Wisps elegíveis uma vez | Shift + Q no painel do Núcleo |
@@ -66,7 +67,7 @@ Pressione `V` para abrir a roda de comunicação. Ela separa perigo, ajuda, ataq
 
 A Barricada é reparada gratuitamente. O primeiro Elfo canalizando aplica 100% do reparo; cada ajudante simultâneo aplica 25%. O reparo das demais estruturas continua consumindo 3 de ouro e 1 de madeira.
 
-Elfos podem construir apoio em uma clareira aliada ativa. A estrutura pertence a quem pagou — somente esse jogador pode evoluir ou demolir — e os limites de 1 Núcleo, 1 Barricada, 5 Torres, 5 Minas e 1 Oficina valem para a clareira inteira. Recursos permanecem pessoais e não podem ser transferidos diretamente.
+Elfos podem construir apoio em uma clareira aliada ativa. A estrutura pertence a quem pagou — somente esse jogador pode evoluir ou demolir — e os limites de 1 Núcleo, 1 Barricada, 2 Torres, 5 Minas e 1 Oficina valem para a clareira inteira. Recursos permanecem pessoais e não podem ser transferidos diretamente.
 
 O Núcleo libera uma vaga de Mina por nível, até cinco. A cada nível, o custo-base da nova Mina cresce 25% e a produção de todas as Minas vinculadas cresce 30%; destruir o Núcleo interrompe essa produção.
 
@@ -74,13 +75,13 @@ Quando um Elfo morre, seus recursos são perdidos e todas as estruturas e Wisps 
 
 O Elfo eliminado retorna como Espírito controlável com visão curta. Ele não causa dano nem impede a vitória do Troll, mas pode revelar uma área de 18 m por 10 segundos a cada 60 segundos e reparar Barricadas a 50% da velocidade-base. O Troll vê e pode matar o Espírito por 25 de ouro; essa segunda morte não conta como nova eliminação e encerra a participação ativa do jogador.
 
-Não há vitória por limite de tempo. No nível 10, Núcleo, Barricada e Torre tornam-se Lendários; a progressão continua até o nível Épico 20. O Núcleo dobra sua produção própria, a Barricada recebe 4× HP e a Torre passa a canalizar um raio com dano-base 5× maior, crescente enquanto mantém linha de visão. Para o Troll, Fúria + Quebra-fortaleza somando 10 libera a Espada Lendária: qualquer golpe executa uma estrutura que termine abaixo de 15% de HP. Atributos do Troll e Wisps também têm limite 20.
+A partida termina no máximo aos 60 minutos. Se nenhum lado cumprir sua condição de vitória antes, vence a equipe com mais pontos; empate favorece os defensores. No nível 10, Núcleo, Barricada e Torre tornam-se Lendários; a progressão continua até o nível Épico 20. Para o Troll, Dano Físico + Dano Estrutural somando 12 libera a Espada Lendária: qualquer golpe executa uma estrutura que termine abaixo de 15% de HP. Atributos do Troll e Wisps também têm limite 20.
 
 Obras precisam de um construtor vivo por perto. A barricada encaixa somente no portão da sua clareira. Elfos atravessam portões aliados; o Troll precisa destruí-los. Após uma ruptura, a entrada fica 12 segundos sem reconstrução e não aceita novas fundações com o Troll a menos de 5 metros.
 
 Depois que sua Barricada é rompida, um Elfo próximo pode usar **F** para atordoar o Troll por três segundos. A recarga de 60 segundos é compartilhada pela equipe. Se o Núcleo for destruído, o Elfo sobrevivente tem 60 segundos para alcançar outra clareira e usar seu voucher único de reassentamento: o próximo Núcleo não consome ouro nem madeira.
 
-A mira permanece travada durante a partida; não existe mais modo de cursor livre nem alternância pela bolinha. Clique no cenário para retomar a mira caso o navegador solte o Pointer Lock por segurança. Estruturas são selecionadas pela mira central e suas ações usam hotkeys. A loja do Troll é operada por WASD/setas e Enter. Ao observar outra região, seu personagem permanece parado: **C** retorna ao personagem e **M** fecha o mapa.
+A mira permanece travada durante a partida; não existe mais modo de cursor livre nem alternância pela bolinha. Clique no cenário para retomar a mira caso o navegador solte o Pointer Lock por segurança. Estruturas são selecionadas pela mira central e suas ações usam hotkeys. O Troll compra e troca equipamentos somente na Forja Ancestral física do Santuário: **B** canaliza o retorno por cinco segundos e **G** abre a Forja quando ela está ao alcance. A loja é operada por WASD/setas e Enter. Ao observar outra região, seu personagem permanece parado: **C** retorna ao personagem e **M** fecha o mapa.
 
 Uma construção confirmada encerra o projeto; segure **Shift** para continuar colocando. O alcance de colocação é 9,75 m; coleta, reparo e gerenciamento continuam em 6,5 m. **R** executa coleta ou reparo contextual. **T**, no Núcleo selecionado, forma um Wisp e o servidor o envia automaticamente à árvore livre mais próxima; não existe transferência manual. **Esc** fecha o contexto atual sem desfazer investimentos. Obras incompletas e formação de Wisp podem ser canceladas com devolução de 75% da parcela pendente; upgrades são compromissos.
 
@@ -97,7 +98,7 @@ O Troll aparece como um losango laranja quando a equipe o avista. Ao sair da vis
 - Mapa determinístico com doze refúgios de três tamanhos e quantidades diferentes de árvores, cada uma com estoque atual de 1.000 madeiras, além de platôs e baixadas ligados por rampas. Trilhas com bifurcações atravessam uma floresta sólida; o minimapa revela o terreno explorado. Cada clareira tem um único portão validado pelo servidor.
 - Núcleo com renda crescente, barricada reparável, cinco torres por Elfo, mina e oficina. A Torre padrão usa o antigo perfil de Balista; especializações permanecem isoladas e desligadas da progressão/UI. Obras, coleta, melhorias e destruição usam recursos reais e alteram o estado compartilhado.
 - Wisps formados no núcleo: um por árvore, escolha automática da árvore livre mais próxima, produção contínua sem consumir o tronco e evolução até o nível 20. Árvores esgotadas pela coleta manual rebrotam após 35 segundos se não houver uma construção no local.
-- Loja do Troll com nove equipamentos, três espaços e sugestões de Cerco, Caçador e Sustentação. A loja usa navegação por teclado; atributos evoluem até o nível 20. Estruturas tornam-se Lendárias no nível 10 e Épicas no nível 20.
+- Forja física do Troll no Santuário, com nove equipamentos, três espaços e sugestões de Cerco, Caçador e Sustentação. Compras e trocas são validadas pelo servidor; atributos evoluem até o nível 20. Estruturas tornam-se Lendárias no nível 10 e Épicas no nível 20.
 - Ataques leves/pesados com preparação e alcance verificados no impacto, combo de três acertos, esquiva que cancela a preparação e fortalece o próximo golpe, rugido e feedback de ruptura. Dano aplicado gera ouro, limitado pelo HP real e pelo orçamento de recompensa da estrutura.
 - Visão por distância e linha de visão. O servidor omite inimigos escondidos e sua economia dos snapshots. Bots do Troll descobrem terreno e alvos pela visão; não consultam o cadastro de bases para caçá-las.
 - Melhorias de estruturas e atributos do Troll ficam disponíveis sem bloqueio temporal, até o nível 20. O Núcleo exige uma Barricada ativa: níveis 2–3 pedem Barricada 1, níveis 4–5 pedem Barricada 2, e assim por diante. Aos 3:30, a Era do Cerco ainda amplia recursos externos e o bônus de cerco; inatividade nunca causa dano ao Troll.

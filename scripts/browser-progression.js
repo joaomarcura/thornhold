@@ -23,16 +23,16 @@ try{
   for(const page of pages)await page.getByRole('button',{name:'Marcar como pronto'}).click();await troll.getByRole('button',{name:'Iniciar expedição →'}).click();for(const page of pages)await page.locator('#role-name').waitFor();
   // Fixtures are confined to this ephemeral test server. All purchases and worker commands use UI → WebSocket → Match.
   const m=[...app.sessions.rooms.values()][0].match,t=m.unit('t0'),e=m.unit('e0');m.controllers.clear();m.state=STATES.ACTIVE;m.time=300;t.gold=10000;t.lastAttack=0;
-  await troll.keyboard.press('KeyB');await troll.locator('.item-card').first().waitFor();assert.equal(await troll.locator('.item-card').count(),9);
-  await troll.getByRole('button',{name:'Caçador',exact:true}).click();assert.equal(await troll.locator('.item-card.recommended').count(),3);
-  for(const id of ['claws','mantle','hunt']){await troll.locator(`[data-do=buy-item][data-item=${id}]`).click();await until(()=>t.inventory.includes(id),'Compra não chegou: '+id);}
-  assert.deepEqual(t.equipment,{weapon:'claws',body:'mantle',relic:'hunt'});await until(()=>troll.locator('.item-card.equipped').count().then(n=>n===3),'Itens equipados no HUD');await troll.screenshot({path:'artifacts/troll-arsenal.png'});report.itemBuildPurchased=true;
-  await troll.getByRole('tab',{name:'Atributos ∞',exact:true}).click();t.levels.damage=4;
+  await troll.keyboard.press('KeyG');await troll.locator('.item-tile').first().waitFor();assert.equal(await troll.locator('.item-tile').count(),5);assert.equal(await troll.locator('.equipment-categories [role=tab]').count(),4);
+  await troll.getByRole('button',{name:'Caçador',exact:true}).click();
+  for(const [slot,id] of [['weapon','claws'],['helmet','hunt'],['armor','heartplate'],['boots','mantle']]){await troll.locator(`[data-do=shop-slot][data-slot=${slot}]`).click();assert.equal(await troll.locator('.item-tile').count(),5);await troll.locator(`[data-do=inspect-item][data-item=${id}]`).click();await troll.locator(`[data-do=buy-item][data-item=${id}]`).click();await until(()=>t.inventory.includes(id),'Compra não chegou: '+id);}
+  assert.deepEqual(t.equipment,{weapon:'claws',helmet:'hunt',armor:'heartplate',boots:'mantle'});await troll.screenshot({path:'artifacts/troll-arsenal.png'});report.itemBuildPurchased=true;
+  await troll.getByRole('tab',{name:'Árvore de crescimento',exact:true}).click();t.levels.damage=4;
   await until(()=>troll.locator('[data-key=damage]').textContent().then(s=>s.includes('Nv. 4')),'Nível 4 não apareceu');await troll.locator('[data-do=buy][data-key=damage]').click();await until(()=>t.levels.damage===5,'Upgrade infinito pelo painel');report.upgradeBeyondCap=true;
   await troll.screenshot({path:'artifacts/infinite-upgrades.png'});
-  await troll.getByRole('tab',{name:'Equipamentos',exact:true}).click();await troll.getByRole('button',{name:'Cerco',exact:true}).click();await troll.locator('[data-do=buy-item][data-item=maul]').click();await until(()=>t.equipment.weapon==='maul','Troca de arma');assert.ok(t.inventory.includes('claws'));
-  await troll.locator('[data-do=equip-item][data-item=claws]').click();await until(()=>t.equipment.weapon==='claws','Reequipar sem recomprar');report.itemCollection=true;
-  await troll.keyboard.press('KeyB');
+  await troll.getByRole('tab',{name:'Equipamentos',exact:true}).click();await troll.getByRole('button',{name:'Cerco',exact:true}).click();await troll.locator('[data-do=shop-slot][data-slot=weapon]').click();await troll.locator('[data-do=inspect-item][data-item=maul]').click();await troll.locator('[data-do=buy-item][data-item=maul]').click();await until(()=>t.equipment.weapon==='maul','Troca de arma');assert.ok(t.inventory.includes('claws'));
+  await troll.locator('[data-do=inspect-item][data-item=claws]').click();await troll.locator('[data-do=equip-item][data-item=claws]').click();await until(()=>t.equipment.weapon==='claws','Reequipar sem recomprar');report.itemCollection=true;
+  await troll.keyboard.press('KeyG');
 
   const base=m.map.bases[0];Object.assign(e,{x:base.x+4.4,z:base.z,gold:10000,wood:1000});
   assert.equal(m.act('e0',{type:'build',kind:'core',x:base.x,z:base.z}),undefined);

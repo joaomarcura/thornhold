@@ -1,15 +1,16 @@
 import * as T from 'three';
-import { heightAt, walkable, index } from '../shared/map.js';
+import { baseZone, heightAt, walkable, index } from '../shared/map.js';
 
 // Vertex heights and diagonal agree with heightAt(), including raycast hit positions.
 export function terrainMesh(map){
   const positions=[],colors=[],indices=[],color=new T.Color();
   for(let z=0;z<map.size;z++)for(let x=0;x<map.size;x++){
     const y=heightAt(map,x*map.cell,z*map.cell),open=walkable(map,x,z);
-    const b=map.bases.find(b=>Math.abs(x-b.cx)<b.rx&&Math.abs(z-b.cz)<b.rz);
+    const b=map.bases.find(b=>Math.abs(x-b.cx)<b.rx&&Math.abs(z-b.cz)<b.rz),zone=b&&open?baseZone(map,b,{x:x*map.cell,z:z*map.cell}):null;
     const noise=((x*73+z*179)%17)/17;
     // Lowlands are cool moss; raised clearings are dry grass. Paths remain legible.
-    color.setHSL(open?(b?(y<-.5?.39:.25):.105):.36,open?(b?.22:.16):.19,open?(b?.27:.30)+noise*.025:.17+noise*.025);
+    const zoneHue=zone==='frontline'?.12:zone==='industrial'?.19:zone==='core'?.28:null;
+    color.setHSL(open?(b?(zoneHue??(y<-.5?.39:.25)):.105):.36,open?(b?.22:.16):.19,open?(b?.27:.30)+noise*.025:.17+noise*.025);
     positions.push(x*map.cell,y,z*map.cell);colors.push(color.r,color.g,color.b);
     if(x<map.size-1&&z<map.size-1){const a=index(map,x,z),b=a+1,c=a+map.size,d=c+1;indices.push(a,d,b,a,c,d);}
   }

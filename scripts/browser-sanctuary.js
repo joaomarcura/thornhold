@@ -17,12 +17,13 @@ try{
   await page.getByRole('button',{name:'Jogar contra bots',exact:false}).click();await page.locator('[name=role]').selectOption('troll');await page.locator('[name=elves]').selectOption('5');
   await page.getByRole('button',{name:'Criar partida local →'}).click();await page.getByRole('button',{name:'Marcar como pronto'}).click();await page.getByRole('button',{name:'Iniciar expedição →'}).click();await page.locator('#role-name').waitFor();
   const room=[...app.sessions.rooms.values()][0],m=room.match,t=m.units.find(u=>u.role==='troll');room.state=m.state=STATES.ACTIVE;m.time=60;Object.assign(t,{...m.map.trollSpawn,hp:t.maxHp*.3,lastHit:50});
+  await page.locator('.card-modal').waitFor();await page.keyboard.press('Digit1');await page.locator('.card-modal').waitFor({state:'detached'});
   await page.mouse.click(720,450);await page.waitForFunction(()=>document.pointerLockElement?.id==='world');
   await page.mouse.click(720,450,{button:'middle'});assert.equal(await page.evaluate(()=>document.pointerLockElement?.id),'world');
   await page.keyboard.press(DEFAULT_BINDINGS.shop);await page.locator('#shop').waitFor();assert.equal(await page.evaluate(()=>document.pointerLockElement?.id),'world');
   const focusedBefore=await page.evaluate(()=>document.activeElement?.dataset?.do||'');await page.keyboard.press('ArrowDown');const focusedAfter=await page.evaluate(()=>document.activeElement?.dataset?.do||'');assert.notEqual(focusedAfter,focusedBefore);await page.keyboard.press(DEFAULT_BINDINGS.shop);
   await page.keyboard.press('KeyH');await page.getByRole('dialog',{name:'Como jogar'}).waitFor();assert.equal(await page.evaluate(()=>document.pointerLockElement?.id),'world');await page.keyboard.press('KeyH');report.permanentAimAndKeyboardShop=true;
-  await until(()=>page.locator('#objective').textContent().then(text=>text.includes('Santuário')),'Sanctuary guidance did not reach HUD');
+  await until(()=>page.locator('#objective').textContent().then(text=>text.includes('Santuário')||text.includes('FORJA AO ALCANCE')),'Sanctuary/shop guidance did not reach HUD');
   const effects=page.locator('#status-effects');await until(()=>effects.textContent().then(text=>text.includes('Santuário ancestral')),'Sanctuary effect did not reach HUD');const before=t.hp;await page.waitForTimeout(350);assert.ok(t.hp>before+t.maxHp*B.troll.sanctuaryRegenRate*.2,'Sanctuary did not heal through live server ticks');
   await page.screenshot({path:'artifacts/sanctuary-ui.png'});report.visibleGuidance=true;report.activeHealing=true;
   Object.assign(t,{x:m.map.trollSpawn.x+B.troll.sanctuaryRadius+4,z:m.map.trollSpawn.z,lastHit:m.time-10});await until(()=>effects.textContent().then(text=>!text.includes('Santuário ancestral')),'Sanctuary effect remained outside its radius');report.radiusExit=true;

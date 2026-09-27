@@ -1,6 +1,6 @@
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { Match } from '../shared/simulation.js';
-import { STATES } from '../shared/config.js';
+import { BALANCE as B, STATES } from '../shared/config.js';
 import { randomFor } from '../shared/map.js';
 
 const requestedCount=Math.min(2000,Math.max(1,Number(process.argv[2])||100)),out=process.argv[3]||'artifacts/simulations.json',baselinePath=process.argv[4]||'';
@@ -17,7 +17,7 @@ for(let i=0;i<count;i++){
   const slots=[{id:'t',role:'troll',occupant:{type:'bot',name:'Troll',difficulty}},...Array.from({length:elves},(_,j)=>({id:'e'+j,role:'elf',occupant:{type:'bot',name:'Elfo '+j,difficulty}}))];
   const m=new Match({seed:seeds[i],difficulty,mapSize:STANDARD_MAP},slots);
   // 50 ms is live-server parity; 100 ms remains available for faster broad sweeps.
-  for(let tick=0;tick<Math.ceil(1200/step)&&m.state!==STATES.END;tick++)m.step(step);
+  for(let tick=0;tick<Math.ceil(B.matchHardLimit/step)&&m.state!==STATES.END;tick++)m.step(step);
   rows.push({run:i,difficulty,completed:m.state===STATES.END,gameVersion,aiVersion,map:m.settings.mapSize,...m.result()});
 }
 const percentile=(values,p)=>{const sorted=[...values].sort((a,b)=>a-b);return sorted.length?sorted[Math.min(sorted.length-1,Math.floor((sorted.length-1)*p))]:0;};

@@ -4,7 +4,7 @@ export const requiredBarricadeTier=targetCoreTier=>Math.max(1,Math.floor(targetC
 
 // Pure rules used by both the authoritative command and its UI preview.
 export function upgradeStatus(u,s,time,state,structures=[]){
-  const cost=s?.kind&&Object.hasOwn(B.structures,s.kind)?upgradeCost(s):null;
+  const cost=s?.kind&&Object.hasOwn(B.structures,s.kind)?upgradeCost(s,u?.elfPath):null;
   const reasons=[];
   const block=(code,message)=>reasons.push({code,message});
   if(![STATES.PREP,STATES.ACTIVE].includes(state))block('match','A partida não está ativa.');
@@ -22,6 +22,7 @@ export function upgradeStatus(u,s,time,state,structures=[]){
     }
     if(!s.upgrading&&(u?.gold??0)<cost.gold)block('gold',`Ouro insuficiente: ${Math.floor(u?.gold||0)} / ${cost.gold}.`);
     if(!s.upgrading&&(u?.wood??0)<cost.wood)block('wood',`Madeira insuficiente: ${Math.floor(u?.wood||0)} / ${cost.wood}.`);
+    if(!s.upgrading&&(u?.essence??0)<(cost.essence||0))block('essence',`Essência insuficiente: ${Math.floor(u?.essence||0)} / ${cost.essence}.`);
   }
   return {allowed:reasons.length===0,cost,reasons};
 }

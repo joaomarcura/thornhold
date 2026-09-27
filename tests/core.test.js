@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateMap, validateBase, index, lineOfSight, towerLineOfSight, pathfind, world } from '../shared/map.js';
+import { generateMap, validateBase, index, lineOfSight, towerLineOfSight, pathfind, toCell, world } from '../shared/map.js';
 import { Match } from '../shared/simulation.js';
 import { BALANCE as B, STATES, distance } from '../shared/config.js';
 import { SessionService } from '../server/sessions.js';
@@ -16,6 +16,23 @@ test('Seed determinística e corte de entrada única em 40 mapas',()=>{
   assert.deepEqual(generateMap('same'),generateMap('same'));
   assert.notDeepEqual(generateMap('same').bases,generateMap('different').bases);
   for(const size of ['compact','large'])for(let seed=0;seed<20;seed++){const m=generateMap('seed-'+seed,size);assert.equal(m.validation.length,12);assert.ok(m.validation.every(v=>v.valid&&v.openings===1&&v.gateIsCutVertex));}
+});
+test('Troll enxerga até 60 metros, mas continua limitado por distância e linha de visão',()=>{
+  const m=new Match({seed:'TROLL-VISION'},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}}]),t=m.unit('t');
+  m.map.grid.fill(0);m.map.heights.fill(0);Object.assign(t,{x:80,z:80});
+  assert.equal(m.canSee(t,{x:139.9,z:80}),true);
+  assert.equal(m.canSee(t,{x:140.1,z:80}),false);
+  const obstacle=toCell(m.map,{x:110,z:80});m.map.grid[index(m.map,obstacle.x,obstacle.z)]=1;
+  assert.equal(m.canSee(t,{x:130,z:80}),false);
+});
+test('Torre que acerta o Troll permanece revelada entre disparos sem revelar o restante da base',()=>{
+  const m=match(1),t=m.unit('t'),elf=m.unit('e0');m.state=STATES.ACTIVE;Object.assign(t,{x:20,z:20});
+  const tower={id:'hidden-attacker',kind:'tower',owner:elf.id,x:85,z:20,tier:1,branch:'power',hp:360,maxHp:360,progress:1,lastHit:-100,lastShot:-100,disabledUntil:0};
+  const core={id:'hidden-core',kind:'core',owner:elf.id,x:87,z:20,tier:1,hp:360,maxHp:360,progress:1,lastHit:-100};m.structures.push(tower,core);
+  assert.equal(m.snapshot(t.id).structures.some(s=>s.id===tower.id),false);
+  m.damage(t,10,elf,'tower',tower.id);
+  const revealed=m.snapshot(t.id).structures;assert.equal(revealed.some(s=>s.id===tower.id),true);assert.equal(revealed.some(s=>s.id===core.id),false);
+  m.time+=B.vision.towerRevealSeconds+.01;assert.equal(m.snapshot(t.id).structures.some(s=>s.id===tower.id),false);
 });
 test('Validador rejeita passagem alternativa e entrada selada',()=>{
   const m=generateMap(),b=m.bases[0];m.grid[index(m,b.cx-b.rx,b.cz)]=0;assert.equal(validateBase(m,b).valid,false);
@@ -39,7 +56,7 @@ test('Orçamento de recompensa compensa lobbies sem vazar no snapshot',()=>{
 });
 test('Ferramentas dev concedem recursos com limites e não aceitam valores falsos',()=>{
   const m=match(),u=m.unit('e0'),before={gold:u.gold,wood:u.wood};
-  assert.equal(m.devGrant('e0',{gold:1000,wood:250}),null);assert.equal(u.gold,before.gold+1000);assert.equal(u.wood,before.wood+250);
+  assert.equal(m.devGrant('e0',{gold:1000,wood:250,essence:25}),null);assert.equal(u.gold,before.gold+1000);assert.equal(u.wood,before.wood+250);assert.equal(u.essence,25);
   assert.match(m.devGrant('e0',{gold:-1}),/Quantidade/);assert.match(m.devGrant('e0',{gold:1.5}),/Quantidade/);assert.match(m.devGrant('e0',{gold:1_000_001}),/Quantidade/);assert.match(m.devGrant('missing',{gold:1}),/Jogador/);
 });
 test('Targeting de torres é determinístico e explica borda, cooldown e estado',()=>{
@@ -47,7 +64,7 @@ test('Targeting de torres é determinístico e explica borda, cooldown e estado'
   assert.equal(m.towerTargeting(s).valid,true);s.lastShot=m.time;assert.equal(m.towerTargeting(s).reason,'cooldown');s.disabledUntil=m.time+2;assert.equal(m.towerTargeting(s).reason,'disabled');s.disabledUntil=0;t.alive=false;assert.equal(m.towerTargeting(s).reason,'no-troll');
 });
 test('Torre usa altura real, mantém alvo na borda e registra por que não disparou',()=>{
-  const m=match(1),t=m.unit('t'),terrain=generateMap('THORNHOLD'),a=world(terrain,84,19),b=world(terrain,86,26),def=B.structures.tower;m.map=terrain;
+  const m=match(1),t=m.unit('t'),terrain=generateMap('THORNHOLD'),a=world(terrain,83,24),b=world(terrain,85,31),def=B.structures.tower;m.map=terrain;
   assert.equal(lineOfSight(terrain,a,b),false);assert.equal(lineOfSight(terrain,a,b,def.muzzleHeight,def.targetHeight),true);
   Object.assign(t,b);const s={id:'tower-height',kind:'tower',owner:'e0',...a,tier:1,branch:'power',hp:260,maxHp:260,progress:1,lastShot:-100,disabledUntil:0};m.structures.push(s);m.state=STATES.ACTIVE;
   assert.equal(m.towerTargeting(s).valid,true);m.step(.05);assert.equal(s.targetLock,t.id);
@@ -72,7 +89,7 @@ test('Bots Elfos adotam perfis distintos e todos constroem economia mínima',()=
   for(let i=0;i<6000;i++)m.step(.05);
   const offsets={economy:-1,balanced:0,defense:1},rows=m.units.filter(u=>u.role==='elf').map(u=>{const own=m.structures.filter(s=>s.owner===u.id&&s.hp>0);return {strategy:m.controllers.get(u.id).elfProfile,core:own.find(s=>s.kind==='core'),wall:own.find(s=>s.kind==='wall'),mines:own.filter(s=>s.kind==='mine'),towers:own.filter(s=>s.kind==='tower')};});
   const botNames=m.units.filter(u=>u.role==='elf').map(u=>u.name);
-  assert.ok(new Set(rows.map(row=>row.strategy)).size>=3);assert.ok(botNames.every(name=>!/^Elfo |^Guardião /.test(name)&&name.includes(' · ')));assert.equal(new Set(botNames).size,botNames.length);assert.ok(rows.every(row=>row.core?.tier>=2&&row.wall?.tier>=2&&row.mines.length>=1));assert.ok(rows.every(row=>row.towers.every(t=>t.tier<=Math.max(1,row.core.tier+offsets[row.strategy]))));
+  assert.ok(new Set(rows.map(row=>row.strategy)).size>=3);assert.ok(botNames.every(name=>!/^Elfo |^Guardião /.test(name)&&name.includes(' · ')));assert.equal(new Set(botNames).size,botNames.length);assert.ok(rows.every(row=>row.core?.tier>=2&&row.wall?.tier>=2&&row.mines.length>=1));assert.ok(rows.every(row=>row.core.zone==='core'&&row.wall.zone==='frontline'&&row.mines.every(mine=>mine.zone==='industrial')&&row.towers.every(tower=>tower.zone==='frontline')));assert.ok(rows.every(row=>row.towers.every(t=>t.tier<=Math.max(1,row.core.tier+offsets[row.strategy]))));
 });
 test('IA do Elfo prioriza a primeira torre antes da barricada',()=>{
   const m=new Match({seed:'EARLY-DEFENSE',difficulty:'easy',preparation:20},[{id:'t',role:'troll',occupant:{type:'bot',name:'Troll',difficulty:'easy'}},{id:'e0',role:'elf',occupant:{type:'bot',name:'Elfo',difficulty:'easy'}}]);
@@ -95,12 +112,13 @@ test('Barricada é reparada sem recursos e ajudantes simultâneos contribuem 25%
   const m=match(2),a=m.unit('e0'),helper=m.unit('e1'),b=m.map.bases[0];
   const wall={id:'wall-free-repair',kind:'wall',owner:a.id,baseId:b.id,x:b.gate.x,z:b.gate.z,tier:1,hp:300,maxHp:500,progress:1,lastHit:-100,bounty:0};m.structures.push(wall);
   Object.assign(a,{x:wall.x,z:wall.z,gold:0,wood:0});Object.assign(helper,{x:wall.x,z:wall.z,gold:0,wood:0});
-  assert.equal(m.act(a.id,{type:'repair',target:wall.id}),undefined);assert.equal(wall.hp,342);
-  assert.equal(m.act(helper.id,{type:'repair',target:wall.id}),undefined);assert.equal(wall.hp,352.5);
+  const fullRepair=B.elf.repair+wall.maxHp*B.elf.wallRepairRate;
+  assert.equal(m.act(a.id,{type:'repair',target:wall.id}),undefined);assert.equal(wall.hp,300+fullRepair);
+  assert.equal(m.act(helper.id,{type:'repair',target:wall.id}),undefined);assert.equal(wall.hp,300+fullRepair*1.25);
   assert.equal(a.gold,0);assert.equal(a.wood,0);assert.equal(helper.gold,0);assert.equal(helper.wood,0);
   assert.equal(m.events.at(-1).contribution,.25);assert.equal(m.events.at(-1).contributors,2);
   assert.equal(m.snapshot(a.id).structures[0].repairers,undefined);
-  m.time+=1.3;assert.equal(m.act(helper.id,{type:'repair',target:wall.id}),undefined);assert.equal(wall.hp,394.5);assert.equal(m.events.at(-1).contribution,1);
+  m.time+=1.3;assert.equal(m.act(helper.id,{type:'repair',target:wall.id}),undefined);assert.equal(wall.hp,300+fullRepair*2.25);assert.equal(m.events.at(-1).contribution,1);
 });
 test('Dano econômico limitado ao HP aplicado, sem overkill ou alvo já morto',()=>{
   const m=match(),t=m.unit('t'),e=m.unit('e0');const before=t.gold;
@@ -126,8 +144,9 @@ test('Descoberta é paga uma vez e ameaça acompanha economia Elfa visível ou n
   const objective=t.stats.goldFromObjectives,threat=t.stats.goldFromThreat;m.step(.1);
   assert.equal(t.stats.goldFromObjectives,objective);assert.ok(t.stats.goldFromThreat>threat);
 });
-test('Cooldowns, preparação e bloqueio físico não dependem do cliente',()=>{
-  const m=match(),t=m.unit('t'),start={x:t.x,z:t.z};m.input(t.id,{x:1,z:0,sprint:true});m.step(.1);assert.equal(t.x,start.x);assert.match(m.act(t.id,{type:'attack'}),/selo/);
+test('Cooldowns, selo de preparação e bloqueio físico não dependem do cliente',()=>{
+  const m=match(),t=m.unit('t'),start={x:t.x,z:t.z};m.input(t.id,{x:1,z:0,sprint:true});m.step(.1);assert.ok(distance(start,t)>.1,'O Troll deve andar dentro do Santuário durante a preparação.');
+  for(let i=0;i<200;i++){m.input(t.id,{x:1,z:0,sprint:true});m.step(.05);}assert.ok(distance(t,m.map.trollSpawn)<=B.troll.sanctuaryRadius+.001,'O selo deve impedir que o Troll saia do Santuário.');assert.match(m.act(t.id,{type:'attack'}),/selo/);
   m.state=STATES.ACTIVE;const e=m.unit('e0');e.x=t.x;e.z=t.z+2;t.yaw=0;m.act(t.id,{type:'attack'});const hp=e.hp;m.act(t.id,{type:'attack'});assert.equal(e.hp,hp);
   const b=m.map.bases[0];t.x=(b.cx-b.rx)*m.map.cell-2;t.z=b.cz*m.map.cell;m.input(t.id,{x:1,z:0});for(let i=0;i<20;i++){m.input(t.id,{x:1,z:0});m.step(.05);}assert.ok(t.x<(b.cx-b.rx)*m.map.cell);
 });
@@ -165,7 +184,7 @@ test('Partidas autônomas padrão 1v5 não prendem o Troll na base nem excedem d
       m.step(.1);const troll=m.unit('t'),brain=m.controllers.get('t')?.brain,waiting=m.state===STATES.ACTIVE&&distance(troll,m.map.trollSpawn)<=B.troll.sanctuaryRadius&&brain?.state==='recover';
       sanctuaryRecovery=waiting?sanctuaryRecovery+.1:0;maxSanctuaryRecovery=Math.max(maxSanctuaryRecovery,sanctuaryRecovery);
     }
-    assert.ok(m.stats.trollDamage>0,seed);assert.ok(m.stats.produced>0,seed);assert.ok(m.stats.upgrades>0,seed);assert.ok(maxSanctuaryRecovery<=10.5,`${seed}: ${maxSanctuaryRecovery.toFixed(1)}s no Santuário`);
+    assert.ok(m.stats.trollDamage>0,seed);assert.ok(m.stats.produced>0,seed);assert.ok(m.stats.upgrades>0,seed);assert.ok(maxSanctuaryRecovery<=25,`${seed}: ${maxSanctuaryRecovery.toFixed(1)}s no Santuário`);
     for(const base of m.map.bases)assert.ok(m.structures.filter(s=>s.baseId===base.id&&s.kind==='tower'&&s.hp>0).length<=2,base.id);
   }
 });

@@ -8,6 +8,7 @@ import { TacticalMap } from '../client/tactical-map.js';
 import { StrategicMap } from '../shared/strategic-map.js';
 import { TROLL_STATES, TrollBrain } from '../shared/troll-brain.js';
 import { evaluateThreatAt } from '../shared/combat-risk.js';
+import { BUILDS } from '../shared/equipment.js';
 const match=()=>new Match({seed:'TACTICS'},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},...['e0','e1'].map(id=>({id,role:'elf',occupant:{type:'human',name:id}}))]);
 
 test('Seed varia patrulha do Troll, refúgios e planos de construção sem perder reprodutibilidade',()=>{
@@ -20,6 +21,13 @@ test('Seed varia patrulha do Troll, refúgios e planos de construção sem perde
   assert.deepEqual(plan('DYNAMIC-A'),plan('DYNAMIC-A'));
   const variants=Array.from({length:8},(_,i)=>JSON.stringify(plan(`DYNAMIC-${i}`)));
   assert.ok(new Set(variants).size>=6,JSON.stringify(variants));
+});
+test('Variação de rota muda lado inicial e sentido sem alterar a seed do mapa',()=>{
+  const route=(start,direction)=>{
+    const m=new Match({seed:'SAME-WORLD',routeVariant:`route-${start}-${direction}`,trollPatrolStart:start,trollPatrolDirection:direction},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},{id:'e',role:'elf',occupant:{type:'human',name:'Elf'}}]),c=new AIController('normal');
+    c.explore(m,m.unit('t'));return {start:c.metrics.patrolStart,direction:c.metrics.patrolDirection,order:c.metrics.patrolOrder,destination:c.destination};
+  };
+  const first=route(0,1),second=route(5,-1);assert.notEqual(first.start,second.start);assert.notEqual(first.direction,second.direction);assert.notDeepEqual(first.order,second.order);assert.notDeepEqual(first.destination,second.destination);
 });
 test('Troll reinicia patrulha quando todo o mapa conhecido fica sem alvo',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=1200;c.searchStarted=true;c.searchBases=[...m.map.bases];c.searchBaseIndex=c.searchBases.length;
@@ -42,7 +50,34 @@ test('Ameaça de torre atravessa a fronteira entre setores estratégicos',()=>{
 test('Três cercos fracassados suprimem o alvo até o Troll ficar mais forte',()=>{
   const m=match(),u=m.unit('t'),brain=new TrollBrain(),wall={id:'fortified-wall',kind:'wall',x:u.x+4,z:u.z,hp:5000,maxHp:5000,tier:6,progress:1};m.time=100;
   brain.recordTargetOutcome(m,u,wall.id,false,.2);brain.recordTargetOutcome(m,u,wall.id,false,.3);brain.recordTargetOutcome(m,u,wall.id,false,.1);
-  assert.equal(brain.targetFailure(wall.id).fortified,true);assert.equal(brain.targetSuppressed(m,u,wall),true);u.levels.siege=3;assert.equal(brain.targetSuppressed(m,u,wall),false);
+  assert.equal(brain.targetFailure(wall.id).fortified,true);assert.equal(brain.targetSuppressed(m,u,wall),true);u.levels.siege=3;assert.equal(brain.targetSuppressed(m,u,wall),true,'o cooldown impede retorno imediato mesmo após uma melhoria');m.time=brain.targetFailure(wall.id).retryAfter+.1;assert.equal(brain.targetSuppressed(m,u,wall),false);
+});
+test('Fortificação suprimida força patrulha em vez de uma quarta tentativa imediata',()=>{
+  const m=match(),u=m.unit('t'),c=new AIController('normal'),wall={id:'scout-wall',kind:'wall',owner:'e0',baseId:'scout-base',x:u.x+5,z:u.z,hp:5000,maxHp:5000,tier:8,progress:1};m.state=STATES.ACTIVE;m.time=200;m.structures.push(wall);for(const elf of m.units.filter(unit=>unit.role==='elf'))Object.assign(elf,{x:0,z:0});
+  c.brain=new TrollBrain();c.brain.probedBases.set(wall.baseId,m.time);c.brain.targetFailures.set(wall.id,{failures:3,lastPower:c.brain.powerValue(u),suppressedUntil:m.time+600,retryAfter:m.time+180,tradeScores:[0,0],fortified:true,siegeLevel:0,equipmentCount:0,targetHpRatio:1,knownTowers:0,legendary:false});
+  c.troll(m,u);assert.equal(c.brain.state,'explore');assert.equal(c.brain.targetId,null);assert.ok(c.destination);assert.ok(distance(c.destination,wall)>1);
+});
+test('Patrulha após fortificação suprimida não alterna HUNT e EXPLORE a cada decisão',()=>{
+  const m=match(),u=m.unit('t'),c=new AIController('normal'),wall={id:'oscillation-wall',kind:'wall',owner:'e0',baseId:'oscillation-base',x:u.x+5,z:u.z,hp:5000,maxHp:5000,tier:8,progress:1};m.state=STATES.ACTIVE;m.time=352;m.structures.push(wall);for(const elf of m.units.filter(unit=>unit.role==='elf'))Object.assign(elf,{x:0,z:0});
+  c.brain=new TrollBrain();c.brain.probedBases.set(wall.baseId,m.time);c.brain.targetFailures.set(wall.id,{failures:3,lastPower:c.brain.powerValue(u),suppressedUntil:m.time+600,retryAfter:m.time+180,tradeScores:[0,0],fortified:true,siegeLevel:0,equipmentCount:0,targetHpRatio:1,knownTowers:0,legendary:false});
+  c.troll(m,u);assert.equal(c.brain.state,'explore');assert.ok(c.brain.suppressionScout);
+  Object.assign(u,{x:u.x-40,z:u.z-40});
+  for(let i=0;i<12;i++){m.time+=.8;c.troll(m,u);assert.equal(c.brain.state,'explore',`decisão ${i} voltou para ${c.brain.state}`);assert.notEqual(c.brain.targetId,wall.id);}
+});
+test('CHASE mantém o Elfo em alcance como alvo até completar um ataque',()=>{
+  const m=match(),t=m.unit('t'),elf=m.unit('e0'),c=new AIController('normal'),wall={id:'chase-wall',kind:'wall',owner:'e1',baseId:'other-base',x:t.x,z:t.z+5,hp:5000,maxHp:5000,tier:6,progress:1};m.state=STATES.ACTIVE;m.time=200;Object.assign(elf,{x:t.x+2.5,z:t.z});Object.assign(m.unit('e1'),{x:0,z:0});m.structures.push(wall);
+  c.brain=new TrollBrain();c.brain.targetId=elf.id;c.brain.chase={targetId:elf.id,startedAt:m.time-1,budget:15,killsAtStart:0,lastSeen:{x:elf.x,z:elf.z},strikeUntil:m.time+1.6};
+  c.troll(m,t);assert.equal(c.brain.targetId,elf.id);assert.equal(c.brain.state,'chase');assert.ok(t.pendingStrike);
+});
+test('CHASE em alcance ignora marcador antigo de rotação até resolver o golpe',()=>{
+  const m=match(),t=m.unit('t'),elf=m.unit('e0'),c=new AIController('normal'),tower={id:'tempting-tower',kind:'tower',owner:'e1',baseId:'other-base',x:t.x-4,z:t.z,hp:300,maxHp:300,tier:2,branch:'power',progress:1};m.state=STATES.ACTIVE;m.time=200;Object.assign(elf,{x:t.x+2.5,z:t.z});Object.assign(m.unit('e1'),{x:0,z:0});m.structures.push(tower);
+  c.brain=new TrollBrain();c.brain.targetId=elf.id;c.brain.chase={targetId:elf.id,startedAt:m.time-1,budget:15,killsAtStart:0,lastSeen:{x:elf.x,z:elf.z},strikeUntil:m.time+1.6};c.brain.avoid.push({id:elf.id,x:elf.x,z:elf.z,until:m.time+8});
+  c.troll(m,t);assert.equal(c.brain.targetId,elf.id);assert.equal(c.brain.state,'chase');assert.ok(t.pendingStrike);
+});
+
+test('IA prioriza roubo de vida na Forja após cercos repetidamente fracassados',()=>{
+  const m=match(),u=m.unit('t'),controller=new AIController('normal'),brain=new TrollBrain();m.state=STATES.ACTIVE;m.time=100;u.gold=1000;Object.assign(u,m.map.trollShop);brain.build=BUILDS.hunter;brain.failedSieges=2;
+  assert.equal(brain.purchase(controller,m,u,false,[]),true);assert.ok(u.inventory.includes('amber'));assert.equal(u.equipment.helmet,'amber');
 });
 
 test('Mapa estratégico esquece estrutura quando o Troll confirma que o local está vazio',()=>{
@@ -151,6 +186,18 @@ test('Siege Budget impede loop de reposicionamento antes de exceder orçamento',
   const m=match(),t=m.unit('t'),c=new AIController('normal'),tower={id:'budget-tower',kind:'tower',owner:'e0',baseId:'budget-base',x:t.x+2,z:t.z,hp:900,maxHp:900,tier:1,branch:'power',progress:1,bounty:500};m.state=STATES.ACTIVE;m.time=100;m.structures.push(tower);for(const elf of m.units.filter(u=>u.role==='elf'))Object.assign(elf,{x:0,z:0});c.troll(m,t);c.brain.probedBases.set(tower.baseId,m.time);c.troll(m,t);assert.equal(c.brain.state,'siege');
   t.hp=t.maxHp*.9;t.stats.damageReceived=100;m.time+=5;c.troll(m,t);assert.equal(c.brain.siegeDecision.budgetExceeded,false);assert.equal(c.brain.state,'siege');assert.equal(c.brain.reposition,null);
 });
+test('Reposicionamento tático retoma a mesma Barricada sem registrar fracasso estratégico',()=>{
+  const m=match(),t=m.unit('t'),c=new AIController('normal'),wall={id:'campaign-wall',kind:'wall',owner:'e0',baseId:'campaign-base',x:t.x+5,z:t.z,hp:5000,maxHp:5000,tier:6,progress:1,bounty:500};m.state=STATES.ACTIVE;m.time=500;m.structures.push(wall);for(const elf of m.units.filter(u=>u.role==='elf'))Object.assign(elf,{x:0,z:0});
+  c.brain=new TrollBrain();c.brain.beginSiege(m,t,wall,{});c.brain.finishSiegeMemory(m,t,false,{strategicFailure:false});
+  assert.equal(c.brain.campaignTargetId,wall.id);assert.equal(c.brain.failedSieges,0);assert.equal(c.brain.targetFailures.size,0);
+  c.brain.reposition={point:{x:t.x-5,z:t.z},origin:{x:t.x,z:t.z},until:m.time-1,resumeTarget:wall.id};c.brain.state='reposition';c.brain.targetId=null;c.troll(m,t);
+  assert.equal(c.brain.targetId,wall.id);assert.equal(c.brain.state,'hunt');assert.equal(c.brain.campaignResumes,1);assert.ok(!c.destination||c.destination.entityId===wall.id);
+});
+test('Abandono estratégico encerra a campanha e registra a fortificação',()=>{
+  const m=match(),t=m.unit('t'),brain=new TrollBrain(),wall={id:'abandoned-wall',kind:'wall',owner:'e0',baseId:'abandoned-base',x:t.x+3,z:t.z,hp:5000,maxHp:5000,tier:6,progress:1};m.state=STATES.ACTIVE;m.time=500;m.structures.push(wall);
+  brain.beginSiege(m,t,wall,{});brain.finishSiegeMemory(m,t,false,{strategicFailure:true});
+  assert.equal(brain.campaignTargetId,null);assert.equal(brain.failedSieges,1);assert.equal(brain.targetFailure(wall.id).failures,1);assert.equal(brain.lastFailedSiege.targetId,wall.id);
+});
 test('Navegação do Troll não trata a própria estrutura-alvo como obstáculo',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('hard'),tower={id:'tower-target',kind:'tower',x:u.x+6,z:u.z,hp:400,maxHp:400,tier:1,branch:'power',progress:1};
   m.state=STATES.ACTIVE;m.structures.push(tower);c.discovered.set(tower.id,{...tower,seenAt:m.time});
@@ -175,12 +222,12 @@ test('Modo final não espera na base diante de uma fortificação suprimida',()=
   u.cooldowns.heavy=m.time+5;c.troll(m,u);assert.equal(c.brain.mode,'finisher');assert.equal(c.brain.targetId,wall.id);assert.equal(c.brain.state,'probe');assert.notEqual(c.brain.state,'recover','o Troll não deve esperar na base pelo ataque pesado');
   u.levels.siege+=1;assert.equal(c.brain.targetSuppressed(m,u,wall),false,'ganho de poder permite reavaliar o alvo');
 });
-test('Modo final reavalia fortificação suprimida após cooldown quando não existe alternativa',()=>{
+test('Modo final inicia ruptura decisiva sem repetir PROBE quando não existe alternativa',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('normal'),wall={id:'retry-final-wall',kind:'wall',owner:'e0',baseId:'retry-base',x:u.x+3,z:u.z,hp:5000,maxHp:5000,tier:8,progress:1},core={id:'retry-core',kind:'core',owner:'e0',baseId:'retry-base',x:u.x+7,z:u.z,hp:2000,maxHp:2000,tier:8,progress:1};
   m.state=STATES.ACTIVE;m.time=900;m.structures.push(wall,core);for(const elf of m.units.filter(a=>a.role==='elf'))elf.alive=false;m.elfBasesClaimed.add(wall.baseId);
   c.brain=new TrollBrain();c.brain.discoveredBases.add(wall.baseId);c.brain.observedIds.add(wall.id);c.brain.lastProgressValue=20;c.brain.lastProgressAt=700;for(const entity of [wall,core])c.discovered.set(entity.id,{...entity,seenAt:m.time});c.brain.strategicMap.update(m,u,[wall,core]);
   c.brain.targetFailures.set(wall.id,{failures:3,lastPower:c.brain.powerValue(u),suppressedUntil:1500,retryAfter:850,tradeScores:[0,0],fortified:true,siegeLevel:u.levels.siege,equipmentCount:u.inventory.length,targetHpRatio:1,knownTowers:0,legendary:false});
-  c.troll(m,u);assert.equal(c.brain.mode,'finisher');assert.equal(c.brain.targetId,wall.id);assert.equal(c.brain.state,'probe');m.time+=3.1;c.troll(m,u);assert.equal(c.brain.state,'siege');assert.equal(c.brain.siege.decisive,true);assert.equal(c.brain.decisiveAssaults,1);
+  c.troll(m,u);assert.equal(c.brain.mode,'finisher');assert.equal(c.brain.targetId,wall.id);assert.equal(c.brain.state,'breach');assert.equal(c.brain.siege.decisive,true);assert.equal(c.brain.decisiveAssaults,1);
 });
 test('Assalto final escolhe a barricada com menor TTK e exposição prevista',()=>{
   const m=match(),u=m.unit('t'),brain=new TrollBrain(),easy={id:'easy-wall',kind:'wall',baseId:'easy',x:u.x+5,z:u.z,hp:5000,maxHp:5000,tier:7,progress:1},hard={id:'hard-wall',kind:'wall',baseId:'hard',x:u.x-5,z:u.z,hp:9000,maxHp:9000,tier:9,progress:1},towers=Array.from({length:5},(_,i)=>({id:'hard-tower-'+i,kind:'tower',baseId:'hard',x:hard.x+(i-2),z:hard.z+3,hp:1000,maxHp:1000,tier:10,branch:'power',progress:1}));
@@ -194,15 +241,15 @@ test('IA recua de cerco perigoso e recupera vida sem ganhar atributos',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=60;u.hp=200;u.lastHit=60;
   m.structures.push({id:'tower',kind:'tower',x:u.x+5,z:u.z,hp:400,maxHp:400,tier:3,branch:'power',progress:1});
   const speed=B.troll.speed,maxHp=u.maxHp;c.troll(m,u);assert.equal(c.retreating,true);assert.equal(c.brain.state,'disengage');assert.ok(c.destination);assert.ok(distance(c.destination,u)>5);assert.equal(u.maxHp,maxHp);assert.equal(B.troll.speed,speed);
-  Object.assign(u,c.destination);m.time=65;u.lastHit=60;m.structures=[];c.discovered.clear();c.troll(m,u);assert.equal(c.brain.state,'recover');assert.equal(c.destination.x,m.map.trollSpawn.x);assert.equal(c.destination.z,m.map.trollSpawn.z);
-  Object.assign(u,c.destination);m.time=74;u.lastHit=60;c.troll(m,u);assert.equal(c.retreating,true);m.time=83;c.troll(m,u);assert.equal(c.retreating,false);assert.notEqual(c.brain.state,'recover','recuperação segura nunca pode prender o Troll na base');
+  Object.assign(u,c.destination);m.time=65;u.lastHit=60;m.structures=[];c.discovered.clear();c.troll(m,u);assert.equal(c.brain.state,'recover');assert.ok(u.recallUntil>m.time);assert.equal(c.destination,null);
+  m.time=u.recallUntil;m.finishTrollRecall(u);assert.ok(distance(u,m.map.trollSpawn)<.01);u.hp=u.maxHp*.6;m.time+=3.1;c.troll(m,u);assert.equal(c.retreating,false);assert.notEqual(c.brain.state,'recover','recuperação segura nunca pode prender o Troll na base');
 });
 test('IA antecipa dano da rota de fuga e usa o Santuário quando muito ferida',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=100;u.hp=u.maxHp*.35;u.lastHit=m.time;
   for(let i=0;i<3;i++)m.structures.push({id:'predictive-'+i,kind:'tower',x:u.x-5+i*5,z:u.z+4,hp:600,maxHp:600,tier:4,branch:'power',progress:1,disabledUntil:0});
   c.troll(m,u);assert.ok(c.brain.projectedEscapeHp<.35,JSON.stringify({projection:c.brain.projectedEscapeHp,risk:c.brain.riskScore}));assert.equal(c.retreating,true);assert.ok(c.destination);
   m.structures=[];c.discovered.clear();u.hp=u.maxHp*.25;u.lastHit=-100;Object.assign(u,{x:m.map.trollSpawn.x+30,z:m.map.trollSpawn.z});c.troll(m,u);
-  assert.equal(c.brain.state,'recover');assert.equal(c.destination.x,m.map.trollSpawn.x);assert.equal(c.destination.z,m.map.trollSpawn.z);
+  assert.equal(c.brain.state,'recover');assert.ok(u.recallUntil>m.time);assert.equal(c.destination,null);
 });
 test('IA encontra rota de fuga fora da barricada enquanto o Elfo repara sob fogo de torre',()=>{
   const m=new Match({seed:'THORNHOLD'},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},{id:'e0',role:'elf',occupant:{type:'human',name:'Elf'}}]),t=m.unit('t'),elf=m.unit('e0'),c=new AIController('normal'),base=m.map.bases[4];m.state=STATES.ACTIVE;m.time=157;
@@ -216,21 +263,60 @@ test('IA encontra rota de fuga fora da barricada enquanto o Elfo repara sob fogo
   const diagnostic=JSON.stringify({hp:t.hp,wall:wall.hp,state:c.brain?.state,retreating:c.retreating,maxDistance,states:[...states],risk:c.brain?.riskScore,metrics:c.metrics});
   assert.equal(t.alive,true,diagnostic);assert.equal(retreated,true,diagnostic);assert.ok(minHp>0);
 });
-test('Espada lendária mantém agressividade, mas respeita recuo emergencial até 58%',()=>{
+test('Espada lendária mantém agressividade, mas respeita piso de 60% após recuo',()=>{
   assert.ok(B.difficulty.easy.retreat>B.difficulty.normal.retreat&&B.difficulty.normal.retreat>B.difficulty.hard.retreat);
   const m=match(),u=m.unit('t'),c=new AIController('hard');m.state=STATES.ACTIVE;m.time=B.finalAge+50;u.hp=u.maxHp*.18;u.levels.damage=5;u.levels.siege=5;u.levels.health=6;u.lastHit=m.time;
   m.structures.push({id:'legend-danger',kind:'tower',x:u.x+5,z:u.z,hp:400,maxHp:400,tier:5,branch:'power',progress:1,disabledUntil:0});
   c.troll(m,u);assert.equal(c.retreating,true);assert.equal(c.brain.state,'disengage');
-  m.structures=[];c.discovered.clear();u.lastHit=-100;Object.assign(u,c.brain.safePoint||u);u.hp=u.maxHp*.57;c.troll(m,u);assert.equal(c.retreating,true);
-  u.hp=u.maxHp*.58;m.time+=3.1;c.troll(m,u);assert.equal(c.retreating,false);assert.ok(!['retreat','recover'].includes(c.brain.state));
+  m.structures=[];c.discovered.clear();u.lastHit=-100;Object.assign(u,c.brain.safePoint||u);u.hp=u.maxHp*.59;c.troll(m,u);assert.equal(c.retreating,true);
+  u.hp=u.maxHp*.6;m.time+=3.1;c.troll(m,u);assert.equal(c.retreating,false);assert.ok(!['retreat','recover'].includes(c.brain.state));
 });
 test('Janela de recuperação começa somente quando o Troll sai do fogo das torres',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=120;u.hp=u.maxHp*.2;u.lastHit=m.time;
   m.structures.push({id:'recovery-danger',kind:'tower',x:u.x+5,z:u.z,hp:400,maxHp:400,tier:3,branch:'power',progress:1,disabledUntil:0});
   c.troll(m,u);assert.equal(c.retreating,true);assert.equal(c.brain.recoveryUntil,0);
   m.time+=12;u.lastHit=-100;m.structures=[];c.discovered.clear();Object.assign(u,c.brain.safePoint||u);c.troll(m,u);
-  assert.equal(c.brain.recoveryUntil,0);assert.equal(c.destination.x,m.map.trollSpawn.x);
-  Object.assign(u,m.map.trollSpawn);c.troll(m,u);assert.ok(c.brain.recoveryUntil>=m.time+7.9);assert.ok(c.brain.recoveryUntil<=m.time+8.1);assert.equal(c.retreating,true);
+  assert.equal(c.brain.recoveryUntil,0);assert.ok(u.recallUntil>m.time);assert.equal(c.destination,null);
+  m.time=u.recallUntil;m.finishTrollRecall(u);c.troll(m,u);assert.ok(c.brain.recoveryUntil>=m.time+7.9);assert.ok(c.brain.recoveryUntil<=m.time+8.1);assert.equal(c.retreating,true);
+});
+test('Duas torres conhecidas exigem 70% e o tempo sozinho nunca encerra a recuperação',()=>{
+  const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=180;u.hp=u.maxHp*.2;u.lastHit=m.time;
+  for(let i=0;i<2;i++)m.structures.push({id:'recovery-tower-'+i,kind:'tower',baseId:'fortified-base',x:u.x+5,z:u.z+i*2,hp:400,maxHp:400,tier:3,branch:'power',progress:1,disabledUntil:0});
+  c.troll(m,u);assert.equal(c.retreating,true);assert.equal(c.brain.recoveryPlan.targetHpPercent,.7);assert.equal(c.brain.recoveryPlan.knownTowers,2);
+  m.structures=[];c.discovered.clear();Object.assign(u,m.map.trollSpawn);u.lastHit=-100;u.hp=u.maxHp*.69;m.time+=1;c.troll(m,u);assert.equal(c.retreating,true);
+  m.time+=20;c.troll(m,u);assert.equal(c.retreating,true,'o antigo timeout de 8s não pode liberar o Troll abaixo de 70%');
+  u.hp=u.maxHp*.7;m.time+=.2;c.troll(m,u);assert.equal(c.retreating,false);
+  const retreat=m.telemetry.retreats.at(-1);assert.equal(retreat.reentryReason,'two_tower_recovery_threshold');assert.equal(retreat.recoveryTargetHpPercent,.7);assert.equal(retreat.exception,false);assert.equal(retreat.atSanctuary,true);
+});
+test('Execução em alcance é exceção explícita ao piso de recuperação',()=>{
+  const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=B.finalAge+20;u.levels.damage=6;u.levels.siege=6;u.levels.health=12;u.hp=u.maxHp*.3;u.lastHit=-100;
+  const wall={id:'execution-window',kind:'wall',baseId:'execution-base',x:u.x+2,z:u.z,hp:100,maxHp:1000,tier:4,progress:1};m.structures.push(wall);
+  c.brain=new TrollBrain();c.retreating=true;c.brain.recoveryPlan={startedAt:m.time,targetHpPercent:.7,knownTowers:2,baseId:wall.baseId,targetId:wall.id,initialException:null};c.brain.safeSince=m.time-4;m.telemetry.retreatStart(m,u,c.brain.recoveryPlan);
+  c.troll(m,u);assert.equal(c.retreating,false);assert.equal(c.brain.targetId,wall.id);
+  const retreat=m.telemetry.retreats.at(-1);assert.equal(retreat.reentryReason,'execution_opportunity');assert.equal(retreat.exception,true);assert.ok(retreat.reengageHpPercent<.7);
+});
+test('Ausência de rota de fuga é registrada como exceção de reentrada',()=>{
+  const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=220;u.hp=u.maxHp*.25;u.lastHit=-100;
+  c.brain=new TrollBrain();c.retreating=true;c.brain.recoveryPlan={startedAt:m.time,targetHpPercent:.6,knownTowers:1,baseId:null,targetId:null,initialException:'no_escape_route'};m.telemetry.retreatStart(m,u,c.brain.recoveryPlan);
+  c.troll(m,u);assert.equal(c.retreating,false);const retreat=m.telemetry.retreats.at(-1);assert.equal(retreat.reentryReason,'no_escape_route');assert.equal(retreat.exception,true);
+});
+test('Terceiro reposicionamento no mesmo alvo vira recuo completo',()=>{
+  const m=match(),u=m.unit('t'),c=new AIController('normal'),brain=new TrollBrain();m.state=STATES.ACTIVE;m.time=300;u.hp=u.maxHp*.55;u.lastHit=m.time;c.brain=brain;
+  const wall={id:'loop-wall',kind:'wall',baseId:'loop-base',x:u.x+3,z:u.z,hp:5000,maxHp:5000,tier:5,progress:1},tower={id:'loop-tower',kind:'tower',baseId:'loop-base',x:u.x+6,z:u.z+2,hp:1000,maxHp:1000,tier:5,branch:'power',progress:1};m.structures.push(wall,tower);
+  brain.beginSiege(m,u,wall,{});brain.targetId=wall.id;brain.repositionStreak={targetId:wall.id,count:2,lastAt:m.time-4};c.troll(m,u);
+  assert.equal(c.retreating,true);assert.equal(brain.recoveryPlan.trigger,'reposition_loop');assert.equal(brain.recoveryPlan.forceSanctuary,true);assert.equal(brain.repositionStreak,null);assert.equal(brain.campaignTargetId,null);assert.equal(brain.targetFailure(wall.id).failures,1);
+});
+test('Rotação reutiliza memória estratégica para procurar outra base conhecida',()=>{
+  const m=match(),u=m.unit('t'),c=new AIController('normal'),brain=new TrollBrain();m.state=STATES.ACTIVE;m.time=500;c.brain=brain;
+  const failed={id:'failed-wall',kind:'wall',baseId:'failed-base',x:u.x+80,z:u.z,hp:5000,maxHp:5000,tier:6,progress:1},alternate={id:'alternate-wall',kind:'wall',baseId:'alternate-base',x:u.x,z:u.z+70,hp:2200,maxHp:2200,tier:3,progress:1};
+  for(const elf of m.units.filter(unit=>unit.role==='elf'))Object.assign(elf,{x:0,z:0});brain.strategicMap.update(m,u,[failed,alternate]);brain.recordTargetOutcome(m,u,failed.id,false,.1);brain.recordTargetOutcome(m,u,failed.id,false,.1);brain.recordTargetOutcome(m,u,failed.id,false,.1);c.discovered.clear();
+  c.troll(m,u);assert.equal(brain.state,'hunt');assert.equal(brain.targetId,alternate.id);assert.equal(c.destination?.entityId,alternate.id);
+});
+test('Recuo sem progresso por seis segundos abandona pontos locais e vai ao Santuário',()=>{
+  const m=match(),u=m.unit('t'),c=new AIController('normal'),brain=new TrollBrain();m.state=STATES.ACTIVE;m.time=400;u.x+=30;u.hp=u.maxHp*.35;u.lastHit=m.time;c.brain=brain;c.retreating=true;
+  const tower={id:'stalled-retreat-tower',kind:'tower',baseId:'stalled-base',x:u.x+5,z:u.z,hp:1000,maxHp:1000,tier:5,branch:'power',progress:1};m.structures.push(tower);c.discovered.set(tower.id,{...tower,seenAt:m.time});
+  brain.recoveryPlan={startedAt:m.time-10,targetHpPercent:.6,knownTowers:1,baseId:tower.baseId,targetId:null,initialException:null,trigger:'risk',threatOrigin:{x:u.x,z:u.z},bestThreatDistance:0,lastProgressAt:m.time-7,forceSanctuary:false};brain.safePoint={x:u.x+2,z:u.z};m.telemetry.retreatStart(m,u,brain.recoveryPlan);
+  c.troll(m,u);assert.equal(brain.recoveryPlan.forceSanctuary,true);assert.equal(brain.state,'disengage');assert.ok(c.destination);assert.ok(distance(brain.safePoint,m.map.trollSpawn)<.01);
 });
 test('Recuos repetidos nunca desativam autopreservação do Troll',()=>{
   const m=match(),u=m.unit('t'),c=new AIController('normal');m.state=STATES.ACTIVE;m.time=B.finalAge+50;u.lastHit=m.time;c.metrics.retreatAttempts=5;
@@ -261,7 +347,21 @@ test('Bot Elfo evacua a clareira e não volta imediatamente quando o Troll rompe
   const m=match(),u=m.unit('e0'),t=m.unit('t'),c=new AIController('normal'),base=m.map.bases[0];m.state=STATES.ACTIVE;m.time=100;Object.assign(u,{x:base.x,z:base.z,baseId:base.id,gold:1000,wood:1000});Object.assign(t,{x:base.x+2,z:base.z});m.unit('e1').alive=false;
   m.structures.push({id:'evac-core',kind:'core',owner:u.id,baseId:base.id,x:base.x,z:base.z,hp:980,maxHp:980,tier:3,progress:1,upgrading:0});m.brokenBases.add(base.id);m.breachUntil.set(base.id,m.time+45);
   c.elf(m,u);assert.ok(c.destination);assert.notEqual(baseAt(m.map,c.destination)?.id,base.id);assert.ok(c.metrics.evacuations>=1);
-  const destination={...c.destination};Object.assign(t,{x:0,z:0});m.time+=3;c.elf(m,u);assert.deepEqual(c.destination,destination);
+  const destination={...c.destination};Object.assign(u,destination);Object.assign(t,{x:0,z:0});m.time+=3;c.elf(m,u);assert.deepEqual(c.elfEvade.destination,{x:destination.x,z:destination.z});
+  m.time+=15;c.elf(m,u);assert.ok(c.elfEvade,'não retorna enquanto a ruptura continua ativa');assert.deepEqual(c.elfEvade.destination,{x:destination.x,z:destination.z});
+  m.time=m.breachUntil.get(base.id)+B.elf.evacuationClearSeconds+1;c.elfEvade.clearSince=m.time-B.elf.evacuationClearSeconds;c.elf(m,u);assert.equal(c.elfEvade,null);assert.equal(c.metrics.evacuationReturns,1);
+});
+test('Bot Elfo deixa a zona de nascimento do Troll antes do fim da preparação',()=>{
+  const m=match(),u=m.unit('e0'),c=new AIController('normal');m.time=m.preparation-B.elf.preparationClearSeconds+1;Object.assign(u,{x:m.map.trollSpawn.x+2,z:m.map.trollSpawn.z});
+  c.elf(m,u);assert.ok(c.destination);assert.ok(distance(c.destination,m.map.trollSpawn)>=B.elf.preparationTrollClearRadius);assert.equal(c.metrics.preparationEvacuations,1);
+});
+test('Bot reassentado abandona a base destruída e escolhe outra clareira longe do Troll',()=>{
+  const m=match(),u=m.unit('e0'),t=m.unit('t'),c=new AIController('normal'),oldBase=m.map.bases[0];m.state=STATES.ACTIVE;m.time=100;m.unit('e1').alive=false;
+  Object.assign(u,{x:oldBase.x,z:oldBase.z,baseId:oldBase.id,gold:1000,wood:1000});Object.assign(t,{x:oldBase.x+2,z:oldBase.z});
+  const core={id:'lost-core',kind:'core',owner:u.id,baseId:oldBase.id,x:oldBase.x,z:oldBase.z,hp:360,maxHp:360,tier:1,progress:1,lastHit:-100,bounty:100};m.structures.push(core);m.elfBasesClaimed.add(oldBase.id);
+  m.damage(core,core.hp,t,'melee');assert.equal(u.baseId,null);assert.equal(u.displacedBaseId,oldBase.id);assert.ok(u.relocationThreat);
+  c.elf(m,u);assert.ok(c.metrics.relocationTarget);assert.notEqual(c.metrics.relocationTarget,oldBase.id);assert.equal(c.metrics.relocationAvoidedBase,oldBase.id);assert.ok(c.destination);
+  const target=m.map.bases.find(base=>base.id===c.metrics.relocationTarget);assert.ok(distance(target,t)>distance(oldBase,t));
 });
 test('Movimento lateral preserva orientação da mira enviada pelo jogador',()=>{
   const m=match(),u=m.unit('e0');m.input(u.id,{x:1,z:0,yaw:Math.PI});m.movement(u,.05);assert.equal(u.yaw,Math.PI);
@@ -290,7 +390,7 @@ test('IA não abandona recuperação segura apenas por pressão de inatividade',
   c.troll(m,u);c.retreating=true;c.brain.recoveryUntil=m.time+36;
   m.step(1/B.tick);c.troll(m,u);
   assert.equal(c.retreating,true);assert.equal(c.brain.state,'recover');
-  u.hp=u.maxHp*.56;m.time+=3.1;c.troll(m,u);assert.equal(c.retreating,false);
+  u.hp=u.maxHp*.6;m.time+=3.1;c.troll(m,u);assert.equal(c.retreating,false);
   // A real hit must still trigger a defensive response under idle pressure.
   u.hp=u.maxHp*.2;m.structures.push({id:'idle-danger',kind:'tower',x:u.x+4,z:u.z,hp:400,maxHp:400,tier:3,branch:'power',progress:1});m.damage(u,1,m.unit('e0'),'tower');c.troll(m,u);
   assert.equal(c.retreating,true);assert.equal(c.brain.state,'disengage');

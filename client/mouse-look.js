@@ -2,7 +2,7 @@
 export class MouseLook {
   constructor(canvas,world,onChange,onError){
     this.canvas=canvas;this.world=world;this.onChange=onChange;this.onError=onError;this.started=false;this.pending=false;
-    document.addEventListener('pointerlockchange',()=>{this.pending=false;world.aiming=this.locked;onChange();});
+    document.addEventListener('pointerlockchange',()=>{this.pending=false;world.aiming=this.locked;onChange(this.locked);});
     document.addEventListener('pointerlockerror',()=>{this.pending=false;this.started=false;onError('Clique no cenário para ativar novamente a mira travada.');});
   }
   get locked(){return document.pointerLockElement===this.canvas;}
