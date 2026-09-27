@@ -102,6 +102,12 @@ test('Cinco Elfos começam em refúgios distribuídos pelo mapa, sem comboio par
     assert.ok(Math.min(...pairDistances)>70,JSON.stringify(opening.map(base=>({id:base.id,x:base.x,z:base.z}))));
   }
 });
+test('Bots reservam cinco clareiras distintas mesmo vendo o Troll no spawn',()=>{
+  const slots=[{id:'t',role:'troll',occupant:{type:'bot',name:'Troll'}},...Array.from({length:5},(_,i)=>({id:`e${i}`,role:'elf',occupant:{type:'bot',name:`Elfo ${i}`}}))],m=new Match({seed:'OPENING-RESERVATIONS'},slots);
+  for(let i=0;i<20;i++)m.step(.05);
+  const targets=m.units.filter(u=>u.role==='elf').map(u=>m.controllers.get(u.id).relocationBaseId);
+  assert.equal(new Set(targets).size,5,JSON.stringify(targets));assert.ok(targets.every(Boolean));
+});
 
 test('Pings validam coordenadas, respeitam equipe, cooldown e expiração',()=>{
   const m=match();assert.match(m.act('e0',{type:'ping',x:NaN,z:1}),/inválida/);assert.match(m.act('e0',{type:'ping',x:-1,z:1}),/inválida/);assert.match(m.act('e0',{type:'ping',x:99999,z:1}),/inválida/);

@@ -163,7 +163,13 @@ export class AIController {
       if(!this.refuges){this.refuges=distributedRefuges(match.map);this.metrics.refugeOrder=this.refuges.map(refuge=>refuge.id);}
       const ordered=Array.from({length:this.refuges.length},(_,i)=>this.refuges[(offset+i)%this.refuges.length]),previousBaseId=u.displacedBaseId||null;
       const visibleThreat=match.visibleEnemies(u).find(e=>e.role==='troll'),rememberedThreat=(u.relocationThreat?.until||0)>match.time?u.relocationThreat:null,relocationThreat=visibleThreat||rememberedThreat;
-      let candidates=ordered.filter(b=>!claimed.has(b.id)&&(match.reclaimUntil.get(b.id)||0)<=match.time&&b.id!==previousBaseId);
+      // A destination is reserved as soon as another bot commits to it. At
+      // match start every Elf can see the same Troll landmark; without this
+      // reservation the threat sort overrides the seeded offsets and sends
+      // the whole team through one corridor toward the same refuge.
+      const reserved=new Set([...match.controllers.entries()].filter(([id])=>id!==u.id).map(([,controller])=>controller.relocationBaseId).filter(Boolean));
+      let candidates=ordered.filter(b=>!claimed.has(b.id)&&!reserved.has(b.id)&&(match.reclaimUntil.get(b.id)||0)<=match.time&&b.id!==previousBaseId);
+      if(!candidates.length)candidates=ordered.filter(b=>!claimed.has(b.id)&&!reserved.has(b.id)&&(match.reclaimUntil.get(b.id)||0)<=match.time);
       if(!candidates.length)candidates=ordered.filter(b=>!claimed.has(b.id)&&(match.reclaimUntil.get(b.id)||0)<=match.time);
       const current=candidates.find(b=>b.id===this.relocationBaseId&&(!relocationThreat||distance(b,relocationThreat)>=B.elf.evacuationThreatRange));
       if(current)base=current;else{
