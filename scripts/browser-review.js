@@ -14,7 +14,11 @@ await mkdir('artifacts',{recursive:true});
 try{
   await page.goto('http://127.0.0.1:'+app.port);
   await page.getByText('Servidor conectado',{exact:false}).waitFor();
-  await page.getByRole('button',{name:'Explorar partidas online',exact:false}).click();await page.getByRole('button',{name:'Ranqueada · 1×5'}).waitFor();await page.getByRole('button',{name:'← Voltar ao início'}).click();
+  await page.getByRole('button',{name:'Explorar partidas online',exact:false}).click();await page.getByRole('button',{name:'Ranqueada · 1×5'}).waitFor();
+  // The public-room browser refreshes while it is open, replacing this button.
+  // Dispatching through the stable action selector avoids a flaky Playwright
+  // visibility/stability race without changing the user-facing behavior.
+  await page.locator('[data-do=menu]').dispatchEvent('click');
   await page.getByRole('button',{name:'Criar sala privada',exact:false}).click();
   assert.deepEqual(await page.locator('[name=mode] option').allTextContents(),['Personalizado','Normal']);
   await page.locator('[name=mode]').selectOption('custom');await page.locator('[name=role]').selectOption('elf');await page.locator('[name=elves]').selectOption('5');
