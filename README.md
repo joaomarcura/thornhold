@@ -141,6 +141,7 @@ npm run audit:progression -- 6 artifacts/progression-current-20hz.json
 - `npm run test:spectator:browser`: abre uma partida local 1×5 apenas com bots, acompanha como observador, valida resultado natural e inicia uma revanche com outra seed.
 - `npm run audit:progression -- 6 CAMINHO`: 72 partidas pareadas a 20 Hz, dificuldade separada por papel, compras, economia, comandos rejeitados e duração. Partidas sem vencedor em 25 min são registradas e fazem o comando retornar código 1.
 - [Progressão infinita, Wisps e combate](docs/PROGRESSAO-INFINITA-E-COMBATE.md): regras implementadas, builds, custos, testes e próximos ajustes. O lote atual terminou com 38 vitórias do Troll, 32 dos Elfos e duas partidas sem vencedor aos 25 minutos; apenas oito das 72 ficaram na meta de **12–18 minutos**.
+- [Progressão dos Elfos](docs/PROGRESSAO-DOS-ELFOS.md): especializações Industrial, Fortaleza e Arcano, recursos especiais, Wisps dedicados, estruturas exclusivas e habilidades ativas.
 - [Auditoria anterior](docs/BALANCEAMENTO-E-PROGRESSAO.md): pesquisa das variantes e diagnóstico antes da progressão infinita; mantida como histórico.
 - `scripts/browser-check.js`, `scripts/browser-gameplay.js`, `scripts/browser-lifecycle.js`, `scripts/browser-controls.js`, `scripts/browser-progression.js` e `scripts/browser-hud.js` verificam a interface, construção, observação, resultado, revanche, câmera, loja, Wisps, combate e cancelamento em sessões isoladas de navegador. Consulte `docs/VALIDACAO.md`.
 

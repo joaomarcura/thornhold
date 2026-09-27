@@ -149,7 +149,7 @@ export async function createGameServer({port=Number(process.env.PORT)||3000,host
               send(ws,'dev',{speed:room.devSpeed,target:targetId,granted:{gold:Number(msg.gold)||0,wood:Number(msg.wood)||0,essence:Number(msg.essence)||0}});
             }else if(msg.command==='speed'){
               if(!slot)sessions.requireHost(room,client);
-              const speed=Number(msg.speed);if(![1,2,4,8].includes(speed))throw new Error('Velocidade dev inválida.');
+              const speed=Number(msg.speed);if(![1,2,4,6,8,16].includes(speed))throw new Error('Velocidade dev inválida.');
               room.devSpeed=speed;room.match.devSpeed=speed;broadcast(room,'dev',{speed});
             }else throw new Error('Comando dev desconhecido.');
             break;

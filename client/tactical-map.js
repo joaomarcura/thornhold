@@ -31,6 +31,8 @@ export class TacticalMap {
     ctx.drawImage(bg.canvas,0,0);
     for(const b of m.bases){if(!this.seenBases.has(b.id))continue;ctx.fillStyle='#d7bf84';ctx.fillRect(b.gate.x*k-2,b.gate.z*k-2,4,4);if(large){ctx.font='10px sans-serif';ctx.textAlign='center';ctx.fillText(b.name,b.x*k,(b.z-b.rz*m.cell-2)*k);ctx.fillStyle='#b6c7b9';ctx.font='9px sans-serif';ctx.fillText(`${b.profile} · ${b.height>0?'+':''}${b.height} m`,b.x*k,(b.z+b.rz*m.cell+4)*k);}}
     const ring=(p,r,color,dashed=false)=>{ctx.strokeStyle=color;ctx.lineWidth=2;ctx.setLineDash(dashed?[4,3]:[]);ctx.beginPath();ctx.arc(p.x*k,p.z*k,r,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);};
+    const resourceColor={ancientWood:'#d3a66d',crystal:'#7fe0dd',mana:'#b58cff'};
+    for(const node of s.specialNodes||[]){if(node.amount<=0)continue;ctx.fillStyle=resourceColor[node.resource]||'#f1d38d';ctx.beginPath();ctx.moveTo(node.x*k,node.z*k-5);ctx.lineTo(node.x*k+5,node.z*k);ctx.lineTo(node.x*k,node.z*k+5);ctx.lineTo(node.x*k-5,node.z*k);ctx.closePath();ctx.fill();if(large){ctx.font='bold 9px sans-serif';ctx.textAlign='center';ctx.fillText(String(Math.floor(node.amount)),node.x*k,node.z*k-8);}}
     for(const e of s.structures){ctx.fillStyle=playerColor(e.owner).css;const r=e.kind==='core'?3:2;ctx.fillRect(e.x*k-r,e.z*k-r,r*2,r*2);}
     if(large)for(const worker of s.wisps||[]){ctx.fillStyle=worker.income>0?'#bbf7d1':'#8a9782';ctx.beginPath();ctx.arc(worker.x*k,worker.z*k,2.5,0,Math.PI*2);ctx.fill();}
     for(const a of s.alerts||[])ring(a,7+Math.sin(s.time*7)*2,'#ff765f');

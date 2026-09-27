@@ -1,15 +1,15 @@
 export const DEFAULT_BINDINGS=Object.freeze({
   forward:'KeyW',backward:'KeyS',left:'KeyA',right:'KeyD',sprint:'ShiftLeft',
-  repair:'KeyR',heal:'KeyR',heavy:'KeyQ',dash:'Space',ability:'KeyF',
+  interact:'KeyE',repair:'KeyR',heal:'KeyR',heavy:'KeyQ',dash:'Space',ability:'KeyF',
   recall:'KeyB',shop:'KeyG',map:'KeyM',camera:'KeyC',core:'KeyN',upgrade:'KeyQ',
-  wisp:'KeyT',ping:'KeyV',spectate:'Tab',help:'KeyH'
+  wisp:'KeyT',specialization:'KeyX',ping:'KeyV',spectate:'Tab',help:'KeyH'
 });
 
 export const BINDING_LABELS=Object.freeze({
   forward:'Mover para frente',backward:'Mover para trás',left:'Mover à esquerda',right:'Mover à direita',sprint:'Correr',
-  repair:'Reparar / coletar / girar projeto',heal:'Cura do Troll',heavy:'Golpe pesado',dash:'Esquiva',ability:'Habilidade',
+  interact:'Interagir',repair:'Reparar / coletar / girar projeto',heal:'Cura do Troll',heavy:'Golpe pesado',dash:'Esquiva',ability:'Habilidade',
   recall:'Retorno ao Santuário',shop:'Loja do Troll',map:'Mapa tático',camera:'Voltar à câmera',core:'Núcleo / Wisps',upgrade:'Evoluir seleção',
-  wisp:'Formar Wisp',ping:'Comunicação',spectate:'Trocar observado',help:'Como jogar'
+  wisp:'Formar Wisp',specialization:'Habilidade da especialização',ping:'Comunicação',spectate:'Trocar observado',help:'Como jogar'
 });
 
 const STORAGE_KEY='thornhold-preferences';

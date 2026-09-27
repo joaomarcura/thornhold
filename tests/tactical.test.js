@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Match } from '../shared/simulation.js';
 import { STATES, BALANCE as B, distance } from '../shared/config.js';
 import { toCell, index, baseAt } from '../shared/map.js';
-import { AIController } from '../shared/controllers.js';
+import { AIController, distributedRefuges } from '../shared/controllers.js';
 import { TacticalMap } from '../client/tactical-map.js';
 import { StrategicMap } from '../shared/strategic-map.js';
 import { TROLL_STATES, TrollBrain } from '../shared/troll-brain.js';
@@ -92,6 +92,15 @@ test('CHASE usa orçamento dinâmico e estagnação troca caça improdutiva por 
   const m=match(),u=m.unit('t'),c=new AIController('normal'),brain=new TrollBrain(),elf=m.unit('e0');m.state=STATES.ACTIVE;
   Object.assign(elf,{x:u.x+6,z:u.z,hp:10});assert.equal(brain.chaseBudget(m,u,elf,{danger:{towers:0}}),20);elf.hp=elf.maxHp;elf.x=u.x+16;assert.equal(brain.chaseBudget(m,u,elf,{danger:{towers:1}}),9);
   brain.strategy='hunter';brain.lastProgressAt=0;m.time=100;brain.updateDirector(c,m,u,[]);assert.equal(brain.strategy,'raider');assert.equal(brain.stagnationEvents,1);assert.equal(brain.director.stagnant,true);
+});
+
+test('Cinco Elfos começam em refúgios distribuídos pelo mapa, sem comboio para o mesmo setor',()=>{
+  for(const seed of ['THORNHOLD','DYNAMIC-1','DYNAMIC-2']){
+    const m=new Match({seed},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},...Array.from({length:5},(_,i)=>({id:`e${i}`,role:'elf',occupant:{type:'human',name:`Elfo ${i}`}}))]);
+    const opening=distributedRefuges(m.map).slice(0,5),pairDistances=opening.flatMap((base,i)=>opening.slice(i+1).map(other=>distance(base,other)));
+    assert.equal(new Set(opening.map(base=>base.id)).size,5);
+    assert.ok(Math.min(...pairDistances)>70,JSON.stringify(opening.map(base=>({id:base.id,x:base.x,z:base.z}))));
+  }
 });
 
 test('Pings validam coordenadas, respeitam equipe, cooldown e expiração',()=>{

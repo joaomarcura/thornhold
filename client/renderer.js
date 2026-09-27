@@ -93,6 +93,12 @@ export function building(kind,tier=1,branch='power',identity=null,legendary=fals
     for(let i=0;i<tier;i++)part(g,'box',trim,0,1+i*.65,.65,.2,.3,.12);g.scale.y=1+(tier-1)*.1;
   }else if(kind==='mine'){
     part(g,'sphere',0x586762,0,.65,0,1.5,1.1,1.25);part(g,'box',wood,0,.6,1.05,1.2,1.4,.25);part(g,'box',0x1b292b,0,.5,1.21,.8,.95,.04);for(let i=0;i<4;i++)part(g,'sphere',trim,(i%2-.5)*.8,.3+Math.floor(i/2)*.4,-.7,.38,.35,.4);g.scale.y=1+tier*.1;
+  }else if(kind==='refinery'){
+    part(g,'cylinder',stone,0,.35,0,1.45,.7,1.45);part(g,'cylinder',0xc08b48,0,1.45,0,1.05,2.3,1.05);part(g,'cylinder',wood,.85,2.15,-.25,.22,2.2,.22);part(g,'sphere',0xf0c26d,0,2.75,0,.5,.24,.5);
+  }else if(kind==='bastion'){
+    part(g,'cylinder',stone,0,.4,0,1.55,.8,1.55);for(let i=0;i<6;i++){const a=i/6*Math.PI*2;part(g,'box',0x8e9c93,Math.sin(a)*1.05,1.35,Math.cos(a)*1.05,.45,2,.45).rotation.y=a;}part(g,'sphere',0xb8d8c7,0,2.4,0,.45,.45,.45);
+  }else if(kind==='arcaneTower'){
+    part(g,'cylinder',0x59656b,0,.3,0,1.25,.6,1.25);part(g,'cylinder',0x756b8d,0,2,0,.65,3.6,.82);part(g,'sphere',0xb78aff,0,4.35,0,.62,.9,.62);for(let i=0;i<3;i++){const a=i/3*Math.PI*2;part(g,'sphere',0x78d8e6,Math.sin(a)*.9,3.7,Math.cos(a)*.9,.18,.18,.18);}
   }else{
     part(g,'box',stone,0,.8,0,1.8,1.6,1.8);part(g,'cone',identity?.hex||0x6c8993,0,2,0,1.6,1.1,1.6);part(g,'cylinder',wood,1,1.8,-.5,.25,3,.3);part(g,'sphere',trim,-.7,.6,1,.7,.7,.15);
   }if(identity)part(g,'sphere',identity.hex,0,kind==='tower'?5.05:2.7,0,.16,.16,.16);
@@ -119,7 +125,7 @@ export class WorldRenderer {
     this.scene=new T.Scene();this.scene.background=new T.Color(0x233e41);this.scene.fog=new T.FogExp2(0x233e41,.012);
     this.camera=new T.PerspectiveCamera(52,innerWidth/innerHeight,.1,400);this.scene.add(new T.HemisphereLight(0xdce8c9,0x253c41,2.6));
     this.sun=new T.DirectionalLight(0xffe3ad,3.4);this.sun.position.set(25,60,-15);this.sun.castShadow=true;this.sun.shadow.mapSize.set(1024,1024);Object.assign(this.sun.shadow.camera,{left:-30,right:30,top:30,bottom:-30,near:1,far:150});this.sun.shadow.bias=-.0005;this.scene.add(this.sun,this.sun.target);
-    this.terrain=group(this.scene);this.dynamic=group(this.scene);this.effects=group(this.scene);this.entities=new Map();this.treeMeshes=new Map();this.visibleTreeIds=new Set();this.towerDebugRings=new Map();this.particles=[];this.projectiles=[];this.effectPool=new Map();this.ray=new T.Raycaster();this.pointer=new T.Vector2();this.plane=new T.Plane(new T.Vector3(0,1,0),0);this.yaw=0;this.pitch=.55;this.zoom=13;this.target=new T.Vector3();this.projectVector=new T.Vector3();this.worldVector=new T.Vector3();this.motionQuery=matchMedia('(prefers-reduced-motion: reduce)');this.isMenu=true;this.eventId=0;this.lastTime=0;this.elapsed=0;this.buildMode=false;this.buildCameraBlend=0;this.frameSamples=[];this.resolutionCheckAt=0;this.longTasks=0;this.performance={fps:60,frameP95Ms:0,drawCalls:0,triangles:0,pixelRatio:this.pixelRatio,longTasks:0};
+    this.terrain=group(this.scene);this.dynamic=group(this.scene);this.effects=group(this.scene);this.entities=new Map();this.treeMeshes=new Map();this.specialNodeMeshes=new Map();this.visibleTreeIds=new Set();this.towerDebugRings=new Map();this.particles=[];this.projectiles=[];this.effectPool=new Map();this.ray=new T.Raycaster();this.pointer=new T.Vector2();this.plane=new T.Plane(new T.Vector3(0,1,0),0);this.yaw=0;this.pitch=.55;this.zoom=13;this.target=new T.Vector3();this.projectVector=new T.Vector3();this.worldVector=new T.Vector3();this.motionQuery=matchMedia('(prefers-reduced-motion: reduce)');this.isMenu=true;this.eventId=0;this.lastTime=0;this.elapsed=0;this.buildMode=false;this.buildCameraBlend=0;this.frameSamples=[];this.resolutionCheckAt=0;this.longTasks=0;this.performance={fps:60,frameP95Ms:0,drawCalls:0,triangles:0,pixelRatio:this.pixelRatio,longTasks:0};
     if(globalThis.PerformanceObserver)try{this.longTaskObserver=new PerformanceObserver(list=>this.longTasks+=list.getEntries().length);this.longTaskObserver.observe({type:'longtask',buffered:true});}catch{}
     this.selection=new T.Mesh(new T.RingGeometry(1.2,1.28,40),new T.MeshBasicMaterial({color:palette.gold,side:T.DoubleSide,transparent:true,opacity:.8}));this.selection.rotation.x=-Math.PI/2;this.selection.position.y=.08;this.selection.visible=false;this.contextTarget=null;this.scene.add(this.selection);
     this.range=new T.Mesh(new T.RingGeometry(16.92,17,80),new T.MeshBasicMaterial({color:palette.teal,side:T.DoubleSide,transparent:true,opacity:.25}));this.range.rotation.x=-Math.PI/2;this.range.visible=false;this.scene.add(this.range);this.buildRange=new T.Mesh(new T.RingGeometry(6.42,6.5,80),new T.MeshBasicMaterial({color:palette.teal,side:T.DoubleSide,transparent:true,opacity:.22}));this.buildRange.rotation.x=-Math.PI/2;this.buildRange.visible=false;this.scene.add(this.buildRange);
@@ -128,7 +134,7 @@ export class WorldRenderer {
   resize(){this.renderer.setSize(innerWidth,innerHeight);this.camera.aspect=innerWidth/innerHeight;this.camera.updateProjectionMatrix();}
   clearGroup(g){g.traverse(o=>{if(o.userData.disposeGeometry)o.geometry?.dispose();if(o.userData.disposeMaterial)o.material?.dispose();});while(g.children.length){const child=g.children[0];disposeModel(child);g.remove(child);}}
   loadMap(map){
-    this.map=map;this.clearGroup(this.terrain);this.clearGroup(this.dynamic);this.clearGroup(this.effects);for(const ring of this.towerDebugRings.values())this.scene.remove(ring);this.towerDebugRings.clear();this.entities.clear();this.treeMeshes.clear();this.decorForest=[];this.particles=[];this.projectiles=[];this.effectPool.clear();this.eventId=0;this.rangeKey=null;this.ghost&&this.scene.remove(this.ghost);this.ghost=null;
+    this.map=map;this.clearGroup(this.terrain);this.clearGroup(this.dynamic);this.clearGroup(this.effects);for(const ring of this.towerDebugRings.values())this.scene.remove(ring);this.towerDebugRings.clear();this.entities.clear();this.treeMeshes.clear();this.specialNodeMeshes.clear();this.decorForest=[];this.particles=[];this.projectiles=[];this.effectPool.clear();this.eventId=0;this.rangeKey=null;this.ghost&&this.scene.remove(this.ghost);this.ghost=null;
     this.ground=terrainMesh(map);this.terrain.add(this.ground);
     const rng=randomFor(map.seed+'visual'),dummy=new T.Object3D(),rockCells=[];
     for(let z=0;z<map.size;z++)for(let x=0;x<map.size;x++)if(!walkable(map,x,z))rockCells.push({x:x*map.cell,z:z*map.cell});
@@ -141,6 +147,15 @@ export class WorldRenderer {
     const trees=map.decor.filter(d=>d.kind==='tree'),trunks=new T.InstancedMesh(geo.cylinder,material(palette.bark).clone(),trees.length),leaves=new T.InstancedMesh(geo.cone,material(palette.leaf).clone(),trees.length*2);this.decorForest=[trunks,leaves];
     trees.forEach((p,i)=>{const y=heightAt(map,p.x,p.z);dummy.position.set(p.x,y+2*p.scale,p.z);dummy.scale.set(.26*p.scale,4*p.scale,.26*p.scale);dummy.rotation.set(0,p.rotation,0);dummy.updateMatrix();trunks.setMatrixAt(i,dummy.matrix);for(let j=0;j<2;j++){dummy.position.y=y+(3.8+j*1.7)*p.scale;dummy.scale.set((1.6-j*.35)*p.scale,3.7*p.scale,(1.6-j*.35)*p.scale);dummy.updateMatrix();leaves.setMatrixAt(i*2+j,dummy.matrix);leaves.setColorAt(i*2+j,new T.Color().setHSL(.37+rng()*.07,.25,.18+rng()*.1));}});trunks.castShadow=true;leaves.castShadow=true;leaves.receiveShadow=true;this.terrain.add(trunks,leaves);
     for(const t of map.trees){const g=group(this.terrain,t.x,heightAt(map,t.x,t.z),t.z);part(g,'cylinder',palette.bark,0,1.5,0,.26,3,.26);part(g,'cone',t.rich?0x6b8870:0x55836a,0,3,0,1.65,3.7,1.65);part(g,'cone',t.rich?0x879365:0x66947c,0,4.2,0,1.13,2.7,1.13);this.treeMeshes.set(t.id,g);}
+    for(const n of map.specialNodes||[]){
+      const g=group(this.terrain,n.x,heightAt(map,n.x,n.z),n.z),color={ancientWood:0xd3a66d,crystal:0x7fe0dd,mana:0xb58cff}[n.resource];
+      part(g,'cylinder',0x4b5149,0,.2,0,1.45,.4,1.45);
+      const luminous=mesh=>{mesh.material=mesh.material.clone();mesh.material.emissive=new T.Color(color);mesh.material.emissiveIntensity=.42;return mesh;};
+      if(n.resource==='ancientWood'){luminous(part(g,'cylinder',color,0,1.25,0,.6,2.3,.72));luminous(part(g,'sphere',0x7bad68,0,2.55,0,1.25,1.3,1.25));}
+      else for(let i=0;i<6;i++){const a=i/6*Math.PI*2,shard=luminous(part(g,'cone',color,Math.sin(a)*.68,1.05+Math.abs(i-2.5)*.1,Math.cos(a)*.68,.4,2,.4));shard.rotation.z=(i-2.5)*.1;}
+      const beacon=new T.Mesh(new T.RingGeometry(1.7,1.9,40),new T.MeshBasicMaterial({color,transparent:true,opacity:.72,side:T.DoubleSide,depthWrite:false}));beacon.rotation.x=-Math.PI/2;beacon.position.y=.08;g.add(beacon);g.userData.beacon=beacon;
+      this.specialNodeMeshes.set(n.id,g);
+    }
     // Landmarks remain inside the safe spawn plaza and never suggest a blocked route.
     for(const p of map.pois){const g=group(this.terrain,p.x,heightAt(map,p.x,p.z),p.z);for(let i=0;i<3;i++){const a=i/3*Math.PI*2;part(g,'sphere',0x7d9489,Math.cos(a)*1.2,.35,Math.sin(a)*1.2,.45,.4,.45);}part(g,'sphere',0x8bdfcf,0,.4,0,.5,.25,.5);}
     const cage=group(this.terrain,map.trollSpawn.x,heightAt(map,map.trollSpawn.x,map.trollSpawn.z),map.trollSpawn.z);for(let i=0;i<8;i++){const a=i/8*Math.PI*2;part(cage,'sphere',0x747e6c,Math.cos(a)*4,.6,Math.sin(a)*4,.75,.8,.75);}this.cage=cage;
@@ -181,6 +196,7 @@ export class WorldRenderer {
     for(const t of snapshot.trees){const g=this.treeMeshes.get(t.id);if(!g)continue;g.visible=t.amount>0;g.userData.entity={...t,kind:'tree'};
       for(const leaf of g.children.slice(1)){if(!leaf.userData.ownMaterial){leaf.material=leaf.material.clone();leaf.material.transparent=true;leaf.material.depthWrite=false;leaf.userData.ownMaterial=true;}leaf.material.opacity=occupied.has(t.id)?.38:1;}
     }
+    const visibleNodes=new Set((snapshot.specialNodes||[]).map(n=>n.id));for(const [id,g] of this.specialNodeMeshes){const n=(snapshot.specialNodes||[]).find(n=>n.id===id);g.visible=!!n&&n.amount>0&&visibleNodes.has(id);if(n)g.userData.entity={...n,kind:'specialNode'};}
     for(const e of snapshot.events){if(e.id>this.eventId){this.effect(e);this.eventId=Math.max(this.eventId,e.id);}}
     if(this.seal)this.seal.visible=snapshot.state==='PREPARATION';
   }
@@ -210,7 +226,7 @@ export class WorldRenderer {
   }
   groundPoint(clientX,clientY){this.pointer.set(clientX/innerWidth*2-1,-clientY/innerHeight*2+1);this.ray.setFromCamera(this.pointer,this.camera);return this.ground?this.ray.intersectObject(this.ground,false)[0]?.point||null:null;}
   constructionPoint(origin){const p=boundedConstructionPoint(origin,this.groundPoint(innerWidth/2,innerHeight/2),this.yaw);return{x:p.x,y:heightAt(this.map,p.x,p.z),z:p.z};}
-  pick(clientX,clientY,ignoreId){this.pointer.set(clientX/innerWidth*2-1,-clientY/innerHeight*2+1);this.ray.setFromCamera(this.pointer,this.camera);const visibleTrees=[...this.treeMeshes.values()].filter(g=>g.visible&&this.visibleTreeIds.has(g.userData.entity?.id));const hits=this.ray.intersectObjects([...this.entities.values()].filter(g=>g.visible&&g.userData.entity.id!==ignoreId).concat(visibleTrees),true);for(const hit of hits){let o=hit.object;while(o){if(o.userData.entity)return o.userData.entity;o=o.parent;}}return null;}
+  pick(clientX,clientY,ignoreId){this.pointer.set(clientX/innerWidth*2-1,-clientY/innerHeight*2+1);this.ray.setFromCamera(this.pointer,this.camera);const visibleTrees=[...this.treeMeshes.values()].filter(g=>g.visible&&this.visibleTreeIds.has(g.userData.entity?.id)),visibleNodes=[...this.specialNodeMeshes.values()].filter(g=>g.visible);const hits=this.ray.intersectObjects([...this.entities.values()].filter(g=>g.visible&&g.userData.entity.id!==ignoreId).concat(visibleTrees,visibleNodes),true);for(const hit of hits){let o=hit.object;while(o){if(o.userData.entity)return o.userData.entity;o=o.parent;}}return null;}
   entityPoint(e){const g=this.entities.get(e.id);if(e.role==='wisp'&&g?.userData.spirit){const v=g.userData.spirit.getWorldPosition(this.worldVector);return this.project(v.x,v.y+.55,v.z);}return this.project(e.x,heightAt(this.map,e.x,e.z)+(e.kind==='tower'?6:e.kind?3.6:e.role==='troll'?4.4:2.6),e.z);}
   ghostAt(kind,p,valid,rotation=0){
     if(!p){if(this.ghost)this.ghost.visible=false;return;}
@@ -290,7 +306,7 @@ export class WorldRenderer {
       }
       this.camera.lookAt(aim);
       if(!reduced&&this.shakeUntil>this.elapsed&&!this.focusPoint)this.camera.position.x+=Math.sin(this.elapsed*110)*this.shakeStrength;
-      const highlighted=this.contextTarget||selected,s=this.entities.get(highlighted)||this.treeMeshes.get(highlighted);if(!this.ghost?.visible){this.selection.visible=!!s;if(s)this.selection.position.set(s.position.x,s.position.y+.08,s.position.z);}const selectedMesh=this.entities.get(selected)||this.treeMeshes.get(selected);this.range.visible=!!selectedMesh&&selectedMesh.userData.entity?.kind==='tower';if(this.range.visible){const radius=B.structures.tower.range+towerProfile(selectedMesh.userData.entity).range,key=selectedMesh.userData.entity.id+':'+radius;if(this.rangeKey!==key){groundRing(this.range,this.map,selectedMesh.position.x,selectedMesh.position.z,radius);this.rangeKey=key;}}
+      const highlighted=this.contextTarget||selected,s=this.entities.get(highlighted)||this.treeMeshes.get(highlighted)||this.specialNodeMeshes.get(highlighted);if(!this.ghost?.visible){this.selection.visible=!!s;if(s)this.selection.position.set(s.position.x,s.position.y+.08,s.position.z);}const selectedMesh=this.entities.get(selected)||this.treeMeshes.get(selected)||this.specialNodeMeshes.get(selected);this.range.visible=!!selectedMesh&&['tower','arcaneTower'].includes(selectedMesh.userData.entity?.kind);if(this.range.visible){const entity=selectedMesh.userData.entity,radius=B.structures[entity.kind].range+(entity.kind==='tower'?towerProfile(entity).range:0),key=entity.id+':'+radius;if(this.rangeKey!==key){groundRing(this.range,this.map,selectedMesh.position.x,selectedMesh.position.z,radius);this.rangeKey=key;}}
     }
     this.sun.position.set(this.target.x+25,55,this.target.z-20);this.sun.target.position.copy(this.target);
     for(const p of this.particles){p.age+=dt;p.velocity.y-=dt*8;p.mesh.position.addScaledVector(p.velocity,dt);p.mesh.scale.multiplyScalar(.98);}this.particles=this.particles.filter(p=>{if(p.age>1){this.releaseEffect(p.mesh);return false;}return true;});

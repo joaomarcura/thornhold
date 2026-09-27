@@ -46,6 +46,17 @@ test('Core tier 2 accepts screenshot resources immediately, even during preparat
   assert.equal(u.gold,19);assert.equal(u.wood,32);assert.ok(core.upgrading>0);
   for(let i=0;i<100;i++)m.step(.05);assert.equal(core.tier,2);
 });
+test('Núcleo próprio na Clareira 5 sempre mostra sua progressão, inclusive durante a construção',()=>{
+  const m=create(),u=m.unit('e'),base=m.map.bases[4];Object.assign(u,{x:base.x+4.4,z:base.z,gold:1000,wood:1000});
+  assert.equal(m.act(u.id,{type:'build',kind:'core',x:base.x,z:base.z}),undefined);
+  const core=m.structures.find(s=>s.kind==='core'&&s.owner===u.id),html=selectionMarkup(core,{u,snapshot:m.snapshot(u.id),map:m.map});
+  assert.match(html,/data-do="upgrade"/);assert.match(html,/Conclua a construção primeiro/);
+  assert.match(html.match(/<button[^>]*data-do="upgrade"[^>]*>/)[0],/disabled/);
+});
+test('Painel do Núcleo mostra três tecnologias no marco 8 e informa o recurso necessário',()=>{
+  const {m,u,core}=fixture();core.tier=8;u.elfSpecialization='industrial';u.specialResources.ancientWood=29;
+  const html=selectionMarkup(core,{u,snapshot:m.snapshot(u.id),map:m.map});assert.equal((html.match(/data-do="choose-technology"/g)||[]).length,3);assert.match(html,/Madeira Ancestral: 29 \/ 30/);assert.match(html,/Produção eficiente/);
+});
 test('Exact affordability, barricade progression, and server messages share one rule',()=>{
   const {m,u,core,wall}=fixture();
   for(const [field,value,code] of [['gold',99.999,'gold'],['wood',34.999,'wood'],['alive',false,'player']]){

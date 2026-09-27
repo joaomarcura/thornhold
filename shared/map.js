@@ -33,7 +33,7 @@ export function traversable(map,x,z,nx,nz){return walkable(map,nx,nz)&&Math.abs(
 
 export function generateMap(seed='THORNHOLD',mapSize='compact'){
   const rng=randomFor(seed),size=mapSize==='large'?125:109,cell=BALANCE.cell,mid=(size-1)/2,offset=(size-109)/2;
-  const map={seed:String(seed),version:3,size,cell,grid:Array(size*size).fill(1),heights:Array(size*size).fill(0),bases:[],trees:[],decor:[],pois:[],trails:[]};
+  const map={seed:String(seed),version:3,size,cell,grid:Array(size*size).fill(1),heights:Array(size*size).fill(0),bases:[],trees:[],specialNodes:[],decor:[],pois:[],trails:[]};
   const carve=(x,z,r=1)=>{for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++)if(x+dx>1&&z+dz>1&&x+dx<size-2&&z+dz<size-2)map.grid[index(map,x+dx,z+dz)]=0;};
   const trail=(points,width=1)=>{map.trails.push(points.map(([x,z])=>world(map,x,z)));for(let i=1;i<points.length;i++){let [x,z]=points[i-1];const [tx,tz]=points[i];carve(x,z,width);while(x!==tx||z!==tz){if(x!==tx)x+=Math.sign(tx-x);else z+=Math.sign(tz-z);carve(x,z,width);}}};
   // Connected woodland loops, turns and blind branches replace radial sight lines.
@@ -65,7 +65,9 @@ export function generateMap(seed='THORNHOLD',mapSize='compact'){
     const nearest=lanes.reduce((best,n)=>Math.abs(n-junction.x)<Math.abs(best-junction.x)?n:best,lanes[0]);
     const nearestZ=lanes.reduce((best,n)=>Math.abs(n-junction.z)<Math.abs(best-junction.z)?n:best,lanes[0]);
     trail([[junction.x,junction.z],[nearest,junction.z],[nearest,nearestZ]]);
-    const b={id:'base'+i,name:names[i],cx,cz,rx,rz,...world(map,cx,cz),height:levels[i],profile:profile.label,capacity:profile.trees,wood:BALANCE.economy.treeStock*profile.trees,zones:{coreRadius:2.75,frontlineDepth:4,lateralExpansion,legacyRx:profile.rx,legacyRz:profile.rz},gate:{...world(map,gx,gz),cx:gx,cz:gz,axis,sign},outside:world(map,gx+dx*3,gz+dz*3),ramp:{from:world(map,gx+dx,gz+dz),to:world(map,junction.x,junction.z)}};
+    // Derive the local advantage without consuming the terrain RNG. Existing
+    // seeds must keep the exact same paths, heights and combat geometry.
+    const resource=['ancientWood','crystal','mana'][(i+shift)%3],b={id:'base'+i,name:names[i],cx,cz,rx,rz,...world(map,cx,cz),height:levels[i],profile:profile.label,capacity:profile.trees,wood:BALANCE.economy.treeStock*profile.trees,localResource:resource,zones:{coreRadius:2.75,frontlineDepth:4,lateralExpansion,legacyRx:profile.rx,legacyRz:profile.rz},gate:{...world(map,gx,gz),cx:gx,cz:gz,axis,sign},outside:world(map,gx+dx*3,gz+dz*3),ramp:{from:world(map,gx+dx,gz+dz),to:world(map,junction.x,junction.z)}};
     map.bases.push(b);
     for(let z=cz-rz;z<=cz+rz;z++)for(let x=cx-rx;x<=cx+rx;x++)map.grid[index(map,x,z)]=(Math.abs(x-cx)===rx||Math.abs(z-cz)===rz||(Math.abs(x-cx)>rx-3&&Math.abs(z-cz)>rz-3))?1:0;
     carve(gx,gz,0);carve(gx+dx,gz+dz,0);
@@ -75,6 +77,8 @@ export function generateMap(seed='THORNHOLD',mapSize='compact'){
     }
     for(let j=candidates.length-1;j>0;j--){const k=Math.floor(rng()*(j+1));[candidates[j],candidates[k]]=[candidates[k],candidates[j]];}
     for(const p of candidates.slice(0,profile.trees))map.trees.push({id:'tree'+map.trees.length,...p,amount:BALANCE.economy.treeStock,rich:false,style:Math.floor(rng()*3),baseId:b.id});
+    const nodeSpot=candidates.find(p=>map.trees.every(t=>Math.hypot(t.x-p.x,t.z-p.z)>2.7))||world(map,cx+2,cz+2);
+    map.specialNodes.push({id:'resource'+map.specialNodes.length,...nodeSpot,resource,amount:BALANCE.elfProgression.localStock,maxAmount:BALANCE.elfProgression.localStock,local:true,baseId:b.id});
     b.capacity=map.trees.filter(t=>t.baseId===b.id).length;b.wood=b.capacity*BALANCE.economy.treeStock;
   }
   // Later approach trails may brush a neighbouring refuge; enforce every perimeter last.
@@ -93,6 +97,10 @@ export function generateMap(seed='THORNHOLD',mapSize='compact'){
   for(const b of map.bases){const axis=b.gate.axis,sign=b.gate.sign;
     for(const side of [-1,1]){const x=b.gate.cx+(axis==='x'?sign*4:side),z=b.gate.cz+(axis==='z'?sign*4:side);if(walkable(map,x,z))map.trees.push({id:'tree'+map.trees.length,...world(map,x,z),amount:BALANCE.economy.treeStock,rich:true,style:1});}
   }
+  // One large neutral deposit of every resource keeps every specialization
+  // viable after the small, safe deposit inside a refuge has been exhausted.
+  const neutralSpots=[[mid-12,mid-8],[mid+12,mid-7],[mid,mid+14]];
+  ['ancientWood','crystal','mana'].forEach((resource,i)=>{const [x,z]=neutralSpots[i];carve(x,z,1);map.specialNodes.push({id:'resource'+map.specialNodes.length,...world(map,x,z),resource,amount:BALANCE.elfProgression.externalStock,maxAmount:BALANCE.elfProgression.externalStock,local:false,baseId:null});});
   // Scenery stays on blocked cells; the visible trail is also the collision corridor.
   for(let z=2;z<size-2;z++)for(let x=2;x<size-2;x++)if(!walkable(map,x,z)&&rng()<.35)map.decor.push({...world(map,x,z),scale:.8+rng()*.4,kind:rng()<.2?'rock':'tree',rotation:rng()*6.28});
   map.pois=[{...world(map,mid-5,mid),name:'Pedras ancestrais'},{...world(map,mid+5,mid+3),name:'Fonte do luar'}];

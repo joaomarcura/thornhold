@@ -8,6 +8,7 @@ import { availableTrees } from '../shared/wisps.js';
 import { siegeParity } from '../shared/siege-balance.js';
 import { shopMarkup } from '../client/shop.js';
 import { applySnapshotDelta, createSnapshotDelta } from '../shared/snapshot-delta.js';
+import { technologyEffects } from '../shared/elf-progression.js';
 
 function match(){return new Match({seed:'PROGRESSION'},[
   {id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},
@@ -111,6 +112,36 @@ test('Melhorias são compromissos; apenas obra e formação podem ser canceladas
   m.act('e',{type:'trainWisp',target:core.id});const w=m.wisps[0];advance(m,1);const before=e.gold,cost=jobRefund(w,m.time);
   m.act('e',{type:'cancelJob',target:w.id});assert.equal(w.alive,false);assert.equal(e.gold,before+cost.gold);advance(m,7);assert.equal(m.snapshot('e').wisps.length,0);
   m.act('e',{type:'trainWisp',target:core.id});advance(m,7);const worker=m.wisps[1];m.act('e',{type:'upgradeWisp',target:worker.id});advance(m,1);assert.match(m.act('e',{type:'cancelJob',target:worker.id}),/não podem/);advance(m,5);assert.equal(worker.level,2);assert.ok(m.snapshot('e').wisps[0].income>0);
+});
+
+test('Núcleo 5 oferece especialização permanente e libera somente sua estrutura assinatura',()=>{
+  const m=match(),{e,core,b}=baseFixture(m);core.tier=5;core.maxHp=structureHP('core',5);core.hp=core.maxHp;Object.assign(e,{x:core.x+2,z:core.z});
+  assert.equal(m.act(e.id,{type:'chooseElfSpecialization',key:'industrial'}),null);assert.equal(e.elfSpecialization,'industrial');
+  assert.match(m.act(e.id,{type:'chooseElfSpecialization',key:'fortress'}),/permanente/);
+  const spots=[];for(let z=-6;z<=6;z+=2)for(let x=-6;x<=6;x+=2)spots.push({x:b.x+x,z:b.z+z});
+  const refinery=spots.find(p=>m.placement(e,'refinery',p.x,p.z)===null);assert.ok(refinery);assert.equal(m.placement(e,'bastion',refinery.x,refinery.z),'Esta construção pertence a outra especialização.');
+  assert.equal(m.act(e.id,{type:'build',kind:'refinery',...refinery}),undefined);Object.assign(e,refinery);advance(m,7);assert.equal(m.structures.find(s=>s.kind==='refinery').progress,1);
+});
+
+test('Núcleos 8, 12 e 16 oferecem uma carta tecnológica paga pelo recurso da especialização',()=>{
+  const m=match(),{e,core}=baseFixture(m);core.tier=8;Object.assign(e,{x:core.x+2,z:core.z});assert.equal(m.act(e.id,{type:'chooseElfSpecialization',key:'industrial'}),null);
+  e.specialResources.ancientWood=160;assert.equal(m.act(e.id,{type:'chooseElfTechnology',key:'efficient-production'}),null);assert.equal(e.specialResources.ancientWood,130);assert.deepEqual(e.elfTechCards,['efficient-production']);assert.equal(technologyEffects(e).production,.08);
+  assert.match(m.act(e.id,{type:'chooseElfTechnology',key:'wisp-network'}),/Nenhuma tecnologia/);
+  core.tier=12;assert.equal(m.act(e.id,{type:'chooseElfTechnology',key:'external-logistics'}),null);assert.equal(e.specialResources.ancientWood,80);assert.equal(technologyEffects(e).specialWisp,.25);
+  core.tier=16;assert.equal(m.act(e.id,{type:'chooseElfTechnology',key:'perfect-synchrony'}),null);assert.equal(e.specialResources.ancientWood,0);assert.equal(e.stats.technologyCards,3);assert.equal(m.snapshot(e.id).units.find(u=>u.id===e.id).elfTechCards.length,3);
+});
+
+test('Recursos especiais são finitos, entram direto na reserva e Wisp migra do depósito local esgotado',()=>{
+  const m=match(),{e,core,b}=baseFixture(m),node=m.specialNodes.find(n=>n.baseId===b.id);Object.assign(e,{x:node.x,z:node.z});
+  const before=node.amount;assert.equal(m.act(e.id,{type:'gatherSpecial',target:node.id}),undefined);assert.equal(node.amount,before-B.elfProgression.specialGather);assert.equal(e.specialResources[node.resource],B.elfProgression.specialGather);
+  Object.assign(e,{x:core.x+2,z:core.z});assert.equal(m.act(e.id,{type:'trainSpecialWisp',target:node.id}),undefined);advance(m,7);const w=m.wisps.find(w=>w.specialNodeId===node.id);assert.ok(w?.alive);
+  node.amount=.01;advance(m,1);assert.notEqual(w.specialNodeId,node.id);assert.equal(m.specialNodes.find(n=>n.id===w.specialNodeId).local,false);assert.ok(e.specialResources[node.resource]>B.elfProgression.specialGather);
+});
+
+test('Habilidade de Fortaleza exige Bastião, usa cooldown e reduz dano recebido',()=>{
+  const m=match(),{e,core,wall,b}=baseFixture(m);core.tier=5;core.maxHp=structureHP('core',5);core.hp=core.maxHp;Object.assign(e,{x:core.x+2,z:core.z});m.act(e.id,{type:'chooseElfSpecialization',key:'fortress'});
+  const spots=[];for(let z=-6;z<=6;z+=2)for(let x=-6;x<=6;x+=2)spots.push({x:b.x+x,z:b.z+z});const p=spots.find(p=>m.placement(e,'bastion',p.x,p.z)===null);assert.ok(p);m.act(e.id,{type:'build',kind:'bastion',...p});Object.assign(e,p);advance(m,7);
+  assert.equal(m.act(e.id,{type:'elfSpecializationAbility'}),null);const hp=wall.hp;m.damage(wall,100,m.unit('t'),'melee');assert.equal(wall.hp,hp-75);assert.match(m.act(e.id,{type:'elfSpecializationAbility'}),/recarregando/);
 });
 
 test('Upgrade All evolui cada Wisp elegível exatamente uma vez',()=>{

@@ -6,7 +6,7 @@ export const BALANCE = {
   // trail without being given hidden base coordinates.
   vision: { troll: 60, elf: 24, towerRevealSeconds: 3 }, interactRange: 6.5,
   movement:{sprint:1.25,elfSprint:1.4375,trollRadius:.64,elfRadius:.37},
-  construction:{range:9.75,initialHealth:.15,breachCooldown:45,enemyClearance:5,gateClearance:2.3,placementGap:.5,placementRadius:{wall:.95},limits:{core:1,wall:1,tower:2,mine:5,workshop:1},upgradeSeconds:3},
+  construction:{range:9.75,initialHealth:.15,breachCooldown:45,enemyClearance:5,gateClearance:2.3,placementGap:.5,placementRadius:{wall:.95},limits:{core:1,wall:1,tower:2,mine:5,workshop:1,refinery:1,bastion:1,arcaneTower:1},upgradeSeconds:3},
   economy:{treeStock:1000,richWood:1.65,finalRichWood:2.5,workshopGather:.3,workshopRepair:.2,lateTier:9,lateStructureGrowth:1.035,lateWispGrowth:1.08,trollThreatRate:.022,trollThreatCap:2.2,trollLateThreatStart:900,trollLateThreatBase:8,trollLateThreatLogScale:30,trollLateThreatReference:100,trollLateThreatMatureBase:8,trollLateThreatLegendary:3,trollLateThreatSoftCap:50,trollLateThreatOverflowRate:.35,trollLateThreatCap:100,trollObjectiveInvestmentRate:.1,trollObjectiveWoodRate:.5,trollObjectiveEssenceRate:12,trollObjectiveIncomeSeconds:15,trollObjective:{discovery:75,elf:75,wisp:5,wall:15,tower:30,mine:25,core:60,workshop:20,legendary:80},trollLobbyBonus:[0,0,.08,.12,.16,.2,.2,.2,.18],trollBountyFactor:[0,1.3,1.5,1.45,1.45,1.41,1.4,1.25,1.1],trollMapBounty:{compact:.9,large:1.1},trollLobbySiege:[1,1.15,1,1,1,1.1,1,1,1],trollScenarioBounty:{
     compact:{normal:[1,1,1,1,1,.94,1,1,1.06],hard:[1,1,1,1,1,1,1,1,1.06]},
     large:{}
@@ -14,6 +14,12 @@ export const BALANCE = {
   elfIncremental:{essenceUnlockTier:4,essenceBaseRate:.06,essenceGrowth:1.22,pathCost:18,legendaryCost:30,epicCost:90,paths:{economy:{name:'Economia',description:'Ouro e madeira +12%.',gold:1.12,wood:1.12},defense:{name:'Defesa',description:'Estruturas e reparos +15%.',structureHp:1.15,repair:1.15},technology:{name:'Tecnologia',description:'Essência +30% e melhorias 20% mais rápidas.',essence:1.3,upgradeSpeed:1.2}}},
   progression:{structureGrowth:1.18,lateCombatGrowth:1.07,wallLateGrowth:1.045,costGrowth:1.35,woodCostGrowth:1.25,trollDamageGrowth:1.12,healthGrowth:1.14},
   wisps:{gold:65,wood:15,hireGrowth:1.32,trainSeconds:6,income:1.4,incomeGrowth:1.25,upgradeGold:70,upgradeWood:20,costGrowth:1.5,seconds:4,hp:55,externalBonus:1.6,range:25,regrowSeconds:35},
+  elfProgression:{unlockTier:5,abilityCooldown:90,abilityDuration:12,specialGather:4,specialWisp:{gold:90,wood:30,rate:.45,hp:48},localStock:160,externalStock:420,
+    specializations:{
+      industrial:{name:'Industrial',resource:'ancientWood',structure:'refinery',description:'Automação, Wisps e produção.',ability:'Sobrecarga',productionPerTier:.035,wispBonus:.2},
+      fortress:{name:'Fortaleza',resource:'crystal',structure:'bastion',description:'Barricadas, resistência e recuperação.',ability:'Fortificação emergencial',regenPerTier:.00035,fortify:.25},
+      arcane:{name:'Arcano',resource:'mana',structure:'arcaneTower',description:'Visão, energia e dano explosivo.',ability:'Pulso Arcano',revealRadius:24,overcharge:.25}
+    }},
   combat:{buffer:.18,lightWindup:.1,heavyWindup:.32,comboWindow:2.8,comboBonus:.25,openingSeconds:1.2,openingBonus:.2},
   breachMomentum:{unlockSeconds:720,maxStacks:6,firstStackSeconds:3,nextStackSeconds:3,decayDelay:30,decaySeconds:8,damagePerStack:.03,repairPenaltyPerStack:.03},
   wallRecovery:{delay:8,rate:.0035},
@@ -28,7 +34,10 @@ export const BALANCE = {
     wall: { name:'Barricada', gold:35, wood:40, hp:2310, radius:1.05, seconds:3, growth:1.9, upgradeGold:85, upgradeWood:30, color:0xa48862 },
     tower: { name:'Torre', gold:70, wood:35, hp:360, radius:0.9, seconds:4, damage:10.815, interval:1.2, range:17, retainRange:1, muzzleHeight:4.5, targetHeight:2, growth:1.65, upgradeGold:90, upgradeWood:40, color:0x81cabb },
     mine: { name:'Mina', gold:85, wood:35, hp:200, radius:1.05, seconds:5, income:1.3, growth:1.7, upgradeGold:110, upgradeWood:45, color:0xc2a54c },
-    workshop: { name:'Oficina', gold:100, wood:50, hp:250, radius:1.1, seconds:5, growth:1.6, upgradeGold:125, upgradeWood:45, color:0x748fa3 }
+    workshop: { name:'Oficina', gold:100, wood:50, hp:250, radius:1.1, seconds:5, growth:1.6, upgradeGold:125, upgradeWood:45, color:0x748fa3 },
+    refinery: { name:'Refinaria', gold:150, wood:85, hp:300, radius:1.2, seconds:6, growth:1.62, upgradeGold:150, upgradeWood:65, aura:11, color:0xd6a45d },
+    bastion: { name:'Bastião', gold:145, wood:95, hp:520, radius:1.25, seconds:6, growth:1.72, upgradeGold:155, upgradeWood:75, aura:12, color:0x8ea5a0 },
+    arcaneTower: { name:'Torre Arcana', gold:175, wood:90, hp:310, radius:1, seconds:6, damage:34, interval:3.2, range:20, retainRange:1, muzzleHeight:4.8, targetHeight:2, growth:1.68, upgradeGold:170, upgradeWood:70, color:0xa680e6 }
   },
   branches: {
     power:{name:'Balista',description:'Mais dano por disparo',damage:1.45,interval:1,range:0,armorPierce:0},
@@ -88,6 +97,7 @@ export const repairPower=structure=>{
   const lateLevels=Math.max(0,(structure.tier||1)-BALANCE.elf.wallRepairDiminishingTier),diminishing=1/Math.sqrt(1+lateLevels*BALANCE.elf.wallRepairDiminishingRate);
   return BALANCE.elf.repair+(structure.maxHp||0)*BALANCE.elf.wallRepairRate*diminishing;
 };
+export const arcaneTowerDamage=tier=>BALANCE.structures.arcaneTower.damage*combatTierScale(BALANCE.structures.arcaneTower.growth,tier);
 export const towerProfile=s=>BALANCE.tower.specializations?(BALANCE.branches[s?.branch]||BALANCE.branches.power):BALANCE.tower.standard;
 export const elfPath=id=>BALANCE.elfIncremental.paths[id]||null;
 export const essenceIncome=s=>s?.kind==='workshop'&&s.tier>=BALANCE.elfIncremental.essenceUnlockTier?BALANCE.elfIncremental.essenceBaseRate*Math.pow(BALANCE.elfIncremental.essenceGrowth,s.tier-BALANCE.elfIncremental.essenceUnlockTier):0;
