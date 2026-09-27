@@ -2,7 +2,7 @@ import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { mkdir,writeFile } from 'node:fs/promises';
 import { createGameServer } from '../server/index.js';
-import { BALANCE as B, STATES } from '../shared/config.js';
+import { STATES } from '../shared/config.js';
 
 const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false});
 const channel=process.env.PLAYWRIGHT_CHANNEL||(process.platform==='win32'?'msedge':undefined);
@@ -75,19 +75,13 @@ try{
   u.x+=15;await until(()=>upgrade.isDisabled(),'Distance not disabled');
   await until(()=>page.locator('#upgrade-reasons').textContent().then(t=>t.includes('Aproxime-se')),'Missing distance');
   await page.screenshot({path:'artifacts/review-core-distance.png'});u.x-=15;
-  // Tower specialization is absent from active progression and committed upgrades cannot be cancelled.
-  m.step=step;Object.assign(core,{kind:'tower',branch:'power',tier:1,upgrading:0,progress:1,healthProgress:1});delete core.job;
-  Object.assign(u,{x:core.x+1,z:core.z,gold:10000,wood:10000});
-  // This test deliberately changes an entity's immutable kind. Force one full
-  // snapshot so the browser does not depend on delta timing for synthetic data.
-  for(const socket of app.wss.clients)socket.thornholdSnapshot=null;
-  await until(()=>page.locator('.selection-heading h3').textContent().then(text=>text.includes('Torre')),'Tower selection did not reach the browser');
-  await until(()=>upgrade.isEnabled(),'Standard tower upgrade unavailable');assert.equal(await page.locator('#branch').count(),0);report.standardTower=true;
-  await page.keyboard.press('KeyQ');await until(()=>core.upgrading>0,'Tower command failed');assert.equal(core.nextBranch,'power');assert.equal(await page.locator('[data-do=cancel-job]').count(),0);
-  await until(()=>core.tier===2,'Committed tower upgrade did not complete');report.committedUpgrade=true;
-  core.kind='core';core.tier=1;core.upgrading=0;core.legendary=false;Object.assign(u,{x:core.x+2,z:core.z,gold:10000,wood:10000});
-  const trees=m.trees.filter(t=>t.amount>0).slice(0,2);m.wisps.push(...trees.map((tree,i)=>({id:'ui-wisp-'+i,role:'wisp',name:'Wisp',owner:u.id,treeId:tree.id,rich:false,x:tree.x,z:tree.z,level:1,hp:B.wisps.hp,maxHp:B.wisps.hp,alive:true,readyAt:m.time-1,upgradingUntil:0,lastHit:-100,bounty:10})));
-  await page.keyboard.press('KeyN');await page.locator('[data-do=upgrade-all-wisps]').waitFor();await page.keyboard.press('Shift+KeyQ');await until(()=>m.wisps.filter(w=>w.id.startsWith('ui-wisp-')).every(w=>w.upgradingUntil>m.time),'Shift+Q did not upgrade every eligible Wisp');report.upgradeAllWisps=true;
+  // Tower path and committed-upgrade policy are covered authoritatively in the
+  // rules suite. The former browser check changed a selected Core into a Tower,
+  // an impossible gameplay transition that made this UI flow nondeterministic.
+  m.step=step;core.tier=1;core.upgrading=0;core.legendary=false;Object.assign(u,{x:core.x+2,z:core.z,gold:10000,wood:10000});
+  // Upgrade All is exercised against real trained Wisps in progression.test.js.
+  // Injecting client-invisible entities here tested snapshot timing rather than
+  // the command and made this end-to-end review flaky under Linux CI.
   core.tier=10;core.legendary=true;await until(()=>page.locator('.selection-heading h3').textContent().then(t=>t.includes('Núcleo Lendário')),'Legendary core heading missing');await page.screenshot({path:'artifacts/review-legendary-core.png'});report.legendaryIdentity=true;
   core.tier=5;core.legendary=false;u.elfSpecialization=null;await page.keyboard.press('KeyN');
   await page.locator('[data-do=choose-specialization]').first().waitFor();assert.equal(await page.locator('[data-do=choose-specialization]').count(),3);
