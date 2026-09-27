@@ -76,7 +76,9 @@ try{
   await until(()=>page.locator('#upgrade-reasons').textContent().then(t=>t.includes('Aproxime-se')),'Missing distance');
   await page.screenshot({path:'artifacts/review-core-distance.png'});u.x-=15;
   // Tower specialization is absent from active progression and committed upgrades cannot be cancelled.
-  m.step=step;core.kind='tower';core.branch='power';core.tier=1;core.upgrading=0;u.gold=90;u.wood=100;
+  m.step=step;Object.assign(core,{kind:'tower',branch:'power',tier:1,upgrading:0,progress:1,healthProgress:1});delete core.job;
+  Object.assign(u,{x:core.x+1,z:core.z,gold:10000,wood:10000});
+  await until(()=>page.locator('.selection-heading h3').textContent().then(text=>text.includes('Torre')),'Tower selection did not reach the browser');
   await until(()=>upgrade.isEnabled(),'Standard tower upgrade unavailable');assert.equal(await page.locator('#branch').count(),0);report.standardTower=true;
   await page.keyboard.press('KeyQ');await until(()=>core.upgrading>0,'Tower command failed');assert.equal(core.nextBranch,'power');assert.equal(await page.locator('[data-do=cancel-job]').count(),0);
   await until(()=>core.tier===2,'Committed tower upgrade did not complete');report.committedUpgrade=true;
