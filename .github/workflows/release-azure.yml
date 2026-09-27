@@ -73,7 +73,7 @@ jobs:
           ACR_NAME: ${{ vars.AZURE_CONTAINER_REGISTRY }}
         run: |
           IMAGE="$ACR_NAME.azurecr.io/thornhold:$GITHUB_SHA"
-          docker build --label org.opencontainers.image.revision="$GITHUB_SHA" -t "$IMAGE" .
+          docker build --build-arg BUILD_SHA="$GITHUB_SHA" --label org.opencontainers.image.revision="$GITHUB_SHA" -t "$IMAGE" .
           docker push "$IMAGE"
       - name: Capture current image for rollback
         id: previous

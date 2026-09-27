@@ -102,6 +102,13 @@ test('Recompensa escalável fica restrita ao Lendário ou ao período após 15 m
   assert.ok(fortress>cheap*20);assert.ok(late>B.economy.trollObjective.mine*multiplier);assert.ok(Math.abs(legendaryOnly-B.economy.trollObjective.mine*multiplier)<1e-9);assert.equal(t.stats.goldFromDamage,before);
 });
 
+test('Retorno decrescente de objetivo preserva recompensa-base e reduz apenas investimento escalável',()=>{
+  const m=match(),t=m.unit('t'),target={id:'late-fortress',kind:'wall',tier:15,legendary:true,x:0,z:0,investmentCost:{gold:50000,wood:12000,essence:30}};
+  t.trollLevel=9;m.objectiveReward(t,target);const full=t.stats.goldFromObjectives,fullGross=t.stats.goldFromObjectiveScalingGross;
+  const reduced=match(),rt=reduced.unit('t');rt.trollLevel=10;reduced.objectiveReward(rt,target);const flat=(B.economy.trollObjective.wall+B.economy.trollObjective.legendary)*(reduced.trollStats(rt).objectiveGold||1);
+  assert.ok(rt.stats.goldFromObjectives<full);assert.ok(rt.stats.goldFromObjectives>=flat);assert.equal(rt.stats.goldFromObjectiveScalingGross,fullGross);assert.ok(rt.stats.goldFromObjectiveScalingDiminished>0);
+});
+
 test('Melhorias são compromissos; apenas obra e formação podem ser canceladas',()=>{
   const m=match(),{e,core}=baseFixture(m),upgradePrice=upgradeCost(core);m.act('e',{type:'upgrade',target:core.id});advance(m,1);
   const refund=jobRefund(core,m.time),gold=e.gold,wood=e.wood,hp=core.hp;
@@ -162,16 +169,48 @@ test('Cura do Troll usa cargas, persiste sob dano e recarrega lentamente',()=>{
 
 test('Melhorias fundamentais do Troll entregam poder relevante nos níveis 1–4',()=>{
   const t=match().unit('t');Object.assign(t.levels,{damage:4,speed:4,health:4,armor:4,siege:4});const stats=combatStats(t);
-  assert.ok(Math.abs(stats.damage-B.troll.damage*1.2**4)<1e-9);
+  const damageGrowth=1+(B.troll.damageGrowth-1)*B.troll.damageUpgradeScale;assert.ok(Math.abs(stats.damage-B.troll.damage*damageGrowth**4)<1e-9);
   assert.ok(Math.abs(stats.interval-B.troll.interval*.87**4)<1e-9);
   assert.equal(stats.maxHp,B.troll.hp+4*B.troll.healthPerLevel);
   assert.equal(stats.armor,B.troll.armor+4*B.troll.armorPerLevel);
   assert.equal(stats.siege,1+4*B.troll.siegeFoundationPerLevel);
 });
 
+test('Cerco preserva níveis 1–8 e recebe retorno decrescente depois deles',()=>{
+  const t=match().unit('t');
+  t.levels.siege=8;const level8=combatStats(t).siege;
+  t.levels.siege=9;const level9=combatStats(t).siege;
+  t.levels.siege=12;const level12=combatStats(t).siege;
+  assert.equal(level8,1+4*B.troll.siegeFoundationPerLevel+4*B.troll.siegePerLevel);
+  assert.ok(Math.abs(level9-level8-B.troll.siegeDiminishingPerLevel)<1e-12);
+  assert.ok(Math.abs(level12-(level8+4*B.troll.siegeDiminishingPerLevel))<1e-12);
+  assert.ok(level12<1+4*B.troll.siegeFoundationPerLevel+8*B.troll.siegePerLevel);
+});
+
+test('Bônus final de cerco exige 12 minutos ativos e no máximo dois Elfos vivos',()=>{
+  const m=match(),t=m.unit('t'),target={kind:'wall'};t.levels.siege=3;m.state=STATES.ACTIVE;
+  m.time=m.preparation+B.troll.finalSiegeUnlockSeconds-0.01;assert.equal(m.finalSiegeMultiplier(t,target),1);
+  m.time=m.preparation+B.troll.finalSiegeUnlockSeconds;m.units.push({id:'third-elf',role:'elf',alive:true});assert.equal(m.finalSiegeMultiplier(t,target),1);
+  m.units.at(-1).alive=false;assert.equal(m.finalSiegeMultiplier(t,target),B.troll.finalSiege);
+  assert.equal(m.finalSiegeMultiplier(t,{role:'elf'}),1);
+});
+
+test('XP por dano estrutural diminui após nível 10 sem reduzir XP contra Elfos',()=>{
+  const m=match(),t=m.unit('t'),elf=m.unit('e'),structure={id:'xp-wall',kind:'wall',owner:elf.id,baseId:'xp-base',x:t.x,z:t.z+2,hp:1000,maxHp:1000,tier:1,progress:1,bounty:1000,lastHit:-100};m.state=STATES.ACTIVE;m.structures.push(structure);
+  t.trollLevel=10;const start=t.stats.xpEarned;m.damage(structure,100,t,'melee');const level10=t.stats.xpEarned-start;assert.equal(level10,18);
+  t.trollLevel=11;const diminishedStart=t.stats.xpEarned;m.damage(structure,100,t,'melee');const level11=t.stats.xpEarned-diminishedStart;assert.ok(level11<18&&level11>=18*B.troll.structureXpMinimum);
+  Object.assign(elf,{hp:1000,maxHp:1000});const unitStart=t.stats.xpEarned;m.damage(elf,100,t,'melee');assert.equal(t.stats.xpEarned-unitStart,18);
+  assert.equal(t.stats.xpFromStructureDamageGross,36);assert.ok(t.stats.xpFromStructureDamageDiminished>0);assert.equal(t.stats.xpFromUnitDamage,18);
+});
+
 test('Regeneração base e cada nível de Vigor usam a curva reforçada',()=>{
   const m=match(),t=m.unit('t'),base=combatStats(t);assert.equal(base.combatRegen,.0012);assert.equal(base.restRegen,.0036);
   t.levels.regen=1;const upgraded=combatStats(t);assert.ok(Math.abs(upgraded.combatRegen-base.combatRegen-.00075)<1e-12);assert.ok(Math.abs(upgraded.restRegen-base.restRegen-.0015)<1e-12);
+});
+
+test('Escada de dano reduz somente os ganhos por nível em 12%',()=>{
+  const m=match(),t=m.unit('t'),base=combatStats(t);assert.equal(base.damage,B.troll.damage);
+  t.levels.damage=1;const levelOne=combatStats(t),expected=B.troll.damage*(1+(B.troll.damageGrowth-1)*.88);assert.ok(Math.abs(levelOne.damage-expected)<1e-9);assert.ok(levelOne.damage<B.troll.damage*B.troll.damageGrowth);
 });
 
 test('Fogo de torre reduz somente a regeneração de combate do Troll',()=>{
@@ -181,6 +220,15 @@ test('Fogo de torre reduz somente a regeneração de combate do Troll',()=>{
   assert.ok(normalHeal>0);assert.ok(Math.abs(pressuredHeal/normalHeal-B.troll.towerCombatRegenMultiplier)<1e-9);
   assert.ok(pressured.m.telemetry.healing.combatRegen>0);assert.equal(pressured.m.telemetry.healing.restRegen,0);assert.ok(pressured.m.telemetry.healing.towerSuppressed>0);
   pressured.t.lastHit=pressured.m.time-10;pressured.t.lastTowerHit=-100;pressured.m.step(.05);assert.ok(pressured.m.telemetry.healing.restRegen>0);
+});
+
+test('Torres Lendárias concentradas suprimem sustain em 30% e 50%',()=>{
+  const m=match(),t=m.unit('t');m.state=STATES.ACTIVE;m.time=100;
+  const tower=i=>({id:`legendary-${i}`,kind:'tower',owner:'e',x:t.x,z:t.z+5,tier:10,hp:1000,maxHp:1000,progress:1,legendary:true,beamTarget:t.id,disabledUntil:0});
+  m.structures.push(tower(1));assert.deepEqual(m.legendarySustainPressure(t),{towers:1,multiplier:1});
+  m.structures.push(tower(2));assert.deepEqual(m.legendarySustainPressure(t),{towers:2,multiplier:.7});
+  m.structures.push(tower(3));assert.deepEqual(m.legendarySustainPressure(t),{towers:3,multiplier:.5});
+  m.structures[1].disabledUntil=m.time+1;assert.deepEqual(m.legendarySustainPressure(t),{towers:2,multiplier:.7});
 });
 
 test('Barricada se recompõe levemente somente fora de cerco',()=>{
@@ -455,20 +503,39 @@ test('Defesa de torres mata Troll exposto e encerra partida com vitória dos Elf
   advance(m,30);assert.equal(t.alive,false);assert.equal(m.winner,'elves');assert.equal(m.state,STATES.END);assert.ok(m.stats.towerDamage>0);
   const end=m.time;advance(m,2);assert.equal(m.time,end);
 });
-test('Progressão lendária resolve estruturas e aumenta o raio enquanto mantém contato',()=>{
-  const sword=arena(),{m,t,e}=sword,structure={id:'execute-me',kind:'core',owner:'e',baseId:'base-x',x:t.x,z:t.z+2,tier:1,hp:140,maxHp:1000,progress:1,bounty:100,lastHit:-100};Object.assign(e,{x:t.x+20,z:t.z+20});m.structures.push(structure);t.yaw=0;t.levels.damage=6;t.levels.siege=6;t.levels.health=11;
-  assert.equal(m.legendarySword(t),false);t.levels.health=12;assert.equal(m.legendarySword(t),true);m.act(t.id,{type:'attack'});m.time=t.pendingStrike.at;m.resolveStrike(t);assert.equal(structure.hp,0);assert.ok(m.events.some(e=>e.type==='legendary-execute'));const executions=m.telemetry.result(m).legendaryExecutions;assert.equal(executions.count,1);assert.ok(executions.hpRemoved>0&&executions.hpRemoved<=140);assert.equal(executions.byKind.core.count,1);assert.equal(executions.events[0].id,structure.id);
+test('Progressão lendária exige nível 10, executa uma vez por cooldown e protege Barricadas',()=>{
+  const sword=arena(),{m,t,e}=sword,structure={id:'execute-me',kind:'core',owner:'e',baseId:'base-x',x:t.x,z:t.z+2,tier:1,hp:140,maxHp:1000,progress:1,bounty:100,lastHit:-100};Object.assign(e,{x:t.x+20,z:t.z+20});m.structures.push(structure);t.yaw=0;t.levels.damage=6;t.levels.siege=6;t.levels.health=12;
+  assert.equal(m.legendarySword(t),false);t.trollLevel=10;assert.equal(m.legendarySword(t),true);m.act(t.id,{type:'attack'});m.time=t.pendingStrike.at;m.resolveStrike(t);assert.equal(structure.hp,0);assert.ok(m.events.some(e=>e.type==='legendary-execute'));assert.ok(t.cooldowns.legendaryExecute>m.time);const executions=m.telemetry.result(m).legendaryExecutions;assert.equal(executions.count,1);assert.ok(executions.hpRemoved>0&&executions.hpRemoved<=140);assert.equal(executions.byKind.core.count,1);assert.equal(executions.events[0].id,structure.id);
+
+  const wall={id:'protected-wall',kind:'wall',owner:'e',baseId:'base-y',x:t.x,z:t.z+2,tier:1,hp:20000,maxHp:100000,progress:1,bounty:100,lastHit:-100};m.structures.push(wall);m.time=t.cooldowns.legendaryExecute;t.cooldowns.attack=0;t.yaw=0;m.act(t.id,{type:'attack'});m.time=t.pendingStrike.at;m.resolveStrike(t);assert.ok(wall.hp>0,'Barricada ainda bem acima de 8% não deve ser executada');
+
+  const capped={id:'capped-wall',kind:'wall',owner:'e',baseId:'base-z',x:t.x,z:t.z+2,tier:10,hp:7000,maxHp:100000,progress:1,bounty:100,lastHit:-100};wall.x+=20;m.structures.push(capped);m.time=t.cooldowns.legendaryExecute;t.cooldowns.attack=0;t.yaw=0;const beforeCap=capped.hp;m.act(t.id,{type:'attack'});m.time=t.pendingStrike.at;m.resolveStrike(t);assert.ok(capped.hp>0);assert.ok(beforeCap-capped.hp<=B.legendary.wallExecuteMaxHp+m.trollStats(t).damage*m.trollStats(t).siege+1,'execução da Barricada respeita o teto por golpe');
 
   const beam=match(),troll=beam.unit('t'),elf=beam.unit('e');beam.state=STATES.ACTIVE;beam.time=80;troll.hp=troll.maxHp=10000;Object.assign(elf,{x:troll.x+8,z:troll.z+8});
   const tower={id:'legend',kind:'tower',owner:elf.id,baseId:'b',x:troll.x,z:troll.z+5,tier:10,hp:1000,maxHp:1000,progress:1,branch:'pierce',lastShot:-100,lastHit:-100,bounty:100};beam.structures.push(tower);
   advance(beam,.1);assert.equal(tower.legendary,true);const hp0=troll.hp;advance(beam,1);const first=hp0-troll.hp,hp1=troll.hp;advance(beam,1);const second=hp1-troll.hp;assert.ok(second>first);assert.ok(beam.events.some(e=>e.type==='beam'));const beamDiagnostic=beam.telemetry.result(beam).towerDiagnostics.find(row=>row.id===tower.id);assert.ok(beamDiagnostic.beamSeconds>0);assert.ok(beamDiagnostic.beamDamage>0);
   tower.disabledUntil=beam.time+1;advance(beam,.5);assert.equal(tower.beamStartedAt,0);const paused=troll.hp;advance(beam,.4);assert.ok(troll.hp>paused,'sustentação de combate continua enquanto a torre está silenciada');
 });
+
+test('Ouro estrutural recebe retorno decrescente, mas dano contra Elfos mantém recompensa integral',()=>{
+  const early=match(),t=early.unit('t'),e=early.unit('e');early.state=STATES.ACTIVE;early.time=early.preparation;t.trollLevel=9;const start=t.gold;early.damage(e,10,t,'melee');const baseline=t.gold-start;
+  e.hp=e.maxHp;t.trollLevel=15;const levelStart=t.gold;early.damage(e,10,t,'melee');assert.equal(t.gold-levelStart,baseline);assert.equal(t.stats.goldFromDamageDiminished,0);
+  const wall={id:'gold-wall',kind:'wall',owner:e.id,baseId:'gold-base',x:t.x,z:t.z+2,tier:1,hp:10000,maxHp:10000,progress:1,bounty:10000,lastHit:-100};early.structures.push(wall);const wallStart=t.gold;early.damage(wall,10,t,'melee');const structuralGold=t.gold-wallStart;assert.ok(structuralGold<baseline&&structuralGold>=baseline*B.economy.trollDamageGoldMinimum);assert.ok(t.stats.goldFromDamageDiminished>0);
+  const late=match(),lateTroll=late.unit('t'),lateElf=late.unit('e');late.state=STATES.ACTIVE;late.time=late.preparation+B.economy.trollDamageGoldDiminishingStart+300;const lateStart=lateTroll.gold,grossStart=lateTroll.stats.goldFromDamageGross;late.damage(lateElf,10,lateTroll,'melee');assert.equal(lateTroll.gold-lateStart,lateTroll.stats.goldFromDamageGross-grossStart);assert.equal(lateTroll.stats.goldFromDamageDiminished,0);
+});
 test('V3.2 produz Essência e especializa clareiras em Economia, Defesa ou Tecnologia',()=>{
   const setup=()=>{const m=match(),{e,core,wall}=baseFixture(m),workshop={id:'essence-workshop',kind:'workshop',owner:e.id,baseId:core.baseId,x:core.x+2,z:core.z,tier:4,hp:1000,maxHp:1000,progress:1,upgrading:0,lastHit:-100,bounty:100};m.state=STATES.ACTIVE;m.structures.push(workshop);Object.assign(e,{x:workshop.x,z:workshop.z,essence:B.elfIncremental.pathCost});return {m,e,core,wall,workshop};};
   const economy=setup(),gold=economy.e.gold;assert.equal(essenceIncome(economy.workshop),B.elfIncremental.essenceBaseRate);assert.equal(economy.m.act(economy.e.id,{type:'chooseElfPath',target:economy.workshop.id,path:'economy'}),null);advance(economy.m,1);assert.equal(economy.e.elfPath,'economy');assert.ok(economy.e.gold-gold>resourceProducer(economy.core).amount);assert.ok(economy.e.essence>0);assert.match(economy.m.act(economy.e.id,{type:'chooseElfPath',target:economy.workshop.id,path:'defense'}),/já possui/);
   const defense=setup(),hp=defense.core.maxHp;assert.equal(defense.m.act(defense.e.id,{type:'chooseElfPath',target:defense.workshop.id,path:'defense'}),null);assert.ok(Math.abs(defense.core.maxHp/hp-B.elfIncremental.paths.defense.structureHp)<.001);
   const technology=setup();assert.equal(technology.m.act(technology.e.id,{type:'chooseElfPath',target:technology.workshop.id,path:'technology'}),null);assert.equal(upgradeCost({kind:'core',tier:9},'technology').essence,Math.ceil(B.elfIncremental.legendaryCost*.75));technology.core.tier=4;technology.wall.tier=2;technology.e.gold=technology.e.wood=1000000;technology.e.x=technology.core.x;technology.e.z=technology.core.z;assert.equal(technology.m.act(technology.e.id,{type:'upgrade',target:technology.core.id}),undefined);assert.ok(technology.core.upgradeDuration<(B.construction.upgradeSeconds+4));
+});
+test('Especializações registram produção, mitigação, cura e dano reais',()=>{
+  const industrial=match(),i=industrial.unit('e'),core={id:'impact-core',kind:'core',owner:i.id,baseId:'impact-base',x:i.x,z:i.z,tier:8,hp:1000,maxHp:1000,progress:1,lastHit:-100},refinery={id:'impact-refinery',kind:'refinery',owner:i.id,baseId:'impact-base',x:i.x+2,z:i.z,tier:5,hp:1000,maxHp:1000,progress:1,lastHit:-100,overdriveUntil:100};industrial.state=STATES.ACTIVE;industrial.time=50;i.elfSpecialization='industrial';industrial.structures.push(core,refinery);industrial.step(.1);assert.ok(i.stats.specializationImpact.refineryBonusGold>0);assert.ok(i.stats.specializationImpact.overdriveBonusGold>0);
+  const fortress=match(),f=fortress.unit('e'),ft=fortress.unit('t'),wall={id:'impact-wall',kind:'wall',owner:f.id,baseId:'impact-fort',x:f.x,z:f.z,tier:8,hp:500,maxHp:1000,progress:1,lastHit:-100,fortifiedUntil:100},bastion={id:'impact-bastion',kind:'bastion',owner:f.id,baseId:'impact-fort',x:f.x+1,z:f.z,tier:6,hp:1000,maxHp:1000,progress:1,lastHit:-100};fortress.state=STATES.ACTIVE;fortress.time=50;f.elfSpecialization='fortress';fortress.structures.push(wall,bastion);fortress.step(.1);assert.ok(f.stats.specializationImpact.bastionHealing>0);const before=wall.hp;fortress.damage(wall,100,ft,'melee');assert.ok(before-wall.hp<100);assert.ok(f.stats.specializationImpact.fortifiedDamagePrevented>0);
+  const arcane=match(),a=arcane.unit('e'),at=arcane.unit('t');arcane.state=STATES.ACTIVE;arcane.time=50;Object.assign(at,{hp:100000,maxHp:100000});a.elfSpecialization='arcane';const tower={id:'impact-arcane',kind:'arcaneTower',owner:a.id,baseId:'impact-arc',x:at.x,z:at.z+4,tier:7,hp:1000,maxHp:1000,progress:1,lastHit:-100,lastShot:-100};arcane.structures.push(tower);advance(arcane,4);assert.ok(a.stats.specializationImpact.arcaneDamage>0);const report=arcane.result().telemetry.specializations;assert.equal(report.structures.arcaneTower.maxTier,7);assert.ok(report.impact.arcaneDamage>0);
+});
+test('Telemetria separa coleta manual e produção de madeira dos Wisps',()=>{
+  const m=match(),e=m.unit('e'),tree=m.trees.find(t=>t.amount>0);Object.assign(e,{x:tree.x,z:tree.z});m.act(e.id,{type:'gather',target:tree.id});assert.ok(e.stats.manualWoodGathered>0);assert.equal(e.stats.wispWoodGenerated,0);const checkpoint=m.telemetry.economySnapshot(m,180).elves;assert.equal(checkpoint.manualWoodGathered,e.stats.manualWoodGathered);assert.equal(checkpoint.wispWoodGenerated,0);
 });
 test('Limite de 60 minutos encerra por soma de pontos da equipe',()=>{
   const trollWin=match(),troll=trollWin.unit('t');trollWin.state=STATES.ACTIVE;troll.stats.damage=5000;trollWin.time=B.matchHardLimit;trollWin.checkEndState();

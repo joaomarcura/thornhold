@@ -1,6 +1,21 @@
 import { BALANCE as B, STATES, distance, upgradeCost } from './config.js';
 
-export const requiredBarricadeTier=targetCoreTier=>Math.max(1,Math.floor(targetCoreTier/2));
+// Preserve the opening curve, then stop late Cores from outgrowing their gate.
+// Core 12 still asks for Wall 6; from Core 13 onward every Core tier also
+// advances the minimum wall, reaching Wall 14 before Core 20.
+export const requiredBarricadeTier=targetCoreTier=>{
+  const target=Math.max(1,Math.floor(targetCoreTier||1));
+  return Math.max(1,target<=12?Math.floor(target/2):target-6);
+};
+
+export const strategicBarricadeTier=(coreTier,trollLevel,profile='balanced',difficulty='normal')=>{
+  const core=Math.max(1,Math.floor(coreTier||1)),level=Math.max(1,Math.floor(trollLevel||1));
+  const personality={economy:.6,balanced:.7,defense:.75}[profile]??.7,difficultyOffset=difficulty==='hard'?.05:difficulty==='easy'?-.05:0;
+  const minimum=requiredBarricadeTier(Math.min(20,core+1)),adaptive=Math.floor(level*(personality+difficultyOffset));
+  return Math.max(2,Math.min(20,Math.max(minimum,Math.min(core,adaptive))));
+};
+
+export const requiredEpicWallTier=targetTowerTier=>targetTowerTier>=20?14:targetTowerTier>=17?12:targetTowerTier>=13?11:9;
 
 // Pure rules used by both the authoritative command and its UI preview.
 export function upgradeStatus(u,s,time,state,structures=[]){

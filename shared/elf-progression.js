@@ -65,14 +65,15 @@ export function signatureAllowed(u,kind){
   const spec=specialization(u?.elfSpecialization);return !!spec&&spec.structure===kind;
 }
 
-export function productionMultiplier(match,owner,producer){
+export function productionBreakdown(match,owner,producer){
   const technology=technologyEffects(owner),base=1+technology.production+(producer?.role==='wisp'?technology.wisp:0);
-  if(owner?.elfSpecialization!=='industrial')return base;
+  if(owner?.elfSpecialization!=='industrial')return {multiplier:base,base,withoutOverdrive:base,refinery:null,overdrive:false};
   const refinery=match.structures.find(s=>s.owner===owner.id&&s.kind==='refinery'&&s.hp>0&&s.progress>=1&&distance(s,producer)<=B.structures.refinery.aura);
-  if(!refinery)return base;
-  const active=refinery.overdriveUntil>match.time?1.2:1;
-  return base*(1+B.elfProgression.specializations.industrial.productionPerTier*refinery.tier*(1+technology.signaturePower))*active;
+  if(!refinery)return {multiplier:base,base,withoutOverdrive:base,refinery:null,overdrive:false};
+  const withoutOverdrive=base*(1+B.elfProgression.specializations.industrial.productionPerTier*refinery.tier*(1+technology.signaturePower)),overdrive=refinery.overdriveUntil>match.time;
+  return {multiplier:withoutOverdrive*(overdrive?1.2:1),base,withoutOverdrive,refinery,overdrive};
 }
+export const productionMultiplier=(match,owner,producer)=>productionBreakdown(match,owner,producer).multiplier;
 
 export function abilityStatus(match,u){
   const spec=specialization(u?.elfSpecialization),readyAt=u?.cooldowns?.elfSpecialization||0;
@@ -101,6 +102,8 @@ export function stepElfProgression(match,dt){
   for(const bastion of match.structures.filter(s=>s.kind==='bastion'&&s.hp>0&&s.progress>=1)){
     const owner=match.unit(bastion.owner);if(!owner?.alive)continue;
     const rate=B.elfProgression.specializations.fortress.regenPerTier*bastion.tier*(1+technologyEffects(owner).signaturePower);
-    for(const s of match.structures.filter(e=>e.owner===owner.id&&e.hp>0&&e.hp<e.maxHp&&distance(e,bastion)<=B.structures.bastion.aura))s.hp=Math.min(s.maxHp,s.hp+s.maxHp*rate*dt);
+    for(const s of match.structures.filter(e=>e.owner===owner.id&&e.hp>0&&e.hp<e.maxHp&&distance(e,bastion)<=B.structures.bastion.aura)){
+      const before=s.hp;s.hp=Math.min(s.maxHp,s.hp+s.maxHp*rate*dt);owner.stats.specializationImpact.bastionHealing+=s.hp-before;
+    }
   }
 }

@@ -1,7 +1,7 @@
 import { BALANCE as B, distance, wispCost, wispIncome, wispUpgradeCost, elfPath } from './config.js';
 import { baseAt } from './map.js';
 import { recordSpend } from './economy.js';
-import { productionMultiplier, technologyEffects } from './elf-progression.js';
+import { productionBreakdown, technologyEffects } from './elf-progression.js';
 
 export function availableTrees(m,u,core){
   return m.trees.filter(t=>t.amount>0&&distance(t,core)<=B.wisps.range&&
@@ -87,7 +87,7 @@ export function stepWisps(m,dt){
       continue;
     }
     if(wispActive(m,w)){
-      const rate=wispIncome(w)*(elfPath(owner.elfPath)?.wood||1)*productionMultiplier(m,owner,w),amount=rate*dt;owner.wood+=amount;owner.stats.woodGenerated=(owner.stats.woodGenerated||0)+amount;w.productionPulse=(w.productionPulse||0)+amount;
+      const pathMultiplier=elfPath(owner.elfPath)?.wood||1,breakdown=productionBreakdown(m,owner,w),baseRate=wispIncome(w)*pathMultiplier,rate=baseRate*breakdown.multiplier,amount=rate*dt;owner.wood+=amount;owner.stats.woodGenerated=(owner.stats.woodGenerated||0)+amount;owner.stats.wispWoodGenerated=(owner.stats.wispWoodGenerated||0)+amount;owner.stats.specializationImpact.refineryBonusWood+=baseRate*(breakdown.withoutOverdrive-breakdown.base)*dt;owner.stats.specializationImpact.overdriveBonusWood+=baseRate*(breakdown.multiplier-breakdown.withoutOverdrive)*dt;w.productionPulse=(w.productionPulse||0)+amount;
       if((w.productionPulseAt??m.time)<=m.time){m.emit('resource',{unit:owner.id,entity:w.id,x:w.x,z:w.z,resource:'wood',amount:w.productionPulse,rate:rate*60});w.productionPulse=0;w.productionPulseAt=m.time+1;}
     }
   }

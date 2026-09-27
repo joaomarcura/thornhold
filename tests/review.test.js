@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Match } from '../shared/simulation.js';
 import { BALANCE as B, STATES, distance } from '../shared/config.js';
-import { upgradeStatus } from '../shared/upgrade-rules.js';
+import { requiredBarricadeTier, requiredEpicWallTier, strategicBarricadeTier, upgradeStatus } from '../shared/upgrade-rules.js';
 import { selectionMarkup } from '../client/selection.js';
 import { resource,resourceCost } from '../client/resources.js';
 import { AIController } from '../shared/controllers.js';
@@ -126,8 +126,14 @@ test('Telemetry distinguishes hunger, caps overkill, tracks tower count and earn
   assert.equal(report.telemetry.received.tower,B.troll.hp-5);assert.equal(report.towerDamage,B.troll.hp-5);assert.equal(report.combatInteractions.find(row=>row.source==='tower').damage,B.troll.hp-5);assert.equal(report.combatInteractions.some(row=>row.source==='elf'),false);assert.equal(report.telemetry.survivalCensored,false);
   assert.ok(report.telemetry.timeline.length<=500);assert.equal(m.state,STATES.END);
 });
+test('Tempo de destruição estrutural soma apenas contato ativo',()=>{
+  const m=create(),t=m.unit('t'),e=m.unit('e'),wall={id:'contact-wall',kind:'wall',owner:e.id,baseId:'contact-base',x:t.x+2,z:t.z,hp:30,maxHp:30,tier:1,progress:1,bounty:100};m.state=STATES.ACTIVE;m.structures.push(wall);
+  m.time=60;m.damage(wall,10,t,'melee');m.time=61;m.damage(wall,10,t,'melee');m.time=100;m.damage(wall,10,t,'melee');const timing=m.result().telemetry.structureDestructionTimes.wall;
+  assert.equal(timing.count,1);assert.equal(timing.averageActiveSeconds,1);assert.equal(timing.maxActiveSeconds,1);assert.equal(timing.averageHits,3);
+});
 test('Checkpoints econômicos cobrem partidas de até uma hora',()=>{
-  const m=create();m.state=STATES.ACTIVE;m.time=m.preparation+3038;m.telemetry.step(m,.1);const checkpoints=m.result().telemetry.v2.economyCheckpoints;assert.equal(checkpoints.at(-1).time,3000);assert.ok(checkpoints.some(row=>row.time===1800));assert.ok(checkpoints.some(row=>row.time===2700));
+  const m=create(),owner=m.unit('e');m.structures.push({id:'checkpoint-wall',kind:'wall',owner:owner.id,baseId:'checkpoint-base',x:owner.x,z:owner.z,hp:8000,maxHp:8000,tier:8,progress:1});m.state=STATES.ACTIVE;m.time=m.preparation+3038;m.telemetry.step(m,.1);const checkpoints=m.result().telemetry.v2.economyCheckpoints;assert.equal(checkpoints.at(-1).time,3000);assert.ok(checkpoints.some(row=>row.time===1800));assert.ok(checkpoints.some(row=>row.time===2700));
+  const atFive=checkpoints.find(row=>row.time===300);assert.ok(atFive);assert.ok(Object.hasOwn(atFive.troll,'structureDps'));assert.ok(Object.hasOwn(atFive.snowball,'legendaryTowers'));assert.ok(Object.hasOwn(atFive.elves,'spendingDistribution'));assert.equal(atFive.elves.wallProgression.maxTier,8);assert.equal(atFive.elves.wallProgression.byTier[8],1);assert.ok(m.result().telemetry.spendingCheckpoints.every(row=>row.time%300===0));
 });
 test('Match diagnostics do not alter deterministic gameplay',()=>{
   const a=create(),b=create();b.telemetry.detailed=false;
@@ -146,7 +152,14 @@ test('V2.1 registra estado, setores, cercos, trade, pressão e economia sem diri
   const economy=v2.economyCheckpoints.find(c=>c.time===180).elves;assert.ok(Object.hasOwn(economy,'netSpentGold'));assert.ok(Object.hasOwn(economy,'goldUtilization'));assert.ok(economy.spendByPurpose.economy);assert.ok(economy.spendByPurpose.defense);assert.ok(Array.isArray(economy.players));
   const frozen=economy.players[0].spendByPurpose;m.unit('e').stats.spendByPurpose.economy={gold:999,wood:999};assert.notDeepEqual(frozen,m.unit('e').stats.spendByPurpose);
   assert.equal(Object.hasOwn(v2.matchState,'elfPower'),true);assert.equal(Object.hasOwn(v2.matchState,'volatility'),true);
-  const report=m.result();assert.equal(report.telemetry.schema,14);assert.equal(report.telemetry.legendaryExecutions.count,0);assert.ok(Array.isArray(report.telemetry.chases));assert.ok(report.telemetry.chaseSummary);assert.equal(v2.maxWallHp,20);assert.ok(Array.isArray(v2.repeatedTargets));assert.ok(Object.hasOwn(v2,'worstRepeatedTarget'));assert.ok(Object.hasOwn(v2,'maxFailedSiegesTarget'));assert.ok(Array.isArray(v2.decisionDiagnostics.targetFailures));assert.ok(Array.isArray(v2.decisionDiagnostics.blockedBases));assert.ok(Object.hasOwn(v2.decisionDiagnostics,'recoveryPlan'));assert.ok(Object.hasOwn(v2.decisionDiagnostics,'repositionStreak'));assert.ok(Array.isArray(v2.finalSiegeParity));assert.deepEqual(Object.keys(v2.outcomeMilestones),['firstElfDeathAt','thirdElfDeathAt','finalElfPhaseAt']);assert.equal(v2.formulaVersion,'v3.9-strategic-rotation');
+  const report=m.result();assert.equal(report.telemetry.schema,19);assert.equal(report.telemetry.legendaryExecutions.count,0);assert.ok(Array.isArray(report.telemetry.chases));assert.ok(report.telemetry.chaseSummary);assert.ok(report.telemetry.structureDestructionTimes.wall);assert.ok(Object.hasOwn(report.telemetry.structureDestructionTimes.wall,'averageActiveSeconds'));assert.equal(report.telemetry.context.devSpeed,1);assert.deepEqual(report.telemetry.context.devSpeedHistory,[{time:0,speed:1}]);assert.equal(report.telemetry.context.difficulty,'normal');assert.ok(report.telemetry.specializations?.impact);assert.ok(Object.hasOwn(report.telemetry.healing,'legendarySuppressed'));assert.equal(v2.maxWallHp,20);assert.ok(Array.isArray(v2.repeatedTargets));assert.ok(Object.hasOwn(v2,'worstRepeatedTarget'));assert.ok(Object.hasOwn(v2,'maxFailedSiegesTarget'));assert.ok(Array.isArray(v2.decisionDiagnostics.targetFailures));assert.ok(Array.isArray(v2.decisionDiagnostics.blockedBases));assert.ok(Object.hasOwn(v2.decisionDiagnostics,'recoveryPlan'));assert.ok(Object.hasOwn(v2.decisionDiagnostics,'repositionStreak'));assert.ok(v2.decisionDiagnostics.baseSearch);assert.ok(Array.isArray(v2.finalSiegeParity));assert.deepEqual(Object.keys(v2.outcomeMilestones),['firstElfDeathAt','thirdElfDeathAt','finalElfPhaseAt']);assert.equal(v2.formulaVersion,'v3.14-snowball-control');
+});
+test('Curva de Barricada cresce no late game e respeita personalidade sem buff de atributos',()=>{
+  assert.deepEqual([12,14,16,18,20].map(requiredBarricadeTier),[6,8,10,12,14]);
+  assert.equal(strategicBarricadeTier(12,16,'economy','normal'),9);
+  assert.equal(strategicBarricadeTier(12,16,'balanced','normal'),11);
+  assert.equal(strategicBarricadeTier(12,16,'defense','hard'),12);
+  assert.deepEqual([10,13,17,20].map(requiredEpicWallTier),[9,11,12,14]);
 });
 test('Stun defensivo só funciona na própria base rompida e bloqueia o Troll por 3s',()=>{
   const m=new Match({seed:'STUN'},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},{id:'e0',role:'elf',occupant:{type:'human',name:'A'}},{id:'e1',role:'elf',occupant:{type:'human',name:'B'}}]);
@@ -168,8 +181,12 @@ test('Placar ao vivo não vaza posição ou HP e MVP pertence ao time vencedor',
   Object.assign(builder.stats,{goldGenerated:800,woodGenerated:600,structuresBuilt:4,upgrades:3,healing:200});
   Object.assign(guardian.stats,{damage:1200,kills:1,stuns:2});Object.assign(troll.stats,{damage:9000,structuresDestroyed:4});
   assert.ok(playerScore(guardian)>playerScore(builder));
+  builder.gold=321;builder.wood=654;guardian.gold=111;guardian.wood=222;troll.gold=999;
   const live=m.snapshot(builder.id).scoreboard;assert.equal(live.length,3);assert.ok(!Object.hasOwn(live[0],'x'));assert.ok(!Object.hasOwn(live[0],'hp'));
+  assert.deepEqual([live.find(player=>player.id===builder.id).gold,live.find(player=>player.id===builder.id).wood],[321,654]);assert.equal(live.find(player=>player.id===guardian.id).gold,111);assert.equal(live.find(player=>player.role==='troll').gold,null);
+  const observerBoard=m.snapshot().scoreboard;assert.equal(observerBoard.find(player=>player.role==='troll').gold,999);assert.equal(observerBoard.find(player=>player.id===guardian.id).wood,222);
   assert.equal(live.find(player=>player.role==='troll').trollLevel,1);assert.equal(m.snapshot(builder.id).units.find(unit=>unit.role==='troll').trollLevel,1);
+  const visibleTroll=m.snapshot(builder.id).units.find(unit=>unit.role==='troll');assert.ok(visibleTroll.combat?.damage>0);const trollPanel=selectionMarkup(visibleTroll,{u:builder,snapshot:m.snapshot(builder.id),map:m.map});assert.match(trollPanel,/Dano físico/);assert.match(trollPanel,/Vel\. de ataque/);assert.match(trollPanel,/Movimento/);assert.match(trollPanel,/Roubo de vida/);
   m.winner='elves';m.state=STATES.END;const result=m.result();
   assert.equal(result.mvp.id,guardian.id);assert.equal(result.players.length,3);
   assert.ok(result.players.every(p=>Number.isFinite(p.score)&&Object.hasOwn(p,'structuresBuilt')&&Object.hasOwn(p,'stuns')));

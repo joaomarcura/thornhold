@@ -70,14 +70,15 @@ export function combatStats(u){
   const sum=key=>equipped.reduce((v,item)=>v+(item[key]??0),0);
   const utility=4*(1-Math.exp(-l.utility/4));
   const baseInterval=l.speed<=4?B.troll.interval*B.troll.speedFactor**l.speed:.32+(B.troll.interval*B.troll.speedFactor**4-.32)*.9**(l.speed-4);
+  const damageUpgradeScale=B.troll.damageUpgradeScale??1,earlyDamageGrowth=1+(B.troll.damageGrowth-1)*damageUpgradeScale,lateDamageGrowth=1+(B.progression.trollDamageGrowth-1)*damageUpgradeScale;
   return {
-    damage:scaled(B.troll.damage*B.troll.damageGrowth**Math.min(4,l.damage),B.progression.trollDamageGrowth,l.damage-4)*product('damage'),
+    damage:scaled(B.troll.damage*earlyDamageGrowth**Math.min(4,l.damage),lateDamageGrowth,l.damage-4)*product('damage'),
     interval:Math.max(.25,baseInterval*product('interval')*(cards.frenzy?Math.pow(1-cards.frenzy,Math.min(2,u.combo||0)):1)),
     armor:Math.max(0,B.troll.armor+B.troll.armorPerLevel*(Math.min(4,l.armor)+Math.log2(1+Math.max(0,l.armor-4)))+sum('armor')+cards.armor),
     combatRegen:((B.troll.combatRegenRate+B.troll.combatRegenPerLevel*Math.min(B.troll.regenLevelCap,l.regen))*product('regen'))+cards.combatRegen,
     restRegen:((B.troll.restRegenRate+B.troll.restRegenPerLevel*Math.min(B.troll.regenLevelCap,l.regen))*product('regen'))+cards.restRegen,
     regenDelay:Math.max(1.5,B.troll.regenDelay+sum('regenDelay')+cards.regenDelay),
-    siege:(1+B.troll.siegeFoundationPerLevel*Math.min(4,l.siege)+B.troll.siegePerLevel*Math.max(0,l.siege-4))*product('siege')*cards.siege,
+    siege:(1+B.troll.siegeFoundationPerLevel*Math.min(4,l.siege)+B.troll.siegePerLevel*Math.max(0,Math.min(B.troll.siegeDiminishingLevel,l.siege)-4)+B.troll.siegeDiminishingPerLevel*Math.max(0,l.siege-B.troll.siegeDiminishingLevel))*product('siege')*cards.siege,
     movement:B.troll.speed*(1+.4*(1-Math.exp(-l.movement/5)))*product('movement')*cards.movement,
     maxHp:trollHealth(l.health)*product('health')*cards.health,
     range:B.troll.range+sum('range'),heavy:B.troll.heavy*product('heavy'),

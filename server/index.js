@@ -13,6 +13,7 @@ import { RELEASE } from '../shared/version.js';
 import { createSnapshotDelta } from '../shared/snapshot-delta.js';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
+const buildHash=process.env.BUILD_SHA||process.env.GITHUB_SHA||'local';
 export function advanceMatch(match,speed=1){
   const steps=Math.max(1,Math.round(Number(speed)||1)),dt=1/BALANCE.tick;
   for(let i=0;i<steps&&[STATES.PREP,STATES.ACTIVE].includes(match.state);i++)match.step(dt);
@@ -24,6 +25,7 @@ export async function createGameServer({port=Number(process.env.PORT)||3000,host
   const telemetrySink=createTelemetrySink({enabled:telemetry,mode:telemetryMode,directory:path.join(root,'telemetry')});
   const persistRoomResult=(room,{reason='manual-exit',clientId=null,playerName=null}={})=>{
     if(!room?.match||room.logged)return room?.resultRecord||null;
+    room.match.release=RELEASE;room.match.buildHash=buildHash;
     const completed=room.match.state===STATES.END,endedAt=new Date().toISOString(),baseResult=room.match.result();
     const result={
       ...baseResult,
@@ -78,7 +80,7 @@ export async function createGameServer({port=Number(process.env.PORT)||3000,host
     ws.thornholdSnapshot=snapshot;ws.thornholdSnapshotSeq=seq;if(snapshot.events.length)ws.thornholdEventId=snapshot.events.at(-1).id;return true;
   };
   const sendMatch=(ws,room,client)=>{if(!ws)return;const slot=room.slots.find(s=>s.occupant?.clientId===client.id);room.match.devSpeed=room.devSpeed||1;room.match.debugTowers=devMode;ws.thornholdEventId=0;ws.thornholdSnapshot=null;ws.thornholdSnapshotSeq=0;send(ws,'map',{map:room.match.map,viewerId:slot?.id||null});sendSnapshot(ws,room,slot?.id||null);if(room.state===STATES.END)send(ws,'result',{result:room.match.result()});};
-  const launchMatch=room=>{room.devSpeed=1;broadcast(room,'phase',{state:STATES.LOADING});for(const member of room.members.values())sendMatch(connections.get(member.id),room,member);room.state=room.match.state;lobby(room);};
+  const launchMatch=room=>{room.devSpeed=1;room.match.release=RELEASE;room.match.buildHash=buildHash;broadcast(room,'phase',{state:STATES.LOADING});for(const member of room.members.values())sendMatch(connections.get(member.id),room,member);room.state=room.match.state;lobby(room);};
   wss.on('connection',(ws,req)=>{
     if(draining){ws.close(1012,'Servidor em atualização');return;}
     const origin=req.headers.origin;if(origin){try{const originHost=new URL(origin).host;if(originHost!==req.headers.host){ws.close(1008,'Origin mismatch');return;}}catch{ws.close(1008);return;}}
@@ -154,7 +156,7 @@ export async function createGameServer({port=Number(process.env.PORT)||3000,host
             }else if(msg.command==='speed'){
               if(!slot)sessions.requireHost(room,client);
               const speed=Number(msg.speed);if(![1,2,4,6,8,16].includes(speed))throw new Error('Velocidade dev inválida.');
-              room.devSpeed=speed;room.match.devSpeed=speed;broadcast(room,'dev',{speed});
+              room.devSpeed=speed;room.match.devSpeed=speed;const history=room.match.devSpeedHistory??=[];if(history.at(-1)?.speed!==speed)history.push({time:+room.match.time.toFixed(2),speed});room.match.devSpeedHistory=history;broadcast(room,'dev',{speed});
             }else throw new Error('Comando dev desconhecido.');
             break;
           }

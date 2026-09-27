@@ -57,7 +57,7 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           IMAGE="$REGISTRY/$REPOSITORY:$IMAGE_TAG"
-          docker build --label org.opencontainers.image.revision="$IMAGE_TAG" -t "$IMAGE" .
+          docker build --build-arg BUILD_SHA="$IMAGE_TAG" --label org.opencontainers.image.revision="$IMAGE_TAG" -t "$IMAGE" .
           docker push "$IMAGE"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
       - name: Download current task definition

@@ -29,7 +29,12 @@ export function selectionMarkup(e,{u,snapshot,map}){
     return header('Árvore de seiva',e.rich?'BOSQUE EXTERNO':'CLAREIRA','leaf')+`<div class="selection-stats"><b>${resource('wood',e.amount)}</b>${e.rich?'<span>Wisp +60%</span>':''}</div>`+(w?`<button class="command-primary" data-do="select-wisp" data-id="${w.id}">${icon('wisp')} Wisp Nv. ${w.level}<span>${resource('wood',w.income,{rate:'s',signed:true})}</span></button>`:e.amount>0?`<button class="command-primary" data-do="gather" ${!near||u?.role!=='elf'?'disabled':''}>${icon('wood')} Coletar <kbd>R</kbd></button><small class="context-note">${near?'Segure R para continuar.':'Aproxime-se para coletar.'}</small>`:`<p>Rebrote ${Math.max(0,Math.ceil((e.regrowAt||time+35)-time))}s · aguarda espaço livre.</p>`);
   }
   if(e.role==='wisp')return wispMarkup(e,{u,snapshot,map});
-  if(!e.kind)return header(escape(e.name),e.role==='troll'?'TROLL':e.ghost?'ESPÍRITO':'ELFO',e.role==='troll'?'heavy':e.ghost?'wisp':'leaf')+`<p>${number(e.hp)} / ${number(e.maxHp)} vida</p>`;
+  if(!e.kind){
+    let html=header(escape(e.name),e.role==='troll'?`TROLL · NÍVEL ${e.trollLevel||1}`:e.ghost?'ESPÍRITO':'ELFO',e.role==='troll'?'heavy':e.ghost?'wisp':'leaf');
+    html+=`<div class="selection-stats"><b>${number(e.hp)} <small>/ ${number(e.maxHp)} HP</small></b><span>${e.alive?'ATIVO':'ELIMINADO'}</span></div><div class="target-health"><i style="width:${e.hp/e.maxHp*100}%"></i></div>`;
+    if(e.role==='troll'&&e.combat){const c=e.combat;html+=`<div class="structure-details unit-attributes"><span>Dano físico <b>${c.damage.toFixed(1)} AD</b></span><span>Vel. de ataque <b>${(1/c.interval).toFixed(2)}/s</b></span><span>Movimento <b>${c.movement.toFixed(2)} m/s</b></span><span>Vida máxima <b>${number(c.maxHp)} HP</b></span><span>Armadura <b>${c.armor.toFixed(1)}</b></span><span>Alcance <b>${c.range.toFixed(1)} m</b></span><span>Dano de cerco <b>${c.siege.toFixed(2)}×</b></span><span>Roubo de vida <b>${(c.drain*100).toFixed(1)}%</b></span><span>Regen. em combate <b>${(c.combatRegen*100).toFixed(2)}%/s</b></span><span>Regen. fora de combate <b>${(c.restRegen*100).toFixed(2)}%/s</b></span></div>`;}
+    return html;
+  }
   const status=upgradeStatus(u,e,time,snapshot.state,snapshot.structures),cost=status.cost,ready=e.progress===1;
   let html=header(e.epic?`${B.structures[e.kind].name} Épico`:e.legendary?`${B.structures[e.kind].name} Lendário`:B.structures[e.kind].name,`${own?'SUA BASE':u?.role==='troll'?'INIMIGO':'ALIADO'} · NV. ${e.tier}`,e.kind);
   const producer=resourceProducer(e);
