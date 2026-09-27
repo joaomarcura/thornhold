@@ -13,6 +13,10 @@ import { RELEASE } from '../shared/version.js';
 import { createSnapshotDelta } from '../shared/snapshot-delta.js';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
+export function advanceMatch(match,speed=1){
+  const steps=Math.max(1,Math.round(Number(speed)||1)),dt=1/BALANCE.tick;
+  for(let i=0;i<steps&&[STATES.PREP,STATES.ACTIVE].includes(match.state);i++)match.step(dt);
+}
 export async function createGameServer({port=Number(process.env.PORT)||3000,host=process.env.HOST||'0.0.0.0',telemetry=true,telemetryMode,devMode=process.env.THORNHOLD_DEV==='1'}={}){
   const sessions=new SessionService(),connections=new Map(),tokens=new Map(),controlDiagnostics=new Map();let draining=false,drainPromise=null,closingPromise=null;
   const limits={maxRooms:Math.max(1,Number(process.env.MAX_ROOMS)||8),maxConnections:Math.max(1,Number(process.env.MAX_CONNECTIONS)||64),maxConnectionsPerIp:Math.max(1,Number(process.env.MAX_CONNECTIONS_PER_IP)||24)},connectionsByIp=new Map();
@@ -168,7 +172,7 @@ export async function createGameServer({port=Number(process.env.PORT)||3000,host
   const interval=setInterval(()=>{const tickStarted=runtimeMetrics.now();
     for(const room of sessions.rooms.values()){
       if(room.emptySince&&Date.now()-room.emptySince>120000){if(room.match&&!room.logged)persistRoomResult(room,{reason:'disconnect-timeout'});sessions.rooms.delete(room.id);for(const m of room.members.values()){const c=sessions.clients.get(m.id);if(c)c.roomId=null;}continue;}
-      if(!room.match)continue;const roomStarted=runtimeMetrics.now();room.devSpeed??=1;room.match.devSpeed=room.devSpeed;room.match.debugTowers=devMode;room.match.step(1/BALANCE.tick*room.devSpeed);room.state=room.match.state;
+      if(!room.match)continue;const roomStarted=runtimeMetrics.now();room.devSpeed??=1;room.match.devSpeed=room.devSpeed;room.match.debugTowers=devMode;advanceMatch(room.match,room.devSpeed);room.state=room.match.state;
       if(ticks%Math.max(1,Math.round(BALANCE.tick/BALANCE.snapshot))===0)for(const m of room.members.values()){const slot=room.slots.find(s=>s.occupant?.clientId===m.id);sendSnapshot(connections.get(m.id),room,slot?.id||null);}
       if(room.state===STATES.END&&!room.logged){const result=persistRoomResult(room);if(result)broadcast(room,'result',{result});}
       runtimeMetrics.recordRoomTick(room.id,runtimeMetrics.now()-roomStarted,{state:room.state,connections:room.members.size,units:room.match.units.length,structures:room.match.structures.filter(s=>s.hp>0).length,wisps:room.match.wisps.filter(w=>w.alive).length});

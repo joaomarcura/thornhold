@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { WebSocket } from 'ws';
-import { createGameServer } from '../server/index.js';
+import { advanceMatch, createGameServer } from '../server/index.js';
 import { BALANCE as B, STATES } from '../shared/config.js';
 import { SessionService } from '../server/sessions.js';
 
@@ -16,6 +16,14 @@ async function client(port,name,token){
   });
   await new Promise((resolve,reject)=>{socket.once('open',resolve);socket.once('error',reject);});send('hello',{name,token});const hello=await wait('hello');return {socket,send,wait,hello,queue};
 }
+
+test('Velocidade dev usa passos fixos para preservar IA e movimento em 16x',()=>{
+  const calls=[],match={state:STATES.ACTIVE,step:dt=>calls.push(dt)};
+  advanceMatch(match,16);
+  assert.equal(calls.length,16);
+  assert.ok(calls.every(dt=>dt===1/B.tick));
+  assert.ok(Math.abs(calls.reduce((sum,dt)=>sum+dt,0)-16/B.tick)<1e-9);
+});
 const closeClient=c=>new Promise(resolve=>{if(c.socket.readyState===WebSocket.CLOSED)return resolve();c.socket.once('close',resolve);c.socket.close();});
 const nextTurn=()=>new Promise(resolve=>setTimeout(resolve,70));
 

@@ -7,6 +7,11 @@ import { playerColor } from '../shared/player-identity.js';
 const palette={ground:0x364f46,path:0x68705a,stone:0x536568,bark:0x4b4035,leaf:0x345f53,gold:0xeac481,teal:0x80d3bd,troll:0x7f9990,elf:0xa8dbbd};
 export const FOLLOW_CAMERA_HEIGHT=Math.sin(.58)*13*.8;
 export const followCameraOffset=(yaw,zoom)=>({x:Math.sin(yaw)*Math.cos(.58)*zoom,y:FOLLOW_CAMERA_HEIGHT,z:-Math.cos(yaw)*Math.cos(.58)*zoom});
+export const spectatorFlightDelta=(yaw,{forward=0,side=0,vertical=0}={},distance=1)=>({
+  x:(-Math.sin(yaw)*forward-Math.cos(yaw)*side)*distance,
+  y:vertical*distance,
+  z:(Math.cos(yaw)*forward-Math.sin(yaw)*side)*distance
+});
 export const BUILD_CAMERA_DISTANCE=6.5;
 export const BUILD_CAMERA_HEIGHT=8.5;
 export const BUILD_CAMERA_BACK=7.5;
@@ -125,7 +130,7 @@ export class WorldRenderer {
     this.scene=new T.Scene();this.scene.background=new T.Color(0x233e41);this.scene.fog=new T.FogExp2(0x233e41,.012);
     this.camera=new T.PerspectiveCamera(52,innerWidth/innerHeight,.1,400);this.scene.add(new T.HemisphereLight(0xdce8c9,0x253c41,2.6));
     this.sun=new T.DirectionalLight(0xffe3ad,3.4);this.sun.position.set(25,60,-15);this.sun.castShadow=true;this.sun.shadow.mapSize.set(1024,1024);Object.assign(this.sun.shadow.camera,{left:-30,right:30,top:30,bottom:-30,near:1,far:150});this.sun.shadow.bias=-.0005;this.scene.add(this.sun,this.sun.target);
-    this.terrain=group(this.scene);this.dynamic=group(this.scene);this.effects=group(this.scene);this.entities=new Map();this.treeMeshes=new Map();this.specialNodeMeshes=new Map();this.visibleTreeIds=new Set();this.towerDebugRings=new Map();this.particles=[];this.projectiles=[];this.effectPool=new Map();this.ray=new T.Raycaster();this.pointer=new T.Vector2();this.plane=new T.Plane(new T.Vector3(0,1,0),0);this.yaw=0;this.pitch=.55;this.zoom=13;this.target=new T.Vector3();this.projectVector=new T.Vector3();this.worldVector=new T.Vector3();this.motionQuery=matchMedia('(prefers-reduced-motion: reduce)');this.isMenu=true;this.eventId=0;this.lastTime=0;this.elapsed=0;this.buildMode=false;this.buildCameraBlend=0;this.frameSamples=[];this.resolutionCheckAt=0;this.longTasks=0;this.performance={fps:60,frameP95Ms:0,drawCalls:0,triangles:0,pixelRatio:this.pixelRatio,longTasks:0};
+    this.terrain=group(this.scene);this.dynamic=group(this.scene);this.effects=group(this.scene);this.entities=new Map();this.treeMeshes=new Map();this.specialNodeMeshes=new Map();this.visibleTreeIds=new Set();this.towerDebugRings=new Map();this.particles=[];this.projectiles=[];this.effectPool=new Map();this.ray=new T.Raycaster();this.pointer=new T.Vector2();this.plane=new T.Plane(new T.Vector3(0,1,0),0);this.yaw=0;this.pitch=.55;this.zoom=13;this.target=new T.Vector3();this.freePosition=new T.Vector3();this.freeCamera=false;this.projectVector=new T.Vector3();this.worldVector=new T.Vector3();this.motionQuery=matchMedia('(prefers-reduced-motion: reduce)');this.isMenu=true;this.eventId=0;this.lastTime=0;this.elapsed=0;this.buildMode=false;this.buildCameraBlend=0;this.frameSamples=[];this.resolutionCheckAt=0;this.longTasks=0;this.performance={fps:60,frameP95Ms:0,drawCalls:0,triangles:0,pixelRatio:this.pixelRatio,longTasks:0};
     if(globalThis.PerformanceObserver)try{this.longTaskObserver=new PerformanceObserver(list=>this.longTasks+=list.getEntries().length);this.longTaskObserver.observe({type:'longtask',buffered:true});}catch{}
     this.selection=new T.Mesh(new T.RingGeometry(1.2,1.28,40),new T.MeshBasicMaterial({color:palette.gold,side:T.DoubleSide,transparent:true,opacity:.8}));this.selection.rotation.x=-Math.PI/2;this.selection.position.y=.08;this.selection.visible=false;this.contextTarget=null;this.scene.add(this.selection);
     this.range=new T.Mesh(new T.RingGeometry(16.92,17,80),new T.MeshBasicMaterial({color:palette.teal,side:T.DoubleSide,transparent:true,opacity:.25}));this.range.rotation.x=-Math.PI/2;this.range.visible=false;this.scene.add(this.range);this.buildRange=new T.Mesh(new T.RingGeometry(6.42,6.5,80),new T.MeshBasicMaterial({color:palette.teal,side:T.DoubleSide,transparent:true,opacity:.22}));this.buildRange.rotation.x=-Math.PI/2;this.buildRange.visible=false;this.scene.add(this.buildRange);
@@ -182,7 +187,20 @@ export class WorldRenderer {
     for(const g of this.dynamic.children)g.position.y=heightAt(this.map,g.position.x,g.position.z);
     this.menuFocus=new T.Vector3(b.x-1,heightAt(this.map,b.x,b.z)+1,b.z);this.camera.position.set(b.x-22,19,b.gate.z-27);this.camera.lookAt(this.menuFocus);
   }
-  start(map){this.isMenu=false;this.loadMap(map);this.yaw=Math.PI;this.pitch=.58;this.zoom=13;this.followId=null;this.focusPoint=null;this.aiming=false;this.buildMode=false;this.buildCameraBlend=0;}
+  start(map){this.isMenu=false;this.loadMap(map);this.yaw=Math.PI;this.pitch=.58;this.zoom=13;this.followId=null;this.focusPoint=null;this.freeCamera=false;this.aiming=false;this.buildMode=false;this.buildCameraBlend=0;}
+  setSpectatorFree(active){
+    const next=!!active;if(next===this.freeCamera)return;
+    this.freeCamera=next;this.focusPoint=null;
+    if(next)this.freePosition.copy(this.camera.position);
+  }
+  moveSpectator(input,dt){
+    if(!this.freeCamera||!this.map)return;
+    const speed=(input.fast?34:15)*Math.min(.05,Math.max(0,dt)),delta=spectatorFlightDelta(this.yaw,input,speed),limit=(this.map.size-1)*this.map.cell;
+    this.freePosition.x=T.MathUtils.clamp(this.freePosition.x+delta.x,0,limit);
+    this.freePosition.z=T.MathUtils.clamp(this.freePosition.z+delta.z,0,limit);
+    const floor=heightAt(this.map,this.freePosition.x,this.freePosition.z)+1.2;
+    this.freePosition.y=T.MathUtils.clamp(this.freePosition.y+delta.y,floor,70);
+  }
   update(snapshot){
     this.snapshot=snapshot;const all=[...snapshot.units,...snapshot.structures,...(snapshot.wisps||[])],ids=new Set(all.map(e=>e.id));
     for(const[id,g]of this.entities)if(!ids.has(id)){this.dynamic.remove(g);disposeModel(g);this.entities.delete(id);}
@@ -274,6 +292,10 @@ export class WorldRenderer {
         g.userData.body.rotation.z=strike?-arc*.08:0;g.userData.body.rotation.x=sprinting?-.18:0;g.userData.body.position.y=Math.sin(this.elapsed*(moving?(sprinting?24:18):2))*(moving?(sprinting?.09:.06):.025);
         if(sprinting&&!reduced&&this.elapsed>(g.userData.nextRunDust||0)){g.userData.nextRunDust=this.elapsed+.14;const dust=this.acquireEffect('sphere',0xb4aa83);dust.scale.set(.12,.05,.12);dust.position.copy(g.position);dust.position.y+=.08;this.particles.push({mesh:dust,velocity:new T.Vector3((Math.random()-.5)*.5,.15,(Math.random()-.5)*.5),age:.58});}
       }
+      if(this.freeCamera){
+        const floor=heightAt(this.map,this.freePosition.x,this.freePosition.z)+1.2;this.freePosition.y=Math.max(this.freePosition.y,floor);this.camera.position.copy(this.freePosition);this.target.copy(this.freePosition);
+        const horizontal=Math.cos(this.pitch),aim=this.freePosition.clone().add(new T.Vector3(-Math.sin(this.yaw)*horizontal,-Math.sin(this.pitch),Math.cos(this.yaw)*horizontal).multiplyScalar(12));this.camera.lookAt(aim);
+      }else{
       let me=this.entities.get(viewerId);if(!me||(!me.userData.entity.alive&&!me.userData.entity.ghost))me=this.entities.get(this.followId)||[...this.entities.values()].find(g=>!g.userData.entity.kind&&g.userData.entity.alive);
       if(this.focusPoint)this.target.lerp(new T.Vector3(this.focusPoint.x,heightAt(this.map,this.focusPoint.x,this.focusPoint.z)+1.25,this.focusPoint.z),Math.min(1,dt*9));
       else if(me)this.target.lerp(me.position.clone().add(new T.Vector3(0,me.userData.entity.role==='troll'?2:1.25,0)),Math.min(1,dt*9));
@@ -306,6 +328,7 @@ export class WorldRenderer {
       }
       this.camera.lookAt(aim);
       if(!reduced&&this.shakeUntil>this.elapsed&&!this.focusPoint)this.camera.position.x+=Math.sin(this.elapsed*110)*this.shakeStrength;
+      }
       const highlighted=this.contextTarget||selected,s=this.entities.get(highlighted)||this.treeMeshes.get(highlighted)||this.specialNodeMeshes.get(highlighted);if(!this.ghost?.visible){this.selection.visible=!!s;if(s)this.selection.position.set(s.position.x,s.position.y+.08,s.position.z);}const selectedMesh=this.entities.get(selected)||this.treeMeshes.get(selected)||this.specialNodeMeshes.get(selected);this.range.visible=!!selectedMesh&&['tower','arcaneTower'].includes(selectedMesh.userData.entity?.kind);if(this.range.visible){const entity=selectedMesh.userData.entity,radius=B.structures[entity.kind].range+(entity.kind==='tower'?towerProfile(entity).range:0),key=entity.id+':'+radius;if(this.rangeKey!==key){groundRing(this.range,this.map,selectedMesh.position.x,selectedMesh.position.z,radius);this.rangeKey=key;}}
     }
     this.sun.position.set(this.target.x+25,55,this.target.z-20);this.sun.target.position.copy(this.target);

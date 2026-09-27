@@ -35,7 +35,13 @@ try {
   const room = server.sessions.rooms.get(code);
   assert.equal(room.match.units.length, 6);
   assert.ok(room.match.units.every(unit => unit.controller === 'bot'));
-  await host.getByRole('button', { name: 'Abrir menu dev' }).click();
+  await host.locator('[data-do=spectator-free]').click();
+  await host.getByText('VOO LIVRE', { exact: false }).first().waitFor();
+  assert.match(await host.locator('#control-hints').textContent(),/WASD.*voar.*Espaço.*subir.*Ctrl.*descer/);
+  await host.keyboard.press('KeyC');
+  await host.keyboard.press('Tab');
+  await host.locator('#player-title').filter({hasText:'Acompanhando'}).waitFor();
+  await host.keyboard.press('F10');
   const troll=room.match.units.find(unit=>unit.role==='troll');
   await host.locator('#dev-target').selectOption(troll.id);
   await host.locator('[data-do=dev-grant][data-gold="1000"]').click();
@@ -74,7 +80,7 @@ try {
   assert.equal(room.members.size, 1);
   assert.deepEqual(errors, []);
 
-  const report = { allBots: true, standardLobby: room.match.units.length===6, observerOnly: room.slots.every(slot=>slot.occupant?.type==='bot'||slot.closed), observerDevGrant: true, devSpeed: devSpeedValidated, naturalVictory: result.endReason!=='score-limit',
+  const report = { allBots: true, standardLobby: room.match.units.length===6, observerOnly: room.slots.every(slot=>slot.occupant?.type==='bot'||slot.closed), observerFreeCamera:true, observerDevGrant: true, devSpeed: devSpeedValidated, naturalVictory: result.endReason!=='score-limit',
     sameLobbyRetained: true, readyReset: true, newSeedOnRematch: true,
     winner: result.winner, duration: result.duration, errors };
   await writeFile('artifacts/browser-lifecycle.json', JSON.stringify(report, null, 2));

@@ -13,5 +13,5 @@ export class MouseLook {
   }
   release(){if(this.locked)document.exitPointerLock();this.world.aiming=false;}
   reset(){this.release();this.started=false;}
-  move(event){if(!this.locked)return false;this.world.yaw+=event.movementX*.003;this.world.pitch=Math.max(.12,Math.min(1.22,this.world.pitch+event.movementY*.0025));return true;}
+  move(event){if(!this.locked)return false;this.world.yaw+=event.movementX*.003;const min=this.world.freeCamera?-1.25:.12,max=this.world.freeCamera?1.25:1.22;this.world.pitch=Math.max(min,Math.min(max,this.world.pitch+event.movementY*.0025));return true;}
 }

@@ -9,7 +9,7 @@ import { AIController } from '../shared/controllers.js';
 import { combatRisk } from '../shared/combat-risk.js';
 import { lineOfSight } from '../shared/map.js';
 import { playerScore } from '../shared/score.js';
-import { BUILD_CAMERA_DISTANCE, FOLLOW_CAMERA_HEIGHT, boundedConstructionPoint, followCameraOffset } from '../client/renderer.js';
+import { BUILD_CAMERA_DISTANCE, FOLLOW_CAMERA_HEIGHT, boundedConstructionPoint, followCameraOffset, spectatorFlightDelta } from '../client/renderer.js';
 
 const create=()=>new Match({seed:'REVIEW',diagnostics:true},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},{id:'e',role:'elf',occupant:{type:'human',name:'Elf'}}]);
 
@@ -18,6 +18,10 @@ test('Zoom altera distância horizontal sem elevar a câmera de acompanhamento',
   assert.ok(offsets.every(offset=>Math.abs(offset.y-FOLLOW_CAMERA_HEIGHT)<1e-9));
   assert.ok(Math.hypot(offsets[0].x,offsets[0].z)<Math.hypot(offsets[1].x,offsets[1].z));
   assert.ok(Math.hypot(offsets[1].x,offsets[1].z)<Math.hypot(offsets[2].x,offsets[2].z));
+});
+test('Voo livre do observador respeita direção, strafe e altitude',()=>{
+  const forward=spectatorFlightDelta(0,{forward:1},10),right=spectatorFlightDelta(0,{side:1},10),up=spectatorFlightDelta(0,{vertical:1},10);
+  assert.ok(Math.abs(forward.x)<1e-9&&forward.y===0&&forward.z===10);assert.ok(right.x===-10&&right.y===0&&Math.abs(right.z)<1e-9);assert.ok(Math.abs(up.x)<1e-9&&up.y===10&&Math.abs(up.z)<1e-9);
 });
 test('Câmera de construção mantém a projeção da mira dentro do alcance',()=>{
   const origin={x:10,z:-4},range=B.construction.range;
