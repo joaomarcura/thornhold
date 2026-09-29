@@ -2,11 +2,11 @@
 
 ## Regra central
 
-Ao alcançar **Núcleo nível 5**, cada Elfo escolhe permanentemente uma identidade para a partida. A escolha pertence ao jogador e sobrevive a reassentamentos. Ela pode ser feita com o mouse ou pelas teclas **1, 2 e 3** no painel do Núcleo.
+Ao alcançar **Núcleo nível 5**, cada Elfo escolhe a identidade do refúgio atual. Se o Núcleo cair e o Elfo reassentar, a especialização pode ser escolhida novamente de acordo com o recurso da nova clareira. A escolha pode ser feita com o mouse ou pelas teclas **1, 2 e 3** no painel do Núcleo.
 
 | Caminho | Recurso | Estrutura exclusiva | Habilidade (X) |
 | --- | --- | --- | --- |
-| Industrial | Madeira Ancestral | Refinaria | Sobrecarga |
+| Industrial | Madeira Ancestral | Nenhuma | Sobrecarga no Núcleo |
 | Fortaleza | Cristal | Bastião | Fortificação emergencial |
 | Arcano | Mana | Torre Arcana | Pulso Arcano |
 
@@ -30,11 +30,35 @@ Todos os Elfos podem formar Wisps especiais. Cada depósito aceita apenas um e o
 
 ## Estruturas
 
-- **Refinaria:** aumenta passivamente a produção de estruturas e Wisps em sua área. Sobrecarga amplifica o efeito temporariamente.
+- **Industrial:** não possui mais construção exclusiva. A Sobrecarga é ativada pelo Núcleo e amplifica temporariamente a produção da base; Wisps especiais mantêm o bônus Industrial.
 - **Bastião:** regenera percentualmente estruturas próximas. Fortificação emergencial reduz temporariamente o dano recebido por estruturas da mesma base.
 - **Torre Arcana:** ocupa um slot ofensivo próprio, limitado a uma por jogador. Seu disparo é forte, lento e visualmente anunciado. Pulso Arcano revela a região e acelera temporariamente seus disparos.
 
-Todas evoluem até o nível 20 e podem ser reconstruídas, respeitando o limite de uma estrutura exclusiva ativa por jogador.
+Bastião e Torre Arcana evoluem até o nível 30 e podem ser reconstruídos, respeitando o limite de uma estrutura exclusiva ativa por jogador. O nível 20 continua sendo o marco Épico; o nível 30 é o marco Ascendente. Refinaria e Oficina foram retiradas das partidas novas e permanecem apenas como compatibilidade de leitura para históricos antigos. O Núcleo produz Essência a partir do nível 4 e também concentra a escolha do caminho Economia, Defesa ou Tecnologia.
+
+## Projeto Épico do reino
+
+O nível 20 não consome mais Essência. Cada melhoria Épica usa o mineral da especialização ativa: Madeira Ancestral para Industrial, Cristal para Fortaleza e Mana para Arcano. A interface mostra o mineral e a quantidade exigida diretamente no botão de melhoria.
+
+O diretor começa a preparar uma base aos 10 minutos. Aos 15 minutos, uma fundação com Núcleo, Barricada e Torre no nível 8, além de Mina, pode ser formalizada como o único Projeto Épico da equipe; Fortaleza e Arcano também exigem sua estrutura exclusiva. Uma base que já tenha Torre Lendária pode entrar antes ao cumprir os demais requisitos. Fora de cerco, a progressão segue Núcleo → Barricada → Torre → Mina → estrutura exclusiva, quando houver. Um alvo pode abrir no máximo dois níveis de vantagem; antes de continuar, o projeto traz os demais edifícios de volta à mesma faixa. Durante pressão real, Barricada e Torre assumem a frente da mesma escada.
+
+Ao iniciar o projeto, ouro, madeira, Essência e o mineral especializado necessário passam a ter reserva explícita. O diretor mede estoque, custo restante e déficit, designa um Wisp especial imediatamente quando necessário e impede compras paralelas de consumirem a reserva. Os quatro marcos Industriais — ou cinco para Fortaleza e Arcano — recebem 45% de eficiência adicional de custo até o nível 20. Se Mina ou uma estrutura exclusiva ativa for destruída, o projeto tenta vincular uma substituta e concede até dois minutos para reconstrução antes de abandonar o investimento.
+
+Custos minerais para alcançar o nível 20:
+
+- Núcleo, Barricada e Torre: 30 unidades cada;
+- Mina: 20 unidades;
+- Bastião ou Torre Arcana: 30 unidades.
+
+Os marcos possuem função real:
+
+- Núcleo Épico aumenta em 20% a produção da base;
+- Mina Épica aumenta sua própria produção em 75%, ajudando a financiar os demais marcos;
+- estrutura exclusiva Épica, quando houver, recebe 60% mais potência;
+- Barricada mantém seu salto defensivo e a Torre Épica recebe 40% mais vida e 75% mais dano;
+- completar todos os marcos ativos concede ao reino mais 15% de produção e 15% de redução de dano estrutural naquela base.
+
+Bots reservam capital para um projeto por equipe, formam Wisp do mineral correspondente desde o início e registram cada marco, gasto e tentativa na telemetria. Checkpoints econômicos também registram, por recurso e por jogador, estoque, geração, gasto, déficit do projeto e quantidade de Wisps dedicados.
 
 ## Autoridade e telemetria
 

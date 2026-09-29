@@ -1,4 +1,5 @@
 import { BALANCE as B, distance } from './config.js';
+import { epicProjectResourceNeed, synchronizeEpicProjectSpecialization } from './elf-team-director.js';
 
 export const SPECIAL_RESOURCES=Object.freeze({
   ancientWood:{name:'Madeira Ancestral',short:'Ancestral'},
@@ -14,12 +15,12 @@ export const ELF_TECH_CARDS=Object.freeze({
     {id:'prepared-casting',name:'Preparação especializada',description:'+3s na duração da habilidade da especialização.',effects:{abilityDuration:3}}
   ],
   12:[
-    {id:'signature-mastery',name:'Domínio da especialização',description:'+12% na potência da estrutura exclusiva.',effects:{signaturePower:.12}},
+    {id:'signature-mastery',name:'Domínio da especialização',description:'+12% na potência da habilidade ou estrutura especializada.',effects:{signaturePower:.12}},
     {id:'external-logistics',name:'Logística externa',description:'+25% na coleta dos Wisps especiais.',effects:{specialWisp:.25}},
     {id:'rapid-command',name:'Comando rápido',description:'-15% na recarga da habilidade da especialização.',effects:{abilityCooldown:.15}}
   ],
   16:[
-    {id:'prosperous-kingdom',name:'Reino próspero',description:'+12% de produção e +10% na estrutura exclusiva.',effects:{production:.12,signaturePower:.1}},
+    {id:'prosperous-kingdom',name:'Reino próspero',description:'+12% de produção e +10% na habilidade ou estrutura especializada.',effects:{production:.12,signaturePower:.1}},
     {id:'living-ramparts',name:'Muralhas vivas',description:'Estruturas recebem 8% menos dano.',effects:{structureReduction:.08}},
     {id:'perfect-synchrony',name:'Sincronia perfeita',description:'+4s de duração e -10% de recarga da habilidade.',effects:{abilityDuration:4,abilityCooldown:.1}}
   ]
@@ -42,6 +43,8 @@ export function chooseTechnology(match,u,id){
   const core=match.structures.find(s=>s.owner===u.id&&s.kind==='core'&&s.hp>0&&s.progress>=1);if(distance(u,core)>B.interactRange)return 'Aproxime-se do seu Núcleo para pesquisar.';
   const resource=specialization(u.elfSpecialization).resource,cost=technologyCost(milestone).resource;
   if((u.specialResources[resource]||0)<cost)return `${SPECIAL_RESOURCES[resource].name} insuficiente: ${Math.floor(u.specialResources[resource]||0)} / ${cost}.`;
+  const project=match.elfEpicProject?.ownerId===u.id&&!match.elfEpicProject.completedAt?match.elfEpicProject:null,reserved=project?.resource===resource?epicProjectResourceNeed(match,project):0;
+  if((u.specialResources[resource]||0)-cost<reserved)return `${SPECIAL_RESOURCES[resource].name} reservado para o Projeto Épico: ${Math.floor(u.specialResources[resource]||0)} / ${reserved+cost}.`;
   u.specialResources[resource]-=cost;u.elfTechCards.push(card.id);u.stats.technologyCards=(u.stats.technologyCards||0)+1;
   match.emit('elf-technology',{unit:u.id,entity:core.id,x:core.x,z:core.z,card:card.id,milestone,resource,cost});return null;
 }
@@ -53,12 +56,12 @@ export function specializationLevel(match,u){
 }
 export function chooseSpecialization(match,u,key){
   if(u.role!=='elf'||!specialization(key))return 'Especialização inválida.';
-  if(u.elfSpecialization)return 'Sua especialização é permanente nesta partida.';
+  if(u.elfSpecialization)return 'Sua especialização permanece até a queda deste Núcleo.';
   const core=match.structures.find(s=>s.owner===u.id&&s.kind==='core'&&s.hp>0&&s.progress>=1);
   if(!core||core.tier<B.elfProgression.unlockTier)return `Núcleo nível ${B.elfProgression.unlockTier} necessário.`;
   if(distance(u,core)>B.interactRange)return 'Aproxime-se do seu Núcleo para escolher.';
-  u.elfSpecialization=key;u.stats.specialization=key;
-  match.emit('specialization',{unit:u.id,entity:core.id,x:core.x,z:core.z,key});return null;
+  const previous=u.previousElfSpecialization||null;u.elfSpecialization=key;u.previousElfSpecialization=null;u.specializationReselectionPending=false;u.stats.specialization=key;u.stats.specializationChoices=(u.stats.specializationChoices||0)+1;synchronizeEpicProjectSpecialization(match,u);
+  match.emit('specialization',{unit:u.id,entity:core.id,x:core.x,z:core.z,key,previous,reselected:!!previous});return null;
 }
 
 export function signatureAllowed(u,kind){
@@ -66,12 +69,10 @@ export function signatureAllowed(u,kind){
 }
 
 export function productionBreakdown(match,owner,producer){
-  const technology=technologyEffects(owner),base=1+technology.production+(producer?.role==='wisp'?technology.wisp:0);
+  const technology=technologyEffects(owner),producerBase=producer?.baseId||owner?.baseId,epicCore=match.structures.some(s=>s.owner===owner?.id&&s.baseId===producerBase&&s.kind==='core'&&s.hp>0&&s.tier>=B.epic.tier),epicKingdom=match.elfEpicProject?.ownerId===owner?.id&&match.elfEpicProject?.baseId===producerBase&&!!match.elfEpicProject?.completedAt,base=(1+technology.production+(producer?.role==='wisp'?technology.wisp:0))*(epicCore?B.epic.coreProduction:1)*(epicKingdom?B.epic.kingdomProduction:1);
   if(owner?.elfSpecialization!=='industrial')return {multiplier:base,base,withoutOverdrive:base,refinery:null,overdrive:false};
-  const refinery=match.structures.find(s=>s.owner===owner.id&&s.kind==='refinery'&&s.hp>0&&s.progress>=1&&distance(s,producer)<=B.structures.refinery.aura);
-  if(!refinery)return {multiplier:base,base,withoutOverdrive:base,refinery:null,overdrive:false};
-  const withoutOverdrive=base*(1+B.elfProgression.specializations.industrial.productionPerTier*refinery.tier*(1+technology.signaturePower)),overdrive=refinery.overdriveUntil>match.time;
-  return {multiplier:withoutOverdrive*(overdrive?1.2:1),base,withoutOverdrive,refinery,overdrive};
+  const core=match.structures.find(s=>s.owner===owner.id&&s.baseId===producerBase&&s.kind==='core'&&s.hp>0&&s.progress>=1),overdrive=!!core&&core.overdriveUntil>match.time;
+  return {multiplier:base*(overdrive?1+.2*(1+technology.signaturePower):1),base,withoutOverdrive:base,refinery:null,overdrive};
 }
 export const productionMultiplier=(match,owner,producer)=>productionBreakdown(match,owner,producer).multiplier;
 
@@ -79,8 +80,8 @@ export function abilityStatus(match,u){
   const spec=specialization(u?.elfSpecialization),readyAt=u?.cooldowns?.elfSpecialization||0;
   if(!spec)return {available:false,reason:'Escolha uma especialização no Núcleo nível 5.',readyAt};
   if(readyAt>match.time)return {available:false,reason:`${spec.ability} recarregando por ${Math.ceil(readyAt-match.time)}s.`,readyAt,key:u.elfSpecialization};
-  const signature=match.structures.filter(s=>s.owner===u.id&&s.kind===spec.structure&&s.hp>0&&s.progress>=1).sort((a,b)=>distance(a,u)-distance(b,u))[0];
-  if(!signature)return {available:false,reason:`Construa ${B.structures[spec.structure].name} para usar ${spec.ability}.`,readyAt,key:u.elfSpecialization};
+  const abilityKind=spec.abilityStructure||spec.structure,signature=match.structures.filter(s=>s.owner===u.id&&s.kind===abilityKind&&s.hp>0&&s.progress>=1).sort((a,b)=>distance(a,u)-distance(b,u))[0];
+  if(!signature)return {available:false,reason:`Construa ${B.structures[abilityKind].name} para usar ${spec.ability}.`,readyAt,key:u.elfSpecialization};
   return {available:true,reason:`Ativar ${spec.ability}.`,readyAt:match.time,key:u.elfSpecialization,signature:signature.id};
 }
 
@@ -101,7 +102,7 @@ export function useSpecializationAbility(match,u){
 export function stepElfProgression(match,dt){
   for(const bastion of match.structures.filter(s=>s.kind==='bastion'&&s.hp>0&&s.progress>=1)){
     const owner=match.unit(bastion.owner);if(!owner?.alive)continue;
-    const rate=B.elfProgression.specializations.fortress.regenPerTier*bastion.tier*(1+technologyEffects(owner).signaturePower);
+    const rate=B.elfProgression.specializations.fortress.regenPerTier*bastion.tier*(1+technologyEffects(owner).signaturePower)*(bastion.tier>=B.epic.tier?B.epic.signaturePower:1);
     for(const s of match.structures.filter(e=>e.owner===owner.id&&e.hp>0&&e.hp<e.maxHp&&distance(e,bastion)<=B.structures.bastion.aura)){
       const before=s.hp;s.hp=Math.min(s.maxHp,s.hp+s.maxHp*rate*dt);owner.stats.specializationImpact.bastionHealing+=s.hp-before;
     }

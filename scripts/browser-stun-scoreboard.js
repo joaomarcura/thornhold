@@ -19,7 +19,7 @@ try{
   await page.getByRole('button',{name:'Marcar como pronto'}).click();await page.getByRole('button',{name:'Iniciar expedição →'}).click();
   await page.locator('#role-name').waitFor();
   const room=[...app.sessions.rooms.values()][0],m=room.match,u=m.units.find(a=>a.controller==='human'),troll=m.units.find(a=>a.role==='troll'),base=m.map.bases[0];
-  m.controllers.clear();m.state=STATES.ACTIVE;m.time=60;u.baseId=base.id;Object.assign(u,{x:base.x,z:base.z});Object.assign(troll,{x:base.x+4,z:base.z});
+  m.controllers.clear();m.state=STATES.ACTIVE;m.time=60;u.baseId=base.id;Object.assign(u,{x:base.x,z:base.z});Object.assign(troll,{x:u.x-Math.sin(u.yaw)*4,z:u.z+Math.cos(u.yaw)*4});
   await until(()=>page.locator('#live-scoreboard>div').count().then(n=>n===3),'Live scoreboard rows');
   const stun=page.locator('[data-do=elf-stun]');await stun.waitFor();assert.equal(await stun.isDisabled(),true);
   m.breachUntil.set(base.id,m.time+45);
@@ -28,7 +28,7 @@ try{
   // Exact three-second duration is covered by the deterministic rules suite.
   // The browser assertion only verifies command delivery and rendered state;
   // wall-clock latency on shared CI runners must not consume a test threshold.
-  await page.locator('.troll-label').getByText('ATORDOADO',{exact:false}).waitFor();
+  await page.locator('#toast').getByText('ATORDOADO',{exact:false}).waitFor();
   await page.screenshot({path:'artifacts/elf-stun-live-scoreboard.png'});report.stunAndLiveScoreboard=true;
   const core={id:'relocation-core',kind:'core',owner:u.id,baseId:base.id,x:base.x,z:base.z,hp:360,maxHp:360,progress:1,healthProgress:1,tier:1,bounty:360,lastHit:-100};
   m.structures.push(core);m.elfBasesClaimed.add(base.id);u.baseId=base.id;u.gold=0;u.wood=0;m.damage(core,core.hp,troll,'melee');

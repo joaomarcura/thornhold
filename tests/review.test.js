@@ -10,8 +10,39 @@ import { combatRisk } from '../shared/combat-risk.js';
 import { lineOfSight } from '../shared/map.js';
 import { playerScore } from '../shared/score.js';
 import { BUILD_CAMERA_DISTANCE, FOLLOW_CAMERA_HEIGHT, boundedConstructionPoint, followCameraOffset, spectatorFlightDelta } from '../client/renderer.js';
+import { CAMERA_LIMITS, adjustCameraZoom, firstPersonBlend, initialCameraZoom } from '../client/camera-mode.js';
+import { orderedMilestoneTarget } from '../shared/elf-team-director.js';
 
 const create=()=>new Match({seed:'REVIEW',diagnostics:true},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},{id:'e',role:'elf',occupant:{type:'human',name:'Elf'}}]);
+
+test('Marcos Lendário e Épico mantêm Núcleo, Barricada e Torre na mesma escada',()=>{
+  const core={kind:'core',tier:9},wall={kind:'wall',tier:3},tower={kind:'tower',tier:3};
+  assert.equal(orderedMilestoneTarget(core,wall,tower,10),wall);
+  wall.tier=4;
+  assert.equal(orderedMilestoneTarget(core,wall,tower,10),tower);
+  tower.tier=4;
+  assert.equal(orderedMilestoneTarget(core,wall,tower,10),wall);
+  core.tier=4;
+  assert.equal(orderedMilestoneTarget(core,wall,tower,10),core);
+});
+
+test('Durante cerco a escada prioriza Barricada e Torre antes do Núcleo',()=>{
+  const core={kind:'core',tier:7},wall={kind:'wall',tier:6},tower={kind:'tower',tier:6};
+  assert.equal(orderedMilestoneTarget(core,wall,tower,10,true),wall);
+  wall.tier=7;
+  assert.equal(orderedMilestoneTarget(core,wall,tower,10,true),tower);
+});
+
+test('Projeto Épico avança em blocos de dois níveis sem abandonar suporte',()=>{
+  const core={kind:'core',tier:10},wall={kind:'wall',tier:10},tower={kind:'tower',tier:10},mine={kind:'mine',tier:10},workshop={kind:'workshop',tier:10},signature={kind:'arcaneTower',tier:10},support=[mine,workshop,signature];
+  assert.equal(orderedMilestoneTarget(core,wall,tower,20,false,support,B.epic.focusLead),core);
+  core.tier=12;assert.equal(orderedMilestoneTarget(core,wall,tower,20,false,support,B.epic.focusLead),wall);
+  wall.tier=12;assert.equal(orderedMilestoneTarget(core,wall,tower,20,false,support,B.epic.focusLead),tower);
+  tower.tier=12;assert.equal(orderedMilestoneTarget(core,wall,tower,20,false,support,B.epic.focusLead),mine);
+  mine.tier=12;workshop.tier=12;signature.tier=12;assert.equal(orderedMilestoneTarget(core,wall,tower,20,false,support,B.epic.focusLead),core);
+  mine.tier=5;assert.equal(orderedMilestoneTarget(core,wall,tower,20,false,support,B.epic.focusLead),mine,'suporte muito atrasado interrompe o avanço do Núcleo');
+  mine.tier=12;core.tier=14;wall.tier=12;tower.tier=12;assert.equal(orderedMilestoneTarget(core,wall,tower,20,true,support,B.epic.focusLead),wall,'cerco coloca Barricada na frente do bloco');
+});
 
 test('Zoom altera distância horizontal sem elevar a câmera de acompanhamento',()=>{
   const offsets=[5,13,23].map(zoom=>followCameraOffset(Math.PI*.37,zoom));
@@ -31,6 +62,11 @@ test('Câmera de construção mantém a projeção da mira dentro do alcance',()
   assert.ok(distance(origin,clamped)<=range-.5+1e-9);
   const nearby=boundedConstructionPoint(origin,{x:12,z:-1},0,range);
   assert.deepEqual(nearby,{x:12,z:-1});
+});
+test('Scroll faz transição contínua entre primeira e terceira pessoa',()=>{
+  assert.equal(initialCameraZoom('first'),CAMERA_LIMITS.first);assert.equal(initialCameraZoom('third'),CAMERA_LIMITS.third);
+  assert.equal(firstPersonBlend(CAMERA_LIMITS.first),1);assert.equal(firstPersonBlend(CAMERA_LIMITS.transition),0);
+  assert.ok(firstPersonBlend(2)>firstPersonBlend(3));assert.equal(adjustCameraZoom(23,1000),23);assert.equal(adjustCameraZoom(0,-1000),0);
 });
 function fixture(){
   const m=create(),u=m.unit('e'),b=m.map.bases[0];Object.assign(u,{x:b.x+4.4,z:b.z});
@@ -71,8 +107,8 @@ test('Exact affordability, barricade progression, and server messages share one 
   u.x+=20;assert.match(m.upgrade(u,core.id),/Aproxime-se/);u.x-=20;
   core.progress=.5;assert.match(m.upgrade(u,core.id),/construção/);core.progress=1;
   core.upgrading=2;assert.match(m.upgrade(u,core.id),/andamento/);core.upgrading=0;
-  core.tier=3;u.gold=u.wood=10000;let status=upgradeStatus(u,core,0,STATES.ACTIVE,m.structures);assert.ok(status.reasons.some(r=>r.code==='barricade'));assert.match(status.reasons.find(r=>r.code==='barricade').message,/nível 2 necessária — atual: nível 1/);
-  wall.tier=2;assert.equal(upgradeStatus(u,core,0,STATES.ACTIVE,m.structures).allowed,true);
+  core.tier=3;u.gold=u.wood=10000;let status=upgradeStatus(u,core,0,STATES.ACTIVE,m.structures);assert.ok(status.reasons.some(r=>r.code==='barricade'));assert.match(status.reasons.find(r=>r.code==='barricade').message,/nível 3 necessária — atual: nível 1/);
+  wall.tier=3;assert.equal(upgradeStatus(u,core,0,STATES.ACTIVE,m.structures).allowed,true);
   wall.hp=0;status=upgradeStatus(u,core,0,STATES.ACTIVE,m.structures);assert.match(status.reasons.find(r=>r.code==='barricade').message,/não construída/);wall.hp=wall.maxHp;
   assert.ok(upgradeStatus(u,core,0,STATES.END,m.structures).reasons.some(r=>r.code==='match'));
   core.owner='someone-else';assert.ok(upgradeStatus(u,core,0,STATES.ACTIVE,m.structures).reasons.some(r=>r.code==='owner'));
@@ -148,30 +184,30 @@ test('V2.1 registra estado, setores, cercos, trade, pressão e economia sem diri
   assert.equal(v2.observational,true);assert.equal(v2.matchState.phase,'SIEGE');assert.ok(v2.sectors.some(s=>s.visits>0));
   assert.equal(v2.siegeSummary.count,1);assert.equal(v2.siegeSummary.successful,1);assert.ok(v2.sieges[0].tradeScore>0);assert.equal(v2.sieges[0].structuresDestroyed.wall,1);
   assert.ok(v2.pressureWindows.length>=1);assert.ok(v2.economyCheckpoints.some(c=>c.time===180));assert.ok(v2.stateSeconds.SIEGE>0);assert.ok(v2.stateSeconds.ROTATE>0);
-  assert.ok(v2.progression);assert.deepEqual(v2.progression.final.trollLevels,t.levels);assert.equal(v2.progression.final.highestStructureTier.wall,0);
+  assert.ok(v2.progression);assert.deepEqual(v2.progression.final.trollLevels,t.levels);assert.equal(v2.progression.final.highestStructureTier.wall,1);assert.equal(v2.progression.final.liveStructureTier.wall,0);
   const economy=v2.economyCheckpoints.find(c=>c.time===180).elves;assert.ok(Object.hasOwn(economy,'netSpentGold'));assert.ok(Object.hasOwn(economy,'goldUtilization'));assert.ok(economy.spendByPurpose.economy);assert.ok(economy.spendByPurpose.defense);assert.ok(Array.isArray(economy.players));
   const frozen=economy.players[0].spendByPurpose;m.unit('e').stats.spendByPurpose.economy={gold:999,wood:999};assert.notDeepEqual(frozen,m.unit('e').stats.spendByPurpose);
   assert.equal(Object.hasOwn(v2.matchState,'elfPower'),true);assert.equal(Object.hasOwn(v2.matchState,'volatility'),true);
-  const report=m.result();assert.equal(report.telemetry.schema,19);assert.equal(report.telemetry.legendaryExecutions.count,0);assert.ok(Array.isArray(report.telemetry.chases));assert.ok(report.telemetry.chaseSummary);assert.ok(report.telemetry.structureDestructionTimes.wall);assert.ok(Object.hasOwn(report.telemetry.structureDestructionTimes.wall,'averageActiveSeconds'));assert.equal(report.telemetry.context.devSpeed,1);assert.deepEqual(report.telemetry.context.devSpeedHistory,[{time:0,speed:1}]);assert.equal(report.telemetry.context.difficulty,'normal');assert.ok(report.telemetry.specializations?.impact);assert.ok(Object.hasOwn(report.telemetry.healing,'legendarySuppressed'));assert.equal(v2.maxWallHp,20);assert.ok(Array.isArray(v2.repeatedTargets));assert.ok(Object.hasOwn(v2,'worstRepeatedTarget'));assert.ok(Object.hasOwn(v2,'maxFailedSiegesTarget'));assert.ok(Array.isArray(v2.decisionDiagnostics.targetFailures));assert.ok(Array.isArray(v2.decisionDiagnostics.blockedBases));assert.ok(Object.hasOwn(v2.decisionDiagnostics,'recoveryPlan'));assert.ok(Object.hasOwn(v2.decisionDiagnostics,'repositionStreak'));assert.ok(v2.decisionDiagnostics.baseSearch);assert.ok(Array.isArray(v2.finalSiegeParity));assert.deepEqual(Object.keys(v2.outcomeMilestones),['firstElfDeathAt','thirdElfDeathAt','finalElfPhaseAt']);assert.equal(v2.formulaVersion,'v3.14-snowball-control');
+  const report=m.result();assert.equal(report.telemetry.schema,22);assert.equal(report.telemetry.legendaryExecutions.count,0);assert.ok(Array.isArray(report.telemetry.chases));assert.ok(report.telemetry.chaseSummary);assert.ok(report.telemetry.structureDestructionTimes.wall);assert.ok(Object.hasOwn(report.telemetry.structureDestructionTimes.wall,'averageActiveSeconds'));assert.equal(report.telemetry.context.devSpeed,1);assert.deepEqual(report.telemetry.context.devSpeedHistory,[{time:0,speed:1}]);assert.equal(report.telemetry.context.difficulty,'normal');assert.ok(report.telemetry.specializations?.impact);assert.ok(report.telemetry.specializations?.specialResources);assert.ok(Array.isArray(report.telemetry.specializations?.epicProjectAttempts));assert.ok(report.telemetry.specializations?.epicProjectSummary);assert.ok(Object.hasOwn(report.telemetry.healing,'legendarySuppressed'));assert.equal(v2.maxWallHp,20);assert.ok(Array.isArray(v2.repeatedTargets));assert.ok(Object.hasOwn(v2,'worstRepeatedTarget'));assert.ok(Object.hasOwn(v2,'maxFailedSiegesTarget'));assert.ok(Array.isArray(v2.decisionDiagnostics.targetFailures));assert.ok(Array.isArray(v2.decisionDiagnostics.blockedBases));assert.ok(Object.hasOwn(v2.decisionDiagnostics,'recoveryPlan'));assert.ok(Object.hasOwn(v2.decisionDiagnostics,'repositionStreak'));assert.ok(v2.decisionDiagnostics.baseSearch);assert.ok(Array.isArray(v2.finalSiegeParity));assert.deepEqual(Object.keys(v2.outcomeMilestones),['firstElfDeathAt','thirdElfDeathAt','finalElfPhaseAt']);assert.equal(v2.formulaVersion,'v3.20-epic-project-authority');
 });
 test('Curva de Barricada cresce no late game e respeita personalidade sem buff de atributos',()=>{
-  assert.deepEqual([12,14,16,18,20].map(requiredBarricadeTier),[6,8,10,12,14]);
-  assert.equal(strategicBarricadeTier(12,16,'economy','normal'),9);
-  assert.equal(strategicBarricadeTier(12,16,'balanced','normal'),11);
+  assert.deepEqual([12,14,16,18,20].map(requiredBarricadeTier),[11,13,15,17,19]);
+  assert.equal(strategicBarricadeTier(12,16,'economy','normal'),12);
+  assert.equal(strategicBarricadeTier(12,16,'balanced','normal'),12);
   assert.equal(strategicBarricadeTier(12,16,'defense','hard'),12);
   assert.deepEqual([10,13,17,20].map(requiredEpicWallTier),[9,11,12,14]);
 });
-test('Stun defensivo só funciona na própria base rompida e bloqueia o Troll por 3s',()=>{
+test('Patch B21 reduz as curvas de vida e dano do Troll em 10%',()=>{
+  assert.equal(B.troll.hp,1980);assert.equal(B.troll.damage,21.6);assert.equal(B.troll.healthPerLevel,324);assert.equal(B.troll.damageGrowth,1.2);
+});
+test('Stun funciona fora da base, mantém alcance e usa cooldown compartilhado',()=>{
   const m=new Match({seed:'STUN'},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},{id:'e0',role:'elf',occupant:{type:'human',name:'A'}},{id:'e1',role:'elf',occupant:{type:'human',name:'B'}}]);
   const troll=m.unit('t'),elf=m.unit('e0'),ally=m.unit('e1'),base=m.map.bases[0];m.state=STATES.ACTIVE;m.time=60;
   elf.baseId=base.id;ally.baseId=m.map.bases[1].id;Object.assign(elf,{x:base.x,z:base.z});Object.assign(troll,{x:base.x+4,z:base.z});
-  assert.match(m.act(elf.id,{type:'elfStun'}),/Barricada/);
-  const wall={id:'wall-stun',kind:'wall',owner:elf.id,baseId:base.id,x:base.gate.x,z:base.gate.z,hp:1,maxHp:1100,progress:1,bounty:1};
-  m.structures.push(wall);m.damage(wall,1,troll,'melee');assert.ok(m.breachUntil.get(base.id)>m.time);
   troll.pendingStrike={heavy:true,at:m.time+1};troll.input={x:1,z:0};assert.equal(m.act(elf.id,{type:'elfStun'}),undefined);
   assert.equal(troll.stunnedUntil,m.time+3);assert.equal(troll.pendingStrike,null);assert.deepEqual(troll.input,{x:0,z:0});assert.equal(elf.stats.stuns,1);
   const x=troll.x;m.input(troll.id,{x:1,z:0});m.movement(troll,1);assert.equal(troll.x,x);assert.match(m.act(troll.id,{type:'attack'}),/Atordoado/);
-  assert.match(m.act(ally.id,{type:'elfStun'}),/Barricada/);
+  Object.assign(ally,{x:troll.x,z:troll.z+2});assert.match(m.act(ally.id,{type:'elfStun'}),/recarregando/);
   m.time+=3.01;assert.equal(troll.effects,undefined);assert.match(m.act(elf.id,{type:'elfStun'}),/recarregando/);
   const effects=m.snapshot(troll.id).units.find(u=>u.id===troll.id).effects;assert.ok(!effects.some(e=>e.id==='stunned'));
 });
@@ -207,6 +243,13 @@ test('Núcleo destruído abre uma janela de reassentamento antes da derrota',()=
   expired.m.damage(expired.core,expired.core.hp,expired.m.unit('t'),'melee');
   expired.m.time=expired.u.relocationUntil+.01;expired.m.checkEndState();
   assert.equal(expired.m.state,STATES.END);assert.equal(expired.m.endReason,'all-elf-bases-destroyed');
+});
+test('Reassentamento libera nova especialização adequada à próxima clareira',()=>{
+  const {m,u,core}=fixture(),troll=m.unit('t');m.state=STATES.ACTIVE;m.time=60;u.elfSpecialization='industrial';u.stats.specialization='industrial';
+  m.damage(core,core.hp,troll,'melee');assert.equal(u.elfSpecialization,null);assert.equal(u.previousElfSpecialization,'industrial');assert.equal(u.specializationReselectionPending,true);
+  const next=m.map.bases.find(base=>base.id!==core.baseId);Object.assign(u,{x:next.x+4.4,z:next.z,gold:0,wood:0});assert.equal(m.act(u.id,{type:'build',kind:'core',x:next.x,z:next.z}),undefined);
+  const replacement=m.structures.at(-1);Object.assign(replacement,{progress:1,hp:replacement.maxHp,tier:5});Object.assign(u,{x:replacement.x+2,z:replacement.z});assert.equal(m.act(u.id,{type:'chooseElfSpecialization',key:'fortress'}),null);
+  assert.equal(u.elfSpecialization,'fortress');assert.equal(u.previousElfSpecialization,null);assert.equal(u.specializationReselectionPending,false);assert.equal(u.stats.specializationChoices,1);
 });
 test('Cada Elfo pode fundar no máximo dois Núcleos durante a partida',()=>{
   const {m,u,core}=fixture(),troll=m.unit('t');m.state=STATES.ACTIVE;m.time=60;

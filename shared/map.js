@@ -31,11 +31,12 @@ export function flatGround(map,x,z,radius){
 }
 export function traversable(map,x,z,nx,nz){return walkable(map,nx,nz)&&Math.abs((map.heights?.[index(map,x,z)]||0)-(map.heights?.[index(map,nx,nz)]||0))<=map.cell*.55;}
 
-export function generateMap(seed='THORNHOLD',mapSize='compact'){
-  const rng=randomFor(seed),size=mapSize==='large'?125:109,cell=BALANCE.cell,mid=(size-1)/2,offset=(size-109)/2;
-  const map={seed:String(seed),version:3,size,cell,grid:Array(size*size).fill(1),heights:Array(size*size).fill(0),bases:[],trees:[],specialNodes:[],decor:[],pois:[],trails:[]};
+export const MAP_STYLES=Object.freeze({woodland:{name:'Bosque clássico'},deepForest:{name:'Mata fechada'},crossroads:{name:'Rotas abertas'}});
+export function generateMap(seed='THORNHOLD',mapSize='compact',mapStyle='woodland'){
+  const style=MAP_STYLES[mapStyle]?mapStyle:'woodland',rng=randomFor(seed),size=mapSize==='large'?125:109,cell=BALANCE.cell,mid=(size-1)/2,offset=(size-109)/2;
+  const map={seed:String(seed),version:4,style,size,cell,grid:Array(size*size).fill(1),heights:Array(size*size).fill(0),bases:[],trees:[],specialNodes:[],decor:[],pois:[],trails:[]};
   const carve=(x,z,r=1)=>{for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++)if(x+dx>1&&z+dz>1&&x+dx<size-2&&z+dz<size-2)map.grid[index(map,x+dx,z+dz)]=0;};
-  const trail=(points,width=1)=>{map.trails.push(points.map(([x,z])=>world(map,x,z)));for(let i=1;i<points.length;i++){let [x,z]=points[i-1];const [tx,tz]=points[i];carve(x,z,width);while(x!==tx||z!==tz){if(x!==tx)x+=Math.sign(tx-x);else z+=Math.sign(tz-z);carve(x,z,width);}}};
+  const trail=(points,width=style==='deepForest'?0:1)=>{map.trails.push(points.map(([x,z])=>world(map,x,z)));for(let i=1;i<points.length;i++){let [x,z]=points[i-1];const [tx,tz]=points[i];carve(x,z,width);while(x!==tx||z!==tz){if(x!==tx)x+=Math.sign(tx-x);else z+=Math.sign(tz-z);carve(x,z,width);}}};
   // Connected woodland loops, turns and blind branches replace radial sight lines.
   const a=36+offset,c=72+offset,lanes=[a,mid,c];
   for(let row=0;row<3;row++)for(let col=0;col<2;col++){
@@ -46,6 +47,10 @@ export function generateMap(seed='THORNHOLD',mapSize='compact'){
   for(let col=0;col<3;col++)for(let row=0;row<2;row++){
     const x=lanes[col],z=lanes[row],end=lanes[row+1],bend=x+Math.floor(rng()*7)-3;
     trail([[x,z],[x,z+4],[bend,z+4],[bend,end-5],[x,end-5],[x,end]]);
+  }
+  if(style==='crossroads'){
+    // Secondary loops create meaningful rotations without opening extra refuge gates.
+    const q=mid-14,r=mid+14;trail([[a,q],[c,q]],1);trail([[a,r],[c,r]],1);trail([[q,a],[q,c]],1);trail([[r,a],[r,c]],1);
   }
   for(let z=mid-8;z<=mid+7;z++)for(let x=mid-7;x<=mid+7;x++)if(Math.abs(x-mid)+Math.abs(z-mid)<13)carve(x,z,0);
   map.elfSpawn=world(map,mid,mid+3);map.trollSpawn=world(map,mid,mid-5);
@@ -102,7 +107,8 @@ export function generateMap(seed='THORNHOLD',mapSize='compact'){
   const neutralSpots=[[mid-12,mid-8],[mid+12,mid-7],[mid,mid+14]];
   ['ancientWood','crystal','mana'].forEach((resource,i)=>{const [x,z]=neutralSpots[i];carve(x,z,1);map.specialNodes.push({id:'resource'+map.specialNodes.length,...world(map,x,z),resource,amount:BALANCE.elfProgression.externalStock,maxAmount:BALANCE.elfProgression.externalStock,local:false,baseId:null});});
   // Scenery stays on blocked cells; the visible trail is also the collision corridor.
-  for(let z=2;z<size-2;z++)for(let x=2;x<size-2;x++)if(!walkable(map,x,z)&&rng()<.35)map.decor.push({...world(map,x,z),scale:.8+rng()*.4,kind:rng()<.2?'rock':'tree',rotation:rng()*6.28});
+  const decorRate=style==='deepForest'?.52:style==='crossroads'?.25:.35;
+  for(let z=2;z<size-2;z++)for(let x=2;x<size-2;x++)if(!walkable(map,x,z)&&rng()<decorRate)map.decor.push({...world(map,x,z),scale:.8+rng()*.4,kind:rng()<.2?'rock':'tree',rotation:rng()*6.28});
   map.pois=[{...world(map,mid-5,mid),name:'Pedras ancestrais'},{...world(map,mid+5,mid+3),name:'Fonte do luar'}];
   map.validation=map.bases.map(b=>validateBase(map,b));
   if(map.validation.some(v=>!v.valid))throw new Error('Mapa recusado: '+JSON.stringify(map.validation.filter(v=>!v.valid)));
@@ -118,15 +124,21 @@ export function validateBase(map,b){
   let openings=0;for(let z=b.cz-b.rz;z<=b.cz+b.rz;z++)for(let x=b.cx-b.rx;x<=b.cx+b.rx;x++)if((Math.abs(x-b.cx)===b.rx||Math.abs(z-b.cz)===b.rz)&&walkable(map,x,z))openings++;
   return {base:b.id,connected,gateIsCutVertex:sealed,openings,valid:connected&&sealed&&openings===1};
 }
+class PathHeap{
+  constructor(){this.items=[];}
+  get length(){return this.items.length;}
+  before(a,b){return a.score<b.score||(a.score===b.score&&a.order<b.order);}
+  push(value){const items=this.items;let at=items.length;items.push(value);while(at>0){const parent=(at-1)>>1;if(!this.before(value,items[parent]))break;items[at]=items[parent];at=parent;}items[at]=value;}
+  pop(){const items=this.items,first=items[0],last=items.pop();if(items.length){let at=0;while(true){const left=at*2+1;if(left>=items.length)break;const right=left+1,child=right<items.length&&this.before(items[right],items[left])?right:left;if(!this.before(items[child],last))break;items[at]=items[child];at=child;}items[at]=last;}return first;}
+}
 export function pathfind(map,from,to,blocked=new Set()){
   const a=toCell(map,from),b=toCell(map,to),start=index(map,a.x,a.z),goal=index(map,b.x,b.z);
   if(!walkable(map,b.x,b.z)||blocked.has(goal))return [];
-  const open=[start],parent=new Map(),g=new Map([[start,0]]),closed=new Set();
-  const heuristic=k=>Math.abs(k%map.size-b.x)+Math.abs(Math.floor(k/map.size)-b.z);
-  while(open.length){let best=0;for(let i=1;i<open.length;i++)if(g.get(open[i])+heuristic(open[i])<g.get(open[best])+heuristic(open[best]))best=i;
-    const k=open.splice(best,1)[0];if(k===goal){const result=[];let n=k;while(n!==start){result.push(world(map,n%map.size,Math.floor(n/map.size)));n=parent.get(n);}return result.reverse();}
+  const open=new PathHeap(),parent=new Map(),g=new Map([[start,0]]),closed=new Set(),order=new Map([[start,0]]);let nextOrder=1;
+  const heuristic=k=>Math.abs(k%map.size-b.x)+Math.abs(Math.floor(k/map.size)-b.z),queue=(key,score)=>open.push({key,score:score+heuristic(key),order:order.get(key)});queue(start,0);
+  while(open.length){const entry=open.pop(),k=entry.key;if(closed.has(k)||entry.score!==g.get(k)+heuristic(k))continue;if(k===goal){const result=[];let n=k;while(n!==start){result.push(world(map,n%map.size,Math.floor(n/map.size)));n=parent.get(n);}return result.reverse();}
     closed.add(k);const x=k%map.size,z=Math.floor(k/map.size);
-    for(const[dx,dz]of[[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,nz=z+dz,n=index(map,nx,nz);if(!traversable(map,x,z,nx,nz)||closed.has(n)||blocked.has(n))continue;const score=g.get(k)+1;if(score<(g.get(n)??Infinity)){parent.set(n,k);g.set(n,score);if(!open.includes(n))open.push(n);}}
+    for(const[dx,dz]of[[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,nz=z+dz,n=index(map,nx,nz);if(!traversable(map,x,z,nx,nz)||closed.has(n)||blocked.has(n))continue;const score=g.get(k)+1;if(score<(g.get(n)??Infinity)){parent.set(n,k);g.set(n,score);if(!order.has(n))order.set(n,nextOrder++);queue(n,score);}}
   }return [];
 }
 export function lineOfSight(map,a,b,fromHeight=1.8,toHeight=1.8){

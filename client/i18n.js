@@ -137,7 +137,7 @@ const EN=new Map(Object.entries({
   ,'do Santuário. Use':'in the Sanctuary. Use','para retornar e':'to return and','perto da Forja para abrir o arsenal.':'near the Forge to open the arsenal.'
   ,'rugido. Torres punem exposição longa; recue, cure-se e escolha seus alvos.':'roar. Towers punish prolonged exposure; retreat, heal, and choose your targets.'
   ,'Mira central sempre travada':'Center reticle always locked','Clique':'Click','Selecionar / agir':'Select / act','Formar Wisp automático':'Train Wisp automatically','Retornar ao Santuário':'Return to Sanctuary','Abrir Forja próxima':'Open nearby Forge','Demolir estrutura selecionada':'Demolish selected structure'
-  ,'Melhorias não possuem bloqueio temporal. Estruturas e atributos evoluem até o nível 20: Lendário no 10 e Épico no 20.':'Upgrades have no time gate. Structures and attributes progress to level 20: Legendary at 10 and Epic at 20.'
+  ,'Melhorias não possuem bloqueio temporal. Estruturas evoluem até o nível 30: Lendário no 10, Épico no 20 e Ascendente no 30. Wisps e atributos mantêm limite 20.':'Upgrades have no time gate. Structures progress to level 30: Legendary at 10, Epic at 20, and Ascendant at 30. Wisps and attributes remain capped at 20.'
   ,'Mira travada · clique para agir':'Aim locked · click to act','Clique no cenário para retomar a mira':'Click the world to resume locked aim'
   ,'Atributos · 20':'Attributes · 20','Lendário no nível 10 · Épico e limite máximo no nível 20.':'Legendary at level 10 · Epic and maximum level at 20.'
 }));

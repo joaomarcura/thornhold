@@ -1,0 +1,15 @@
+services:
+  thornhold:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_PATH: /app/data/thornhold.sqlite
+      RANKED_SIMULATION_ENABLED: "true"
+    volumes:
+      - thornhold-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  thornhold-data:

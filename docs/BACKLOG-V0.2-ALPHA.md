@@ -18,7 +18,7 @@ Regra de medição: todo baseline e toda rodada de balanceamento usam exclusivam
 ### Partida e cooperação
 
 - Não existe limite fixo de duração. Impasses são resolvidos pela progressão lendária e pelas condições normais de eliminação/base.
-- Uma clareira comporta 1 Núcleo, 1 Barricada, 5 Torres, 5 Minas e 1 Oficina.
+- Uma clareira comporta 1 Núcleo, 1 Barricada, 2 Torres, 5 Minas e até 1 estrutura exclusiva da especialização. Refinaria e Oficina estão aposentadas.
 - Aliados podem construir e reparar na mesma clareira. Recursos, renda e propriedade continuam individuais.
 - Uma estrutura pertence a quem pagou por ela. Somente o proprietário pode melhorar ou demolir; não há transferência direta de recursos. Upgrades iniciados não podem ser cancelados.
 - Ao morrer, o Elfo perde recursos, Wisps e todas as suas estruturas. O colapso concede ao Troll 25% da recompensa normal e não devolve investimento.

@@ -27,6 +27,5 @@ export function structureEffects(s,time){
   const effects=[];
   if(s.disabledUntil>time)effects.push({id:'silenced',label:'Rugido · desativada',kind:'debuff',until:s.disabledUntil,detail:'Torre não pode disparar'});
   if(s.kind==='wall'&&s.passiveRegenerating)effects.push({id:'wall-recovery',label:'Barricada se recompondo',kind:'buff',until:null,detail:`+${(s.maxHp*B.wallRecovery.rate).toFixed(1)} vida/s · após 8s sem dano`});
-  if(s.kind==='wall'&&(s.breachStacks||0)>0)effects.push({id:'breach-pressure',label:`Pressão de cerco ×${s.breachStacks}`,kind:'debuff',until:s.breachDecayAt||null,detail:`Dano recebido +${Math.round(s.breachStacks*B.breachMomentum.damagePerStack*100)}% · reparo −${Math.round(s.breachStacks*B.breachMomentum.repairPenaltyPerStack*100)}%`});
   return effects;
 }

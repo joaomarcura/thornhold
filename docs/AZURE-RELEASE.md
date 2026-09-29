@@ -18,6 +18,8 @@ O template `infra/azure/main.bicep` cria:
 - escala estritamente limitada a zero ou uma réplica;
 - parâmetros de limite de salas e conexões;
 - telemetria JSON em stdout, persistida fora do filesystem do container.
+- Azure Files de 5 GiB montado em `/app/data` para contas, ranking, histórico e estatísticas;
+- SQLite em journal `DELETE` e uma única réplica, evitando WAL sobre SMB.
 
 ## 1. Criar conta e assinatura
 
@@ -68,6 +70,11 @@ O ACR usa identidade gerenciada para pull e mantém o usuário administrador
 desativado. Isso acrescenta o custo do tier Basic, mas remove tokens permanentes
 de registry e mantém build, armazenamento e deploy dentro da assinatura Azure.
 
+Depois de introduzir a plataforma competitiva, execute novamente o deploy do
+`main.bicep` uma vez com uma conta que possa criar Storage Account e configurar
+o Container Apps Environment. Apenas atualizar a imagem não cria o volume novo.
+Os releases seguintes preservam o mount e voltam a atualizar somente a imagem.
+
 ## 3. Validar a infraestrutura
 
 O Bicep pode ser compilado sem fazer alterações na assinatura:
@@ -93,7 +100,7 @@ az deployment group what-if `
 
 `.github/workflows/release-azure.yml` roda manualmente ou em tags `v*`:
 
-1. valida sintaxe e 148 testes;
+1. valida sintaxe, regras, rede e fluxos críticos de navegador;
 2. roda carga WebSocket com oito salas 1×5;
 3. constrói a imagem Docker no runner e envia uma tag imutável ao ACR;
 4. autentica no Azure por OIDC e permissões restritas;
@@ -121,7 +128,9 @@ O orçamento Azure é um alerta, não um hard cap. Os hard caps práticos são:
 - `MAX_CONNECTIONS=1200`;
 - `MAX_CONNECTIONS_PER_IP=24`.
 
-Partidas continuam em memória. O servidor agora entra em draining, responde
+Contas, ranks e históricos ficam no Azure Files. Partidas ativas continuam em memória. O servidor agora entra em draining, responde
 `503` no health check, recusa novas conexões e aguarda até 20 segundos antes de
 encerrar. Isso melhora revisões, mas não migra uma partida para outro container.
-Releases da alpha ainda devem ocorrer em janela de manutenção ou sem salas.
+Releases da alpha ainda devem ocorrer em janela de manutenção ou sem salas. O
+SQLite desta fase exige `maxReplicas=1`; migre para PostgreSQL antes de escalar
+horizontalmente ou operar múltiplas regiões.

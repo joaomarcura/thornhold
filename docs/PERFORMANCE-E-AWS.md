@@ -1,11 +1,11 @@
 # Revisão de performance e preparação para AWS
 
-## Diagnóstico de 25 de setembro de 2026
+## Diagnóstico de 25–28 de setembro de 2026
 
 O travamento percebido não é causado pela quantidade de testes. Os testes não
 são carregados pelo navegador e o `Dockerfile` copia somente `client`, `shared`
-e `server`. A suíte completa possui 143 casos e terminava em aproximadamente 12
-segundos; um único teste autônomo 1x5 concentrava a maior parte desse tempo.
+e `server`. A suíte rápida possui 279 casos e termina em aproximadamente 7–9
+segundos; o cenário autônomo 1x5 foi preservado em uma suíte longa separada.
 
 Os gargalos encontrados no caminho de produção foram:
 
@@ -39,15 +39,27 @@ Os gargalos encontrados no caminho de produção foram:
   padrão e impede retorno dos campos internos removidos.
 - `npm run test:smoke` oferece retorno rápido; `npm test` continua sendo o
   portão completo antes de release.
+- Snapshots usam delta por coleção; no teste com oito salas o pacote médio ficou
+  em aproximadamente 452 bytes durante a preparação.
+- Observadores da mesma sala reutilizam a mesma visão autoritativa dentro do
+  tick. Visões de jogadores continuam individuais e preservam fog of war.
+- Rochas e floresta decorativa usam chunks espaciais; árvores coletáveis usam
+  modelos completos próximos e instâncias leves à distância.
+- Modelos de estruturas em runtime são consolidados por material e estágio de
+  construção, sem alterar o ghost de posicionamento.
+- Draw calls no cenário gráfico 1920×1080 caíram de 224 para 137; o benchmark
+  headless por software manteve 138–139 FPS e frame p95 de 7,1 ms.
 
 ## Decisão sobre os testes
 
 Não remover testes por contagem. Eles não afetam FPS, pacote do navegador nem a
 imagem Docker. A divisão recomendada é:
 
-- Durante desenvolvimento: `npm run test:smoke`.
+- Durante desenvolvimento: `npm run test:fast`.
+- Teste autônomo demorado: `npm run test:long`.
 - Antes de merge/release: `npm test`.
-- Antes de staging: `npm run verify` e arena 1x5 com seeds versionadas.
+- Antes de staging: `npm run verify`, `npm run test:performance:browser`,
+  `npm run test:load:mature` e arena 1x5 com seeds versionadas.
 
 Testes lentos de simulação podem futuramente ser movidos para uma etapa de CI
 separada, mas devem continuar existindo porque detectam loops infinitos e
@@ -84,8 +96,11 @@ Para o primeiro staging no Brasil:
   automático pelo circuit breaker.
 - P95 do tick abaixo de 25 ms; nenhum tick acima do orçamento de 50 ms de forma
   recorrente. Em 8 salas simultâneas a 1x, a medição local inicial foi P95
-  11,81 ms, máximo 33,24 ms e zero overruns.
-- FPS validado em notebook integrado e desktop comum.
+  11,93 ms, máximo 17,15 ms e zero overruns após compartilhamento seguro da
+  visão de observador. Quatro partidas aquecidas até aproximadamente 6:40,
+  contendo 32–34 estruturas e 15–16 Wisps cada, mediram P95 global de 9,97 ms.
+- Benchmark gráfico automatizado disponível; ainda falta validar em notebook
+  integrado e desktop comum para estabelecer budgets específicos de hardware.
 - Tráfego por jogador medido em early, siege e late game.
 - Graceful shutdown/migração de partidas continua pendente antes de permitir
   deploy sem janela de manutenção. O pipeline faz rolling deploy e rollback,

@@ -30,8 +30,8 @@ try{
   assert.equal(await page.locator('#tactical-panel [data-do=map] kbd').innerText(),'J');assert.equal(await page.locator('.map-expand kbd').innerText(),'J');report.remappedGameAction=true;
   await page.keyboard.press('Escape');
   await page.locator('#hud [data-do=pause]').click();
-  const volume=page.locator('#master-volume');await volume.fill('27');
-  assert.equal(await page.locator('#master-volume-value').innerText(),'27%');
+  const volume=page.locator('[data-audio=master]');await volume.fill('27');
+  assert.equal(await page.locator('#audio-master-value').innerText(),'27%');
   assert.equal(await page.evaluate(()=>localStorage.getItem('thornhold-volume')),'0.27');report.audioVolume=true;
   await page.getByRole('button',{name:'Acessibilidade e controles'}).click();
   await page.locator('[data-do=reset-preferences]').click();

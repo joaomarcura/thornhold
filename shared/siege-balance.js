@@ -17,8 +17,8 @@ export function siegeParity(match,troll,wall,{towers=null,assumeRepair=true}={})
   const lightDps=stats.damage*stats.siege/Math.max(.1,stats.interval),heavyBonus=stats.damage*stats.siege*Math.max(0,stats.heavy-1)/Math.max(.1,stats.heavyCooldown),structureDps=lightDps+heavyBonus;
   let repairDps=0;
   if(assumeRepair&&wall.owner){
-    const owner=match.unit(wall.owner),workshop=match.structures.find(s=>s.owner===wall.owner&&s.kind==='workshop'&&s.hp>0&&s.progress>=1),path=elfPath(owner?.elfPath);
-    if(owner?.alive)repairDps=repairPower(wall)*(1+(workshop?.tier||0)*B.economy.workshopRepair)*(path?.repair||1);
+    const owner=match.unit(wall.owner),path=elfPath(owner?.elfPath);
+    if(owner?.alive)repairDps=repairPower(wall)*(path?.repair||1);
   }
   const netStructureDps=Math.max(1,structureDps-repairDps),breakSeconds=wall.hp/netStructureDps,availableHp=troll.maxHp*(1+((troll.healCharges||0)>0?B.troll.healPercent:0)),survivalSeconds=incomingTowerDps>0?availableHp/incomingTowerDps:999,parity=survivalSeconds/breakSeconds;
   return {parity:round(parity),breakSeconds:round(breakSeconds,1),survivalSeconds:round(survivalSeconds,1),structureDps:round(structureDps,1),repairDps:round(repairDps,1),incomingTowerDps:round(incomingTowerDps,1),towerCount:baseTowers.length,viable:parity>=.45};

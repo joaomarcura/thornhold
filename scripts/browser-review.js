@@ -63,8 +63,8 @@ try{
   await page.keyboard.press('KeyQ');await until(()=>core.upgrading>0,'Q upgrade command did not reach server');
   await until(()=>core.tier===2,'Core did not reach tier 2');report.coreUpgrade=true;
   core.tier=3;core.upgrading=0;u.gold=u.wood=10000;wall.tier=1;
-  await until(()=>upgrade.isDisabled(),'Core 4 should require Barricade 2');await until(()=>page.locator('#upgrade-reasons').textContent().then(t=>t.includes('Barricada nível 2 necessária — atual: nível 1')),'Missing Barricade requirement');await page.screenshot({path:'artifacts/review-core-barricade-gate.png'});report.coreBarricadeGate=true;
-  wall.tier=2;await until(()=>upgrade.isEnabled(),'Barricade 2 did not unlock Core 4');core.tier=1;
+  await until(()=>upgrade.isDisabled(),'Core 4 should require Barricade 3');await until(()=>page.locator('#upgrade-reasons').textContent().then(t=>t.includes('Barricada nível 3 necessária — atual: nível 1')),'Missing Barricade requirement');await page.screenshot({path:'artifacts/review-core-barricade-gate.png'});report.coreBarricadeGate=true;
+  wall.tier=3;await until(()=>upgrade.isEnabled(),'Barricade 3 did not unlock Core 4');core.tier=1;
   // Freeze simulation (not snapshots) to isolate threshold refresh from clock changes.
   const step=m.step.bind(m);m.step=()=>{};core.tier=1;core.upgrading=0;u.gold=99.99;u.wood=35;
   await until(()=>upgrade.isDisabled(),'Insufficient gold not disabled');
@@ -90,7 +90,7 @@ try{
   assert.equal(await page.locator('.special-resource').count(),3);await page.screenshot({path:'artifacts/review-elf-specialization.png'});report.elfSpecialization=true;
   core.tier=8;u.specialResources.ancientWood=30;await until(()=>page.locator('[data-do=choose-technology]').count().then(n=>n===3),'Technology milestone did not render three cards');
   await page.screenshot({path:'artifacts/review-elf-technology.png'});await page.keyboard.press('Digit1');await until(()=>u.elfTechCards.includes('efficient-production'),'Keyboard technology choice did not reach server');report.elfTechnology=true;
-  const localNode=m.specialNodes.find(node=>node.baseId===base.id);assert.ok(localNode,'Clearing has no local special resource');Object.assign(u,{x:localNode.x,z:localNode.z});
+  const localNode=m.specialNodes.find(node=>node.baseId===base.id);assert.ok(localNode,'Clearing has no local special resource');Object.assign(u,{x:localNode.x+Math.sin(u.yaw)*3,z:localNode.z-Math.cos(u.yaw)*3});
   await until(()=>page.locator(`.resource-node-label[data-id="${localNode.id}"]`).count().then(n=>n===1),'Local special resource has no world label');
   await page.screenshot({path:'artifacts/review-clearing-resource.png'});report.clearingResource=true;
   // Central icon shapes must match HUD and menu at both desktop and narrow widths.

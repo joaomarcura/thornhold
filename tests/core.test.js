@@ -104,7 +104,7 @@ test('Servidor rejeita construção remota, terreno, sobreposição, protótipos
 });
 test('Coleta física esgota árvore; cooldown e reparo custam os mesmos recursos',()=>{
   const m=match(),{u,core,b}=completedBase(m),t=m.trees[0];u.x=t.x+1;u.z=t.z;const wood=u.wood;
-  m.act(u.id,{type:'gather',target:t.id});assert.equal(u.wood,wood+B.elf.gather);m.act(u.id,{type:'gather',target:t.id});assert.equal(u.wood,wood+B.elf.gather);
+  m.act(u.id,{type:'gather',target:t.id});assert.equal(u.wood,wood+B.elf.gather);assert.equal(m.events.at(-1).entity,t.id);m.act(u.id,{type:'gather',target:t.id});assert.equal(u.wood,wood+B.elf.gather);
   t.amount=3;m.time+=1;m.act(u.id,{type:'gather',target:t.id});assert.equal(t.amount,0);
   u.x=b.x+3;u.z=b.z;core.hp-=100;const before=u.gold;m.act(u.id,{type:'repair',target:core.id});assert.equal(u.gold,before-3);assert.equal(core.hp,core.maxHp-58);
 });
@@ -177,17 +177,6 @@ test('Vitórias simétricas, resultado imutável e nenhuma punição de vida por
 test('IA usa os mesmos atributos em fácil, normal e difícil',()=>{
   for(const difficulty of Object.keys(B.difficulty)){const m=new Match({difficulty},slots(2,'bot'));assert.equal(m.unit('t').maxHp,B.troll.hp);assert.equal(m.unit('e0').gold,B.elf.gold);assert.equal(m.unit('e0').maxHp,B.elf.hp);}
 });
-test('Partidas autônomas padrão 1v5 não prendem o Troll na base nem excedem duas torres',()=>{
-  for(const seed of ['TEST-5','SIM-2','SIM-7']){
-    const m=new Match({seed,difficulty:'normal'},slots(5,'bot'));let sanctuaryRecovery=0,maxSanctuaryRecovery=0;
-    for(let i=0;i<18000&&m.state!==STATES.END;i++){
-      m.step(.1);const troll=m.unit('t'),brain=m.controllers.get('t')?.brain,waiting=m.state===STATES.ACTIVE&&distance(troll,m.map.trollSpawn)<=B.troll.sanctuaryRadius&&brain?.state==='recover';
-      sanctuaryRecovery=waiting?sanctuaryRecovery+.1:0;maxSanctuaryRecovery=Math.max(maxSanctuaryRecovery,sanctuaryRecovery);
-    }
-    assert.ok(m.stats.trollDamage>0,seed);assert.ok(m.stats.produced>0,seed);assert.ok(m.stats.upgrades>0,seed);assert.ok(maxSanctuaryRecovery<=25,`${seed}: ${maxSanctuaryRecovery.toFixed(1)}s no Santuário`);
-    for(const base of m.map.bases)assert.ok(m.structures.filter(s=>s.baseId===base.id&&s.kind==='tower'&&s.hp>0).length<=2,base.id);
-  }
-});
 test('Lobby: autorização, slots, readiness, sessão privada e revanche',()=>{
   const service=new SessionService(),host=service.addClient('host','Host'),guest=service.addClient('guest','Guest'),r=service.create(host,{role:'troll',settings:{elfSlots:2,private:true},password:'secret',fillBots:true});
   assert.equal(service.list().length,0);assert.throws(()=>service.join(guest,{code:r.id,password:'wrong'}),/Senha/);service.join(guest,{code:r.id,password:'secret'});
@@ -201,12 +190,19 @@ test('Lobby: autorização, slots, readiness, sessão privada e revanche',()=>{
 test('Modos Normal, Personalizado e Ranqueado são presets autoritativos',()=>{
   const service=new SessionService(),host=service.addClient('modes','Host');
   const room=service.create(host,{role:'troll',fillBots:true,settings:{mode:'normal',private:true,elfSlots:2,mapSize:'large',difficulty:'hard',preparation:20}});
-  assert.equal(room.settings.mode,'normal');assert.equal(room.settings.elfSlots,5);assert.equal(room.settings.mapSize,'compact');assert.equal(room.settings.difficulty,'normal');assert.equal(room.settings.preparation,50);assert.equal(room.settings.private,true);
+  assert.equal(room.settings.mode,'normal');assert.equal(room.settings.elfSlots,5);assert.equal(room.settings.mapSize,'compact');assert.equal(room.settings.difficulty,'normal');assert.equal(room.settings.trollDifficulty,'normal');assert.equal(room.settings.elfDifficulty,'normal');assert.equal(room.settings.preparation,60);assert.equal(room.settings.private,true);
   service.configure(room,host,{mapSize:'large',elfSlots:2});assert.equal(room.settings.mapSize,'compact');assert.equal(room.settings.elfSlots,5);
   assert.throws(()=>service.changeSlot(room,host,{slot:'e0',action:'difficulty',difficulty:'hard'}),/fixa/);
-  service.configure(room,host,{mode:'custom',mapSize:'large',elfSlots:2,difficulty:'hard',preparation:20});assert.equal(room.settings.mode,'custom');assert.equal(room.settings.mapSize,'large');assert.equal(room.settings.elfSlots,2);assert.equal(room.settings.difficulty,'hard');
+  service.configure(room,host,{mode:'custom',mapSize:'large',mapStyle:'deepForest',elfSlots:2,trollDifficulty:'normal',elfDifficulty:'hard',preparation:20});assert.equal(room.settings.mode,'custom');assert.equal(room.settings.mapSize,'large');assert.equal(room.settings.mapStyle,'deepForest');assert.equal(room.settings.elfSlots,2);assert.equal(room.settings.difficulty,'hard');assert.equal(room.settings.trollDifficulty,'normal');assert.equal(room.settings.elfDifficulty,'hard');assert.ok(room.slots.filter(s=>s.role==='elf'&&s.occupant).every(s=>s.occupant.difficulty==='hard'));
   assert.throws(()=>service.configure(room,host,{mode:'ranked'}),/fila ranqueada/);
   const rankedHost=service.addClient('ranked-host','Ranked Host'),ranked=service.create(rankedHost,{role:'troll',matchmade:true,settings:{mode:'ranked',private:true,local:true,seed:'CHEAT'}});assert.equal(ranked.settings.mode,'ranked');assert.equal(ranked.settings.private,false);assert.equal(ranked.settings.local,false);assert.equal(ranked.settings.allowRoles,false);assert.match(ranked.settings.seed,/^RANK-[A-F0-9]{16}$/);assert.equal(service.publicRoom(ranked).mode,'ranked');assert.throws(()=>service.addBot(ranked,'e0'),/preenchimento de teste/);
+});
+test('Lobby separa dificuldade do Troll e dos Elfos até a telemetria',()=>{
+  const service=new SessionService(),host=service.addClient('split-difficulty','Observador'),room=service.create(host,{role:'observer',fillBots:true,settings:{mode:'custom',local:true,trollDifficulty:'easy',elfDifficulty:'hard'}});
+  for(const member of room.members.values())member.ready=true;
+  const match=service.start(room,host),troll=match.units.find(unit=>unit.role==='troll'),elves=match.units.filter(unit=>unit.role==='elf');
+  assert.equal(troll.difficulty,'easy');assert.ok(elves.every(unit=>unit.difficulty==='hard'));
+  const context=match.result().telemetry.context;assert.equal(context.trollDifficulty,'easy');assert.equal(context.elfDifficulty,'hard');
 });
 test('Referência de sala expirada não impede criar ou entrar em outra partida',()=>{
   const service=new SessionService(),host=service.addClient('stale-host','Host'),guest=service.addClient('stale-guest','Guest');

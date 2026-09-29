@@ -50,18 +50,21 @@ Ainda requer playtest humano para confirmar legibilidade, circulação e câmera
 
 Primeira entrega implementada:
 
-- Essência é o único recurso avançado e passa a ser produzida pela Oficina a partir do nível 4;
+- Essência é o único recurso avançado e passa a ser produzida pelo Núcleo a partir do nível 4;
 - cada clareira escolhe permanentemente Economia, Defesa ou Tecnologia;
 - Economia aumenta em 12% a produção de ouro e madeira;
 - Defesa aumenta em 15% a vida das estruturas e a eficiência de reparo;
 - Tecnologia aumenta em 30% a produção de Essência, reduz em 20% o tempo de melhorias e reduz em 25% o custo avançado;
 - melhorias Lendárias e Épicas agora exigem Essência, tornando o avanço tardio uma decisão separada de acumular ouro e madeira;
 - bots escolhem a especialização coerente com sua personalidade;
-- HUD, seleção da Oficina, ferramentas dev e telemetria mostram produção, estoque, gasto e caminho escolhido.
+- HUD, seleção do Núcleo, ferramentas dev e telemetria mostram produção, estoque, gasto e caminho escolhido;
+- a Oficina foi aposentada das partidas novas; históricos antigos continuam legíveis.
 
 Ainda precisa de calibração pareada para posicionar Lendário em 10–15 minutos e Épico em 20–30 minutos sem enfraquecer o early game.
 
 ### V3.3 — Balance Pass
+
+> Nota atual: os itens abaixo registram os experimentos históricos da V3.3. A Pressão de Cerco foi removida integralmente do runtime em setembro de 2026; Siege Parity e o bônus explícito de final de partida permanecem.
 
 Primeiro experimento implementado, focado exclusivamente no late game:
 

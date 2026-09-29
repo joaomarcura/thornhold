@@ -2,10 +2,12 @@ import { STATES, BALANCE as B, distance, mineEconomy, upgradeCost, wispCost, wis
 import { pathfind, toCell, index, lineOfSight, towerLineOfSight, walkable, baseAt, baseZone, randomFor } from './map.js';
 import { TrollBrain } from './troll-brain.js';
 import { availableTrees } from './wisps.js';
-import { requiredBarricadeTier, requiredEpicWallTier, strategicBarricadeTier, upgradeStatus } from './upgrade-rules.js';
+import { requiredBarricadeTier, strategicBarricadeTier, upgradeStatus } from './upgrade-rules.js';
 import { ELF_TECH_CARDS, pendingTechnology, specialization, technologyCost } from './elf-progression.js';
+import { orderedMilestoneTarget, updateElfTeamProject, updateEpicProjectResourcePlan } from './elf-team-director.js';
 
 const shuffled=(values,rng)=>{const result=[...values];for(let i=result.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[result[i],result[j]]=[result[j],result[i]];}return result;};
+const pointSegmentDistance=(point,a,b)=>{const dx=b.x-a.x,dz=b.z-a.z,length=dx*dx+dz*dz;if(!length)return distance(point,a);const t=Math.max(0,Math.min(1,((point.x-a.x)*dx+(point.z-a.z)*dz)/length));return Math.hypot(point.x-a.x-t*dx,point.z-a.z-t*dz);};
 
 // Keep seed variation without sending an entire Elf team through the same
 // opening corridor. Farthest-point ordering distributes the first refuges
@@ -23,7 +25,7 @@ export function distributedRefuges(map,seed=map.seed){
 
 // Controllers only choose intentions. Every cost, hit, cooldown and collision goes through Match.
 export class AIController {
-  constructor(difficulty='normal'){this.profile=B.difficulty[difficulty]||B.difficulty.normal;this.difficulty=difficulty;this.nextThink=0;this.route=[];this.destination=null;this.routeAt=-100;this.explored=new Set();this.exploreTarget=null;this.exploreAt=0;this.discovered=new Map();this.retreating=false;this.navigationFailure=null;this.lastNavigationEntity=null;this.lastNavigationAt=-Infinity;this.metrics={idle:0,attacking:0,defending:0,retreating:0,failedNavigation:0,failedExploration:0,pathRecalculations:0,retreatAttempts:0,retreatSuccesses:0,targetChanges:0,stuckNavigation:0,navigationFailureReasons:{stuck:0,noRoute:0},navigationFailureSamples:[]};}
+  constructor(difficulty='normal'){this.profile=B.difficulty[difficulty]||B.difficulty.normal;this.difficulty=difficulty;this.nextThink=0;this.route=[];this.destination=null;this.routeAt=-100;this.explored=new Set();this.exploreTarget=null;this.exploreAt=0;this.discovered=new Map();this.retreating=false;this.navigationFailure=null;this.lastNavigationEntity=null;this.lastNavigationAt=-Infinity;this.metrics={idle:0,attacking:0,defending:0,retreating:0,failedNavigation:0,failedExploration:0,pathRecalculations:0,retreatAttempts:0,retreatSuccesses:0,targetChanges:0,stuckNavigation:0,wallRepairDecisions:0,localGatherDecisions:0,externalGatherDecisions:0,externalGatherBlocked:0,navigationFailureReasons:{stuck:0,noRoute:0},navigationFailureSamples:[]};}
   recordNavigationFailure(match,target,reason){this.metrics.navigationFailureReasons[reason]=(this.metrics.navigationFailureReasons[reason]||0)+1;if(this.metrics.navigationFailureSamples.length<100){const entity=target.entityId?match.entity(target.entityId)||this.discovered.get(target.entityId):null;this.metrics.navigationFailureSamples.push({time:+match.time.toFixed(1),reason,state:this.brain?.state||null,targetId:target.entityId||null,targetKind:entity?.kind||entity?.role||null,baseId:entity?.baseId||null});}}
   tick(match,u,dt){
     if(match.time>=this.nextThink){const think=u.role==='elf'?Math.max(.45,this.profile.think):this.profile.think;this.nextThink=match.time+think;if(u.ghost)this.ghost(match,u);else if(u.role==='elf')this.elf(match,u);else this.troll(match,u);}
@@ -69,7 +71,22 @@ export class AIController {
   }
   reachablePoint(match,u,p){const blocked=this.navigationBlocks(match,u),start=toCell(match.map,u),goal=toCell(match.map,p);if(blocked.has(index(match.map,goal.x,goal.z)))return false;return (start.x===goal.x&&start.z===goal.z)||pathfind(match.map,u,p,blocked).length>0;}
   navigationBlocks(match,u,ignoreId=null){
-    if(u.role!=='troll')return match.blockedCells(u.role);
+    if(u.role!=='troll'){
+      // The authoritative collision test uses the complete structure radius,
+      // while the old path grid blocked only the cell containing its centre.
+      // An off-centre Bastion could therefore produce a route that looked
+      // valid to A* but was rejected every frame by movement collision.
+      const blocked=new Set(),radius=B.movement.elfRadius+.12;
+      for(const structure of match.structures){
+        if(structure.hp<=0||structure.id===ignoreId||structure.kind==='wall')continue;
+        const centre=toCell(match.map,structure),clearance=placementRadius(structure.kind)+radius,cells=Math.ceil(clearance/match.map.cell)+1;
+        for(let dx=-cells;dx<=cells;dx++)for(let dz=-cells;dz<=cells;dz++){
+          const x=centre.x+dx,z=centre.z+dz;if(x<0||z<0||x>=match.map.size||z>=match.map.size)continue;
+          if(distance({x:x*match.map.cell,z:z*match.map.cell},structure)<clearance)blocked.add(index(match.map,x,z));
+        }
+      }
+      return blocked;
+    }
     return new Set([...this.discovered.values()].filter(e=>e.kind&&e.id!==ignoreId).map(e=>{const p=toCell(match.map,e);return index(match.map,p.x,p.z);}));
   }
   go(match,u,target,reach=2){
@@ -87,7 +104,7 @@ export class AIController {
     this.progressProbe??={x:u.x,z:u.z,time:match.time};
     if(!this.route.length||match.time-this.routeAt>1.5){
       const blocked=this.navigationBlocks(match,u,target.entityId),goal=toCell(match.map,target);
-      const candidates=target.entityId?[]:[target];
+      const candidates=target.interactionPoint?[target]:target.entityId?[]:[target];
       // A reachable cell is only useful if the action actually works there.
       // Previously endpoints up to two cells OUTSIDE attack range were accepted.
       const cells=Math.ceil(target.reach/match.map.cell)+1;
@@ -125,20 +142,53 @@ export class AIController {
       if(choices[0]){this.go(match,u,choices[0],.2);return 'moving';}
       this.elfAvoid??=[];this.elfAvoid.push({x:target.x,z:target.z,until:match.time+20});this.stop(u);return 'no-position';
     }
+    // Interaction targets are destinations for an action, not walkable points.
+    // Choose a physically valid point around trees and structures so the grid
+    // route, structure footprint and authoritative movement agree.
+    if(u.role==='elf'&&target.id&&cmd.type!=='build'&&!(distance(u,target)<=reach&&lineOfSight(match.map,u,target))){
+      const base=target.baseId&&match.map.bases.find(row=>row.id===target.baseId),radius=(target.kind?B.structures[target.kind]?.radius:1)||1;
+      let approaches=[];
+      if(target.kind==='wall'&&base){
+        const length=Math.max(.001,distance(base,target)),ix=(base.x-target.x)/length,iz=(base.z-target.z)/length,lx=-iz,lz=ix;
+        approaches=[2.4,3.4,4.4].flatMap(depth=>[0,-1.2,1.2].map(side=>({x:target.x+ix*depth+lx*side,z:target.z+iz*depth+lz*side})));
+      }else{
+        const ring=Math.min(reach-.6,Math.max(1.8,radius+B.movement.elfRadius+.8));
+        approaches=Array.from({length:16},(_,i)=>{const angle=i*Math.PI/8;return {x:target.x+Math.sin(angle)*ring,z:target.z+Math.cos(angle)*ring};});
+      }
+      approaches=approaches.filter(point=>(!base||target.kind!=='wall'||baseAt(match.map,point)?.id===base.id)&&distance(point,target)<=reach&&lineOfSight(match.map,point,target)&&match.positionValid(u,point.x,point.z)&&this.reachablePoint(match,u,point)).sort((a,b)=>distance(u,a)-distance(u,b));
+      if(approaches[0]){
+        this.go(match,u,approaches[0],.35);
+        // Preserve the logical target for diagnostics and long-distance plans.
+        // Walls remain point-only because their safe approach must never make
+        // pathfinding target the blocked wall footprint itself.
+        if(target.kind!=='wall'&&this.destination){this.destination.entityId=target.id;this.destination.interactionPoint=true;}
+        return 'moving';
+      }
+    }
     if(this.go(match,u,target,reach)){u.yaw=Math.atan2(target.x-u.x,target.z-u.z);return match.act(u.id,cmd);}return 'moving';
   }
   specializedPlacementCandidates(match,u,base,kind,towers=[],avoidedPoint=()=>false){
     const gateDistance=Math.max(.001,distance(base,base.gate)),ix=(base.x-base.gate.x)/gateDistance*match.map.cell,iz=(base.z-base.gate.z)/gateDistance*match.map.cell;
     const lateral=[...(this.buildPlan?.towerSides||[-2,2]),-1.5,1.5,-2.75,2.75].filter((value,index,values)=>values.indexOf(value)===index);
-    const available=p=>!avoidedPoint(p)&&baseAt(match.map,p)?.id===base.id&&match.positionValid(u,p.x,p.z)&&
+    const gateLaneClear=p=>pointSegmentDistance(p,base,base.gate)>=placementRadius(kind)+B.movement.elfRadius+1.1;
+    const available=p=>!avoidedPoint(p)&&baseAt(match.map,p)?.id===base.id&&gateLaneClear(p)&&match.positionValid(u,p.x,p.z)&&
       !match.structures.some(s=>s.hp>0&&distance(s,p)<placementRadius(s.kind)+placementRadius(kind)+B.construction.placementGap)&&
       !match.trees.some(t=>t.amount>0&&distance(t,p)<B.structures[kind].radius+.55);
     const points=(depths=>depths.flatMap(depth=>lateral.map(side=>({x:base.gate.x+ix*depth+side*iz,z:base.gate.z+iz*depth-side*ix,depth,side}))))
       (kind==='arcaneTower'?[1.5,2,2.5,3]:[2.5,3.5,4.5]);
-    if(kind==='arcaneTower')return points.filter(p=>baseZone(match.map,base,p)==='frontline'&&Math.abs(p.side)*match.map.cell>=2.5&&towerLineOfSight(match.map,p,base.outside,base.id,B.structures.arcaneTower.muzzleHeight,B.structures.arcaneTower.targetHeight)&&available(p));
+    if(kind==='arcaneTower')return points.filter(p=>{
+      const wallDistance=distance(p,base.gate);
+      return baseZone(match.map,base,p)==='frontline'&&wallDistance>=3&&wallDistance<=6&&Math.abs(p.side)*match.map.cell>=2.5&&towerLineOfSight(match.map,p,base.outside,base.id,B.structures.arcaneTower.muzzleHeight,B.structures.arcaneTower.targetHeight)&&available(p);
+    }).sort((a,b)=>{
+      const support=point=>towers.filter(t=>t.hp>0&&t.progress>=1&&distance(point,t)<=B.structures.arcaneTower.range).length;
+      return support(b)-support(a)||b.depth-a.depth||Math.abs(b.side)-Math.abs(a.side);
+    });
     if(kind==='bastion'){
       const wall=match.structures.find(s=>s.baseId===base.id&&s.kind==='wall'&&s.hp>0&&s.progress>=1),aura=B.structures.bastion.aura;
-      return wall?points.filter(p=>distance(p,wall)<=aura&&towers.some(t=>t.hp>0&&t.progress>=1&&distance(p,t)<=aura)&&available(p)):[];
+      return wall?points.filter(p=>distance(p,wall)<=aura&&towers.some(t=>t.hp>0&&t.progress>=1&&distance(p,t)<=aura)&&available(p)).sort((a,b)=>{
+        const coverage=point=>towers.filter(t=>t.hp>0&&t.progress>=1&&distance(point,t)<=aura).length;
+        return coverage(b)-coverage(a)||distance(b,base.gate)-distance(a,base.gate)||Math.abs(b.side)-Math.abs(a.side);
+      }):[];
     }
     return [];
   }
@@ -166,6 +216,10 @@ export class AIController {
   elf(match,u){
     if(this.navigationFailure){
       this.elfAvoid??=[];this.elfAvoidEntities??=new Map();const failed=this.navigationFailureTarget;if(failed)this.elfAvoid.push({x:failed.x,z:failed.z,until:match.time+20});if(failed?.entityId)this.elfAvoidEntities.set(failed.entityId,match.time+20);
+      if(failed?.entityId){
+        this.elfNavigationFailures??=new Map();const previous=this.elfNavigationFailures.get(failed.entityId),count=previous&&match.time-previous.lastAt<180?previous.count+1:1,entityKind=match.entity(failed.entityId)?.kind,kind=entityKind||(match.trees.find(tree=>tree.id===failed.entityId)?'tree':null),avoidSeconds=count>=2?(kind==='tree'?60:45):20;
+        this.elfNavigationFailures.set(failed.entityId,{count,lastAt:match.time,avoidUntil:match.time+avoidSeconds});this.elfAvoidEntities.set(failed.entityId,match.time+avoidSeconds);
+      }
       this.elfAvoid=this.elfAvoid.filter(p=>p.until>match.time);this.navigationFailure=null;this.navigationFailureTarget=null;
     }
     if(!this.elfProfile){
@@ -227,11 +281,11 @@ export class AIController {
     base=match.map.bases.find(b=>b.id===core.baseId);
     if(!u.elfSpecialization&&core.tier>=B.elfProgression.unlockTier){
       const preferred={economy:'industrial',defense:'fortress',balanced:'arcane'}[this.elfProfile],resourceFit={ancientWood:'industrial',crystal:'fortress',mana:'arcane'}[base.localResource],counts=Object.fromEntries(Object.keys(B.elfProgression.specializations).map(key=>[key,match.units.filter(a=>a.role==='elf'&&a.elfSpecialization===key).length]));
-      const rng=randomFor(`${match.map.seed}:specialization:${u.id}`),choice=Object.keys(B.elfProgression.specializations).map(key=>({key,score:(key===preferred?3:0)+(key===resourceFit?2:0)-counts[key]*.8+rng()})).sort((a,b)=>b.score-a.score)[0].key;
+      const rng=randomFor(`${match.map.seed}:specialization:${u.id}:${u.coreFoundations||1}`),choice=u.specializationReselectionPending&&resourceFit?resourceFit:Object.keys(B.elfProgression.specializations).map(key=>({key,score:(key===preferred?3:0)+(key===resourceFit?2:0)-counts[key]*.8+rng()})).sort((a,b)=>b.score-a.score)[0].key;
       if(distance(u,core)<=B.interactRange){match.act(u.id,{type:'chooseElfSpecialization',key:choice});const label=B.elfProgression.specializations[choice].name,personality={economy:'Economista',balanced:'Adaptável',defense:'Guardião'}[this.elfProfile];u.name=`${label} — ${personality}`;this.stop(u);return;}
       this.go(match,u,core,B.interactRange*.7);return;
     }
-    const wall=own.find(s=>s.kind==='wall'),towers=own.filter(s=>s.kind==='tower'),mines=own.filter(s=>s.kind==='mine'),workshop=own.find(s=>s.kind==='workshop'),signatureKind=u.elfSpecialization&&B.elfProgression.specializations[u.elfSpecialization].structure,signatureStructure=own.find(s=>s.kind===signatureKind);
+    const specializationConfig=u.elfSpecialization&&B.elfProgression.specializations[u.elfSpecialization],wall=own.find(s=>s.kind==='wall'),towers=own.filter(s=>s.kind==='tower'),mines=own.filter(s=>s.kind==='mine'),signatureKind=specializationConfig?.structure,signatureStructure=signatureKind?own.find(s=>s.kind===signatureKind):null,abilityStructure=own.find(s=>s.kind===(specializationConfig?.abilityStructure||signatureKind));
     if(signatureKind){
       if(!signatureStructure&&this.signatureStructureId)this.signatureAwaitingRebuild=true;
       if(signatureStructure){
@@ -243,47 +297,40 @@ export class AIController {
     const troll=match.units.find(a=>a.role==='troll'),newBaseLosses=Math.max(0,match.stats.basesDestroyed-(this.observedBaseLosses||0)),difficultyPlan={easy:{range:0,floor:0,alert:150,evacuation:0,clear:0},normal:{range:0,floor:0,alert:180,evacuation:0,clear:0},hard:{range:6,floor:.08,alert:240,evacuation:6,clear:3}}[this.difficulty]||{range:0,floor:0,alert:180,evacuation:0,clear:0};
     if(newBaseLosses>0)this.defenseAlertUntil=match.time+difficultyPlan.alert;this.observedBaseLosses=match.stats.basesDestroyed;
     const activeElapsed=Math.max(0,match.time-match.preparation),lateThreat=(troll?.trollLevel||1)>=8,teamRecovering=(this.defenseAlertUntil||0)>match.time;
-    const teamLegendaryTowers=match.structures.filter(s=>s.kind==='tower'&&s.hp>0&&s.progress>=1&&s.tier>=B.legendary.tier&&match.controllers.has(s.owner));
-    if(teamLegendaryTowers.length>=2&&!match.elfEpicProject?.completedAt){
-      const current=match.structures.find(s=>s.id===match.elfEpicProject?.towerId&&s.hp>0&&s.kind==='tower');
-      if(!current){
-        const candidates=teamLegendaryTowers.map(tower=>{
-          const structures=match.structures.filter(s=>s.baseId===tower.baseId&&s.hp>0&&s.progress>=1),wall=structures.find(s=>s.kind==='wall'),coverage=structures.filter(s=>['tower','arcaneTower'].includes(s.kind)).length;
-          const recentPressure=structures.reduce((sum,s)=>sum+Math.max(0,90-(match.time-(s.lastHit??-Infinity)))/90,0);
-          return {tower,wall,coverage,recentPressure,wallRatio:wall?wall.hp/wall.maxHp:0};
-        }).filter(row=>row.wall&&row.coverage>=2).sort((a,b)=>a.recentPressure-b.recentPressure||b.coverage-a.coverage||b.wallRatio-a.wallRatio||b.tower.tier-a.tower.tier||(a.tower.createdAt||0)-(b.tower.createdAt||0)||a.tower.id.localeCompare(b.tower.id));
-        const selected=candidates[0]?.tower,previous=match.elfEpicProject;
-        if(selected){match.elfEpicProject={towerId:selected.id,ownerId:selected.owner,baseId:selected.baseId,selection:{wallAlive:true,coverage:candidates[0].coverage,recentPressure:+candidates[0].recentPressure.toFixed(3)},startedAt:previous?.startedAt??match.time,designatedAt:match.time,startingTier:selected.tier,replacements:(previous?.replacements||0)+(previous?1:0),resources:previous?.resources||{gold:0,wood:0,essence:0}};match.emit('epic-project',{entity:selected.id,unit:selected.owner,x:selected.x,z:selected.z,tier:selected.tier,replacement:!!previous,baseId:selected.baseId,coverage:candidates[0].coverage,recentPressure:candidates[0].recentPressure});}
-      }
-    }
+    const earlyLegendaryTrigger=(troll?.trollLevel||1)>=8||activeElapsed>=480;
+    const teamProject=updateElfTeamProject(match,activeElapsed,troll?.trollLevel||1),anchor=teamProject.anchor,anchorLegendaryTowers=teamProject.anchorLegendaryTowers,anchorPairReady=teamProject.anchorPairReady;
     // A defensive personality starts preparing one designated tower before the
-    // general legendary race. This includes the Essence infrastructure needed
-    // by tier 10, instead of discovering that dependency only at minute 12.
-    const earlyLegendaryTrigger=this.elfProfile==='defense'&&((troll?.trollLevel||1)>=8||activeElapsed>=600);
-    if(earlyLegendaryTrigger)this.legendaryProjectActive=true;
-    const earlyLegendaryPlan=this.elfProfile==='defense'&&this.legendaryProjectActive===true,legendaryRace=earlyLegendaryPlan||(troll?.trollLevel||1)>=10||activeElapsed>=720;
+    // general legendary race. The Core now supplies the Essence needed by tier
+    // 10, instead of requiring a separate support building.
+    // Every Elf may complete a Legendary Tower. Personality changes urgency,
+    // never eligibility. Once this bot completes one, the focused opening plan
+    // ends and the ordinary fortification project can continue toward Epic.
+    const legendaryCompleted=towers.some(s=>s.tier>=B.legendary.tier),anchorOwner=anchor?.ownerId===u.id&&anchor?.baseId===base.id;
+    const earlyLegendaryPlan=earlyLegendaryTrigger&&!legendaryCompleted,legendaryRace=earlyLegendaryPlan;
     const strategicDefense=lateThreat||teamRecovering;
-    this.metrics.defenseDirector={...(this.metrics.defenseDirector||{}),trollLevel:troll?.trollLevel||1,baseLosses:match.stats.basesDestroyed,alertUntil:this.defenseAlertUntil||0,strategicDefense,legendaryRace,earlyLegendaryPlan,reservingForLegendary:false};
+    this.metrics.defenseDirector={...(this.metrics.defenseDirector||{}),trollLevel:troll?.trollLevel||1,baseLosses:match.stats.basesDestroyed,alertUntil:this.defenseAlertUntil||0,strategicDefense,legendaryRace,earlyLegendaryPlan,legendaryEligible:true,legendaryCompleted,legendaryAnchorBaseId:anchor?.baseId||null,legendaryAnchorOwnerId:anchor?.ownerId||null,legendaryAnchorPair:anchorLegendaryTowers.length,reservingForLegendary:false};
     const response={economy:{range:14,repairFloor:.45,reserve:0},balanced:{range:20,repairFloor:.6,reserve:0},defense:{range:28,repairFloor:.75,reserve:120}}[this.elfProfile];response.range+=difficultyPlan.range;response.repairFloor=Math.min(.9,response.repairFloor+difficultyPlan.floor);
     const approaching=threat&&(distance(threat,base.gate)<=response.range||(wall&&match.time-wall.lastHit<5));
     if(approaching)this.elfThreatUntil=match.time+6;
     const defenseMode=approaching||(this.elfThreatUntil||0)>match.time;
-    if(signatureStructure&&!(u.cooldowns.elfSpecialization>match.time)){
+    if(abilityStructure&&!(u.cooldowns.elfSpecialization>match.time)){
       let useAbility=false;
       if(u.elfSpecialization==='industrial'){
-        const producers=own.filter(s=>['core','mine'].includes(s.kind)&&s.progress>=1&&distance(s,signatureStructure)<=B.structures.refinery.aura).length+match.wisps.filter(w=>w.owner===u.id&&w.alive&&distance(w,signatureStructure)<=B.structures.refinery.aura).length;
+        const producers=own.filter(s=>['core','mine'].includes(s.kind)&&s.progress>=1).length+match.wisps.filter(w=>w.owner===u.id&&w.alive).length;
         useAbility=producers>=2||core.tier>=8;
       }else if(u.elfSpecialization==='fortress')useAbility=approaching||!!wall&&match.time-wall.lastHit<2||this.difficulty==='hard'&&threat&&distance(threat,base.gate)<=response.range+6;
-      else if(u.elfSpecialization==='arcane'){const targetStatus=match.towerTargeting(signatureStructure,troll);useAbility=targetStatus.valid||targetStatus.reason==='cooldown'&&targetStatus.los&&targetStatus.distance<=targetStatus.acquisitionRange;}
+      else if(u.elfSpecialization==='arcane'){const targetStatus=match.towerTargeting(abilityStructure,troll);useAbility=targetStatus.valid||targetStatus.reason==='cooldown'&&targetStatus.los&&targetStatus.distance<=targetStatus.acquisitionRange;}
       if(useAbility){match.act(u.id,{type:'elfSpecializationAbility'});return;}
     }
     const stun=match.elfStunStatus(u);
     const trollInside=threat&&baseAt(match.map,threat)?.id===base.id;
     const evade=this.elfEvade?.baseId===base.id?this.elfEvade:null;
     const evacuationRange=B.elf.evacuationThreatRange+difficultyPlan.evacuation,threatNear=!!threat&&(distance(threat,u)<evacuationRange||distance(threat,base.gate)<evacuationRange);
-    if(trollInside||evade&&threatNear){
+    const imminentBreach=!!threat&&!!wall&&wall.hp/wall.maxHp<=.05&&match.time-(wall.lastHit??-Infinity)<2;
+    if(trollInside||imminentBreach||evade&&threatNear){
       const destination=this.elfEscapePoint(match,u,base,threat);this.elfEvade.minimumUntil=Math.max(this.elfEvade.minimumUntil||0,match.time+B.elf.evacuationMinSeconds);this.elfEvade.lastThreatAt=match.time;this.elfEvade.clearSince=null;
-      if(stun.available)match.act(u.id,{type:'elfStun'});
+      const breachActive=(match.breachUntil.get(base.id)||0)>match.time;
+      if(stun.available&&(trollInside||breachActive))match.act(u.id,{type:'elfStun'});
       this.go(match,u,destination,2);return;
     }
     if(evade){
@@ -297,26 +344,31 @@ export class AIController {
     const gateDistance=distance(base,base.gate),ix=(base.x-base.gate.x)/gateDistance*match.map.cell,iz=(base.z-base.gate.z)/gateDistance*match.map.cell;
     const towerPositions=[];for(const depth of this.buildPlan.towerDepths)for(const side of this.buildPlan.towerSides)towerPositions.push({x:base.gate.x+ix*depth+side*iz,z:base.gate.z+iz*depth-side*ix});
     const avoidedPoint=p=>this.elfAvoid?.some(a=>a.until>match.time&&distance(a,p)<3);
-    const towerPosition=towerPositions.find(p=>!avoidedPoint(p)&&baseAt(match.map,p)?.id===base.id&&baseZone(match.map,base,p)==='frontline'&&match.positionValid(u,p.x,p.z)&&!match.structures.some(s=>s.hp>0&&distance(s,p)<placementRadius(s.kind)+placementRadius('tower')+B.construction.placementGap)&&!match.trees.some(t=>t.amount>0&&distance(t,p)<B.structures.tower.radius+.55));
+    const towerPosition=towerPositions.find(p=>!avoidedPoint(p)&&baseAt(match.map,p)?.id===base.id&&baseZone(match.map,base,p)==='frontline'&&towerLineOfSight(match.map,p,base.outside,base.id,B.structures.tower.muzzleHeight,B.structures.tower.targetHeight)&&match.positionValid(u,p.x,p.z)&&!match.structures.some(s=>s.hp>0&&distance(s,p)<placementRadius(s.kind)+placementRadius('tower')+B.construction.placementGap)&&!match.trees.some(t=>t.amount>0&&distance(t,p)<B.structures.tower.radius+.55));
     const buildTower=()=>{const p=towerPosition;if(p)return this.actNear(match,u,p,{type:'build',kind:'tower',...p});return 'no-position';};
     const utilityPositions=[];for(const radius of [4.4,6.6,8.8,11])for(let step=0;step<8;step++){const i=(this.buildPlan.utilityOffset+this.buildPlan.utilityDirection*step+8)%8;utilityPositions.push({x:base.x+Math.sin(i*Math.PI/4)*radius,z:base.z+Math.cos(i*Math.PI/4)*radius});}
     const buildUtility=kind=>{const def=B.structures[kind],p=utilityPositions.find(p=>!avoidedPoint(p)&&baseAt(match.map,p)?.id===base.id&&baseZone(match.map,base,p)==='industrial'&&match.positionValid(u,p.x,p.z)&&!match.structures.some(s=>s.hp>0&&distance(s,p)<placementRadius(s.kind)+placementRadius(kind)+B.construction.placementGap)&&!match.trees.some(t=>t.amount>0&&distance(t,p)<def.radius+.55));if(p)return this.actNear(match,u,p,{type:'build',kind,...p});return 'no-position';};
     const buildSignature=kind=>{
-      if(kind==='refinery')return buildUtility(kind);
       const p=this.specializedPlacementCandidates(match,u,base,kind,towers,avoidedPoint)[0];
       if(p)return this.actNear(match,u,p,{type:'build',kind,x:p.x,z:p.z});
-      return 'no-position';
+      // A rebuilt refuge may no longer have room in the ideal frontline
+      // formation. Preserve the specialization in a safe industrial slot
+      // instead of abandoning the complete Epic project.
+      return buildUtility(kind);
     };
     const upgrade=s=>this.actNear(match,u,s,{type:'upgrade',target:s.id});
     // Distance is an execution requirement, not a strategic blocker. Treat a
     // sole distance reason as a valid plan so actNear can walk to the target.
     const affordable=s=>{if(!s||avoidedEntity(s)||s.upgrading)return false;const status=upgradeStatus(u,s,match.time,match.state,match.structures);return status.allowed||status.reasons.every(reason=>reason.code==='distance');};
-    // Proximity maintenance is bot-only. It no longer consumes the complete
-    // strategic decision, allowing a nearby bot to repair and then improve a
-    // tower during the same defensive cycle.
+    // Under real pressure, repairing the gate is a committed tactical action.
+    // Above the safe margin a nearby bot can still perform maintenance and
+    // spend the same strategic cycle on a tower upgrade.
     const maintenanceRange=10;
+    const wallRatio=wall?wall.hp/Math.max(1,wall.maxHp):1,repairCommitFloor=Math.min(.95,response.repairFloor+.15),wallUnderAttack=wall&&match.time-(wall.lastHit??-Infinity)<5;
+    if(defenseMode&&wall&&!avoidedEntity(wall)&&wall.hp<wall.maxHp&&(wallRatio<repairCommitFloor||wallUnderAttack&&wallRatio<.9)){
+      this.metrics.wallRepairDecisions++;this.actNear(match,u,wall,{type:'repair',target:wall.id});return;
+    }
     if(wall&&!avoidedEntity(wall)&&wall.hp<wall.maxHp&&distance(u,wall)<=maintenanceRange)match.repair(u,wall.id,maintenanceRange);
-    if(defenseMode&&wall&&!avoidedEntity(wall)&&wall.hp/wall.maxHp<response.repairFloor&&distance(u,wall)>B.interactRange){this.go(match,u,wall,B.interactRange);return;}
     if(u.wood<45){this.gather(match,u,base);return;}
     const desiredPath=this.elfProfile==='economy'?'economy':this.elfProfile==='defense'?'defense':'technology';
     // The defensive specialist reserves the first Essence milestone for its
@@ -324,7 +376,7 @@ export class AIController {
     // first delayed the actual defence by several minutes; the path resumes
     // normally as soon as one owned tower reaches tier 10.
     const reserveLegendaryEssence=earlyLegendaryPlan&&!towers.some(s=>s.tier>=B.legendary.tier);
-    if(!defenseMode&&!reserveLegendaryEssence&&match.elfEpicProject?.ownerId!==u.id&&workshop?.tier>=B.elfIncremental.essenceUnlockTier&&!u.elfPath&&u.essence>=B.elfIncremental.pathCost){this.actNear(match,u,workshop,{type:'chooseElfPath',target:workshop.id,path:desiredPath});return;}
+    if(!defenseMode&&!reserveLegendaryEssence&&match.elfEpicProject?.ownerId!==u.id&&core.tier>=B.elfIncremental.essenceUnlockTier&&!u.elfPath&&u.essence>=B.elfIncremental.pathCost){this.actNear(match,u,core,{type:'chooseElfPath',target:core.id,path:desiredPath});return;}
     // The first defensive tower is the bot's opening combat insurance. Building
     // the wall first leaves no reaction window when the Troll arrives early.
     if((!threat||(defenseMode&&wall&&wall.hp/wall.maxHp>=response.repairFloor))&&!towers.length&&u.gold>=B.structures.tower.gold&&u.wood>=B.structures.tower.wood){if(buildTower()!=='no-position')return;}
@@ -344,49 +396,89 @@ export class AIController {
     if(wall.tier<2&&!wall.upgrading&&affordable(wall)){upgrade(wall);return;}
     const urgentTower=towers.slice().sort((a,b)=>a.tier-b.tier).find(s=>s.tier<2&&affordable(s));
     if(defenseMode&&urgentTower&&wall.hp/wall.maxHp>=response.repairFloor){upgrade(urgentTower);return;}
-    const wallTarget=strategicBarricadeTier(core.tier,troll?.trollLevel||1,this.elfProfile,this.difficulty);Object.assign(this.metrics.defenseDirector,{wallTier:wall.tier,wallTarget,wallTargetCoreMinimum:requiredBarricadeTier(Math.min(B.maxTier,core.tier+1)),wallTargetTrollLevel:troll?.trollLevel||1});
-    if(wall.tier<wallTarget&&affordable(wall)&&(!defenseMode||wall.hp/wall.maxHp>=response.repairFloor)){upgrade(wall);return;}
-    if(!earlyLegendaryPlan&&signatureKind&&!signatureStructure&&core.tier>=B.elfProgression.unlockTier&&u.gold>=B.structures[signatureKind].gold&&u.wood>=B.structures[signatureKind].wood&&(!defenseMode||wall.hp/wall.maxHp>=response.repairFloor)){if(buildSignature(signatureKind)!=='no-position')return;}
-    const signatureTarget=Math.max(1,Math.min(B.maxTier,core.tier-1));
-    const recoveringSignature=signatureStructure&&this.signatureRecoveryId===signatureStructure.id&&signatureStructure.tier<signatureTarget;
-    if(signatureStructure&&signatureStructure.tier>=signatureTarget&&this.signatureRecoveryId===signatureStructure.id)this.signatureRecoveryId=null;
-    if(!earlyLegendaryPlan&&signatureStructure&&signatureStructure.tier<signatureTarget&&affordable(signatureStructure)&&(recoveringSignature||core.tier>=15||!defenseMode)){upgrade(signatureStructure);return;}
-    // This is a contextual director, not a fixed economy/defence spending cap.
-    // Troll progression and actual base losses promote a real defensive plan;
-    // personality still controls how aggressively each bot follows it.
-    const defensiveFloor=this.elfProfile==='defense'?Math.min(B.legendary.tier,Math.max(2,core.tier+1)):this.elfProfile==='balanced'?Math.min(B.legendary.tier,Math.max(2,core.tier)):Math.min(B.legendary.tier,Math.max(2,core.tier-1));
-    const previousLegendaryTowerId=this.legendaryTowerId,designatedTower=towers.find(s=>s.id===previousLegendaryTowerId&&s.hp>0)||towers.slice().sort((a,b)=>b.tier-a.tier)[0];
+    // Once the team director opens an Epic project, this owner stops spending
+    // the reserved economy on unrelated progression. Emergency repair and the
+    // minimum defensive reactions above still win; every ordinary decision
+    // below is subordinate to the narrow project ladder (four milestones for
+    // Industrial, five when a specialization has an exclusive structure).
+    const epicProject=match.elfEpicProject,activeEpicOwner=epicProject?.ownerId===u.id,epicTower=activeEpicOwner&&match.structures.find(s=>s.id===epicProject.towerId&&s.hp>0),epicMine=activeEpicOwner&&match.structures.find(s=>s.id===epicProject.mineId&&s.hp>0),epicSignature=activeEpicOwner&&epicProject.signatureKind?match.structures.find(s=>s.id===epicProject.signatureId&&s.hp>0):null,epicSupportReady=epicTower&&epicMine&&(!epicProject?.signatureKind||epicSignature);
+    if(activeEpicOwner&&!epicProject.completedAt&&epicProject.recoveringKind){
+      const kind=epicProject.recoveringKind;
+      Object.assign(this.metrics.defenseDirector,{epicRecovery:true,epicRecoveryKind:kind,epicRecoverySince:epicProject.missingSince||epicProject.lastMigratedAt||match.time});
+      if(kind==='tower'&&!towers.length){if(u.gold>=B.structures.tower.gold&&u.wood>=B.structures.tower.wood&&buildTower()!=='no-position')return;}
+      else if(kind==='mine'&&!mines.length){if(u.gold>=match.buildCost(u,'mine',base.id).gold&&u.wood>=match.buildCost(u,'mine',base.id).wood&&buildUtility('mine')!=='no-position')return;}
+      else if(kind===signatureKind&&!signatureStructure){const cost=B.structures[kind];if(cost&&u.gold>=cost.gold&&u.wood>=cost.wood&&buildSignature(kind)!=='no-position')return;}
+      if(u.wood<Math.max(45,B.structures[kind]?.wood||0)){this.gather(match,u,base);return;}
+      this.stop(u);return;
+    }
+    if(activeEpicOwner&&epicSupportReady&&!epicProject.completedAt){
+      const epicTarget=orderedMilestoneTarget(core,wall,epicTower,B.epic.tier,defenseMode,[epicMine,epicSignature].filter(Boolean),B.epic.focusLead),coreWallPrerequisite=epicTarget===core?requiredBarricadeTier(core.tier+1):0,plan=updateEpicProjectResourcePlan(match,epicProject,epicTarget),resourceNeed=plan?.required||0,resourceStored=u.specialResources?.[epicProject.resource]||0,resourceShortfall=Math.max(0,resourceNeed-resourceStored);
+      Object.assign(this.metrics.defenseDirector,{epicProjectTowerId:epicTower.id,epicProjectTier:epicTower.tier,epicProjectCoreTier:core.tier,epicProjectWallTier:wall.tier,epicProjectMineTier:epicMine.tier,epicProjectSignatureTier:epicSignature?.tier||null,epicProjectTarget:epicTarget?.kind||null,epicProjectResource:epicProject.resource,epicProjectResourceNeed:resourceNeed,epicProjectResourceStored:+resourceStored.toFixed(2),epicProjectResourceShortfall:+resourceShortfall.toFixed(2),epicProjectReserveGold:plan?.gold?.required||0,epicProjectReserveWood:plan?.wood?.required||0,epicProjectReserveEssence:plan?.essence?.required||0,epicProjectWallTarget:B.epic.tier,epicProjectStartedAt:+Math.max(0,epicProject.startedAt-match.preparation).toFixed(1),reservingForEpic:true});
+      if(resourceShortfall>0){
+        const projectWisps=match.wisps.filter(w=>w.owner===u.id&&w.alive&&w.specialResource===epicProject.resource),node=match.specialNodes.filter(n=>n.resource===epicProject.resource&&n.amount>0&&!match.wisps.some(w=>w.alive&&w.specialNodeId===n.id)&&match.teamSee(u,n)).sort((a,b)=>Number(!a.local)-Number(!b.local)||distance(a,core)-distance(b,core))[0];
+        if(!projectWisps.length&&node&&u.gold>=B.elfProgression.specialWisp.gold&&u.wood>=B.elfProgression.specialWisp.wood){this.actNear(match,u,core,{type:'trainSpecialWisp',target:node.id});return;}
+        if(!projectWisps.length&&node){this.actNear(match,u,node,{type:'gatherSpecial',target:node.id});return;}
+      }
+      if(epicTower.tier<B.legendary.tier&&affordable(epicTower)){upgrade(epicTower);return;}
+      if(coreWallPrerequisite&&wall.tier<coreWallPrerequisite&&affordable(wall)){upgrade(wall);return;}
+      if(epicTarget&&affordable(epicTarget)){upgrade(epicTarget);return;}
+      if(epicTarget){
+        const epicCost=upgradeCost(epicTarget,u.elfPath,u.elfSpecialization),resource=epicCost.specialResource,need=Math.max(0,(epicCost.specialAmount||0)-(u.specialResources?.[resource]||0));
+        if(need>0){const specialWisps=match.wisps.filter(w=>w.owner===u.id&&w.alive&&w.specialResource===resource),node=match.specialNodes.filter(n=>n.resource===resource&&n.amount>0&&!match.wisps.some(w=>w.alive&&w.specialNodeId===n.id)&&match.teamSee(u,n)).sort((a,b)=>Number(!a.local)-Number(!b.local)||distance(a,core)-distance(b,core))[0];if(!specialWisps.length&&node&&u.gold>=B.elfProgression.specialWisp.gold&&u.wood>=B.elfProgression.specialWisp.wood){this.actNear(match,u,core,{type:'trainSpecialWisp',target:node.id});return;}if(node&&!specialWisps.length){this.actNear(match,u,node,{type:'gatherSpecial',target:node.id});return;}}
+        if(u.wood<(epicCost.wood||0))this.gather(match,u,base);else this.stop(u);return;
+      }
+      this.stop(u);return;
+    }
+    const previousLegendaryTowerId=this.legendaryTowerId,unfinishedLegendary=towers.filter(s=>s.tier<B.legendary.tier),designatedTower=unfinishedLegendary.find(s=>s.id===previousLegendaryTowerId&&s.hp>0)||unfinishedLegendary.slice().sort((a,b)=>b.tier-a.tier||(a.createdAt||0)-(b.createdAt||0)||a.id.localeCompare(b.id))[0]||towers.slice().sort((a,b)=>b.tier-a.tier)[0];
     if(designatedTower){
       if(earlyLegendaryPlan&&previousLegendaryTowerId&&previousLegendaryTowerId!==designatedTower.id){this.metrics.defenseDirector.legendaryProjectReplacements=(this.metrics.defenseDirector.legendaryProjectReplacements||0)+1;this.metrics.defenseDirector.lastReplacementAt=+activeElapsed.toFixed(1);}
       this.legendaryTowerId=designatedTower.id;this.legendaryProjectBaseId=base.id;
     }else if(earlyLegendaryPlan&&this.legendaryProjectBaseId&&this.legendaryProjectBaseId!==base.id){this.legendaryTowerId=null;this.legendaryProjectBaseId=base.id;}
-    Object.assign(this.metrics.defenseDirector,{designatedTowerId:designatedTower?.id||null,designatedTowerTier:designatedTower?.tier||0,workshopTier:workshop?.tier||0,storedEssence:+(u.essence||0).toFixed(2)});
+    Object.assign(this.metrics.defenseDirector,{designatedTowerId:designatedTower?.id||null,designatedTowerTier:designatedTower?.tier||0,coreEssenceTier:core.tier,storedEssence:+(u.essence||0).toFixed(2)});
     if(designatedTower&&earlyLegendaryPlan){const milestones=this.metrics.defenseDirector.designatedTowerMilestones??={};milestones[designatedTower.tier]??=+activeElapsed.toFixed(1);}
-    if(earlyLegendaryPlan&&!workshop&&core.tier>=2&&u.gold>=B.structures.workshop.gold&&u.wood>=B.structures.workshop.wood){if(buildUtility('workshop')!=='no-position')return;}
-    // Tier 7 gives the defensive specialist enough Essence throughput to make
-    // a 12-15 minute Legendary realistic. Upgrade only the designated tower;
-    // the second tower remains ordinary protection until this plan completes.
-    const legendaryWorkshop=earlyLegendaryPlan&&workshop&&(workshop.tier<4||designatedTower?.tier>=8&&workshop.tier<7)&&affordable(workshop);
-    if(legendaryWorkshop&&!defenseMode){upgrade(workshop);return;}
+    const wallTarget=strategicBarricadeTier(core.tier,troll?.trollLevel||1,this.elfProfile,this.difficulty);Object.assign(this.metrics.defenseDirector,{wallTier:wall.tier,wallTarget,wallTargetCoreMinimum:requiredBarricadeTier(Math.min(B.maxStructureTier,core.tier+1)),wallTargetTrollLevel:troll?.trollLevel||1});
+    const signatureTarget=Math.max(1,Math.min(B.maxStructureTier,core.tier-1));
+    const recoveringSignature=signatureStructure&&this.signatureRecoveryId===signatureStructure.id&&signatureStructure.tier<signatureTarget;
+    if(signatureStructure&&signatureStructure.tier>=signatureTarget&&this.signatureRecoveryId===signatureStructure.id)this.signatureRecoveryId=null;
+    if(recoveringSignature&&affordable(signatureStructure)){upgrade(signatureStructure);return;}
+    // Team milestones have one explicit order. Essence is generated by the
+    // Core; the combat project is Core -> Wall -> Tower outside combat and Wall
+    // -> Tower -> Core while the gate is pressured.
+    if(signatureKind&&!signatureStructure&&core.tier>=B.elfProgression.unlockTier&&u.gold>=B.structures[signatureKind].gold&&u.wood>=B.structures[signatureKind].wood&&(!defenseMode||wall.hp/wall.maxHp>=response.repairFloor)){if(buildSignature(signatureKind)!=='no-position')return;}
+    const legendaryMilestone=earlyLegendaryPlan?orderedMilestoneTarget(core,wall,designatedTower,B.legendary.tier,defenseMode):null;
+    const legendaryCoreWallPrerequisite=legendaryMilestone===core?requiredBarricadeTier(core.tier+1):0;
+    if(legendaryCoreWallPrerequisite&&wall.tier<legendaryCoreWallPrerequisite&&affordable(wall)&&!defenseMode){upgrade(wall);return;}
+    if(legendaryMilestone&&affordable(legendaryMilestone)){upgrade(legendaryMilestone);return;}
+    if(legendaryMilestone&&!defenseMode&&mines.length){this.metrics.defenseDirector.reservingForLegendary=true;this.gather(match,u,base);return;}
+    const epicOwner=teamProject.epicInProgress&&teamProject.epicProject?.ownerId===u.id;
+    if(!epicOwner&&wall.tier<wallTarget&&affordable(wall)&&(!defenseMode||wall.hp/wall.maxHp>=response.repairFloor)){upgrade(wall);return;}
+    // Late-game fortification project. Capital previously went into the Core,
+    // increasing economy spending while Towers remained behind the Troll.
+    // Mature bases now concentrate the same earned resources into one wall and
+    // one tower. No income or combat attribute is granted implicitly.
+    const capitalRules=B.elfProgression.capital,capitalTarget=capitalRules.targets[this.elfProfile]||capitalRules.targets.balanced;
+    const capitalActive=(activeElapsed>=capitalRules.start||(troll?.trollLevel||1)>=capitalRules.trollLevel)&&core.tier>=capitalRules.minCore&&mines.length>=capitalRules.requiredMines&&towers.length>0&&(!signatureKind||!!signatureStructure)&&!defenseMode&&!earlyLegendaryPlan&&!teamProject.epicInProgress;
+    const fortificationTarget=Math.min(core.tier,capitalTarget),capitalTower=towers.slice().sort((a,b)=>b.tier-a.tier)[0],capitalStructure=wall.tier<fortificationTarget?wall:capitalTower?.tier<fortificationTarget?capitalTower:null;
+    if(capitalActive&&capitalStructure){
+      const capitalStatus=upgradeStatus(u,capitalStructure,match.time,match.state,match.structures),codes=capitalStatus.reasons.map(reason=>reason.code),canApproach=capitalStatus.allowed||codes.every(code=>code==='distance');
+      Object.assign(this.metrics.defenseDirector,{capitalProject:true,capitalTarget:fortificationTarget,capitalKind:capitalStructure.kind,capitalTier:capitalStructure.tier,capitalReserveGold:capitalStatus.cost?.gold||0,capitalReserveWood:capitalStatus.cost?.wood||0});
+      if(canApproach){upgrade(capitalStructure);return;}
+      if(codes.length&&codes.every(code=>['gold','wood','essence'].includes(code))){this.metrics.defenseDirector.reservingForCapital=true;if(u.wood<(capitalStatus.cost?.wood||0))this.gather(match,u,base);else this.stop(u);return;}
+    }
+    if(signatureStructure&&signatureStructure.tier<signatureTarget&&affordable(signatureStructure)&&(recoveringSignature||!earlyLegendaryPlan)&&(recoveringSignature||!teamProject.epicInProgress)&&(recoveringSignature||core.tier>=15||!defenseMode)){upgrade(signatureStructure);return;}
+    // This is a contextual director, not a fixed economy/defence spending cap.
+    // Troll progression and actual base losses promote a real defensive plan;
+    // personality still controls how aggressively each bot follows it.
+    const defensiveFloor=this.elfProfile==='defense'?Math.min(B.legendary.tier,Math.max(2,core.tier+1)):this.elfProfile==='balanced'?Math.min(B.legendary.tier,Math.max(2,core.tier)):Math.min(B.legendary.tier,Math.max(2,core.tier-1));
     const defensiveTower=towers.slice().sort((a,b)=>a.tier-b.tier).find(s=>s.tier<defensiveFloor&&affordable(s));
-    if(strategicDefense&&defensiveTower&&!defenseMode&&!earlyLegendaryPlan){upgrade(defensiveTower);return;}
+    if(strategicDefense&&defensiveTower&&!defenseMode&&!earlyLegendaryPlan&&!teamProject.epicInProgress){upgrade(defensiveTower);return;}
     if(legendaryRace&&designatedTower&&designatedTower.tier<B.legendary.tier&&affordable(designatedTower)&&!defenseMode){upgrade(designatedTower);return;}
     if(earlyLegendaryPlan&&signatureKind&&!signatureStructure&&core.tier>=B.elfProgression.unlockTier&&u.gold>=B.structures[signatureKind].gold&&u.wood>=B.structures[signatureKind].wood&&(!defenseMode||wall.hp/wall.maxHp>=response.repairFloor)){if(buildSignature(signatureKind)!=='no-position')return;}
     if(earlyLegendaryPlan&&signatureStructure&&signatureStructure.tier<signatureTarget&&affordable(signatureStructure)&&(recoveringSignature||core.tier>=15||!defenseMode)){upgrade(signatureStructure);return;}
-    const epicProject=match.elfEpicProject,epicTower=epicProject?.ownerId===u.id&&match.structures.find(s=>s.id===epicProject.towerId&&s.hp>0);
-    if(epicTower&&epicTower.tier<B.epic.tier){
-      const epicWallTarget=requiredEpicWallTier(epicTower.tier+1);Object.assign(this.metrics.defenseDirector,{epicProjectTowerId:epicTower.id,epicProjectTier:epicTower.tier,epicProjectWallTarget:epicWallTarget,epicProjectStartedAt:+Math.max(0,epicProject.startedAt-match.preparation).toFixed(1),reservingForEpic:false});
-      if(wall.tier<epicWallTarget){if(affordable(wall)&&(!defenseMode||wall.hp/wall.maxHp>=response.repairFloor)){upgrade(wall);return;}if(mines.length){this.metrics.defenseDirector.reservingForEpic=true;this.gather(match,u,base);return;}}
-      if(workshop&&workshop.tier<7&&affordable(workshop)&&!defenseMode){upgrade(workshop);return;}
-      if(affordable(epicTower)&&(!defenseMode||wall.hp/wall.maxHp>=response.repairFloor)){upgrade(epicTower);return;}
-      if(!defenseMode&&mines.length){this.metrics.defenseDirector.reservingForEpic=true;this.gather(match,u,base);return;}
-    }
     // Once the chosen tower reaches the expensive final tiers, stop opening
     // new economic purchases while its Gold/Essence accumulates. The bot can
     // still gather and all emergency siege reactions above remain available.
     if(earlyLegendaryPlan&&mines.length>0&&designatedTower&&designatedTower.tier<B.legendary.tier&&!defenseMode){this.metrics.defenseDirector.reservingForLegendary=true;this.gather(match,u,base);return;}
-    if(strategicDefense&&!workshop&&core.tier>=3&&u.gold>=B.structures.workshop.gold&&u.wood>=B.structures.workshop.wood){if(buildUtility('workshop')!=='no-position')return;}
-    const technologyFoundation=workshop&&workshop.tier<Math.min(4,core.tier)&&affordable(workshop);if(strategicDefense&&technologyFoundation&&!defenseMode){upgrade(workshop);return;}
     const mineRules=mineEconomy(core.tier),desiredMines=Math.min(mineRules.capacity,Math.max(1,Math.ceil(mineRules.capacity*strategy.mineRatio)));
     // Every profile establishes income before multiplying defences. The profile
     // controls how far it pushes that economy, not whether it understands it.
@@ -405,8 +497,7 @@ export class AIController {
     if(affordable(wall)&&defenseMode){upgrade(wall);return;}
     const desiredTowers=Math.min(B.construction.limits.tower,Math.max(1,Math.floor(strategy.towerBase+core.tier*strategy.towerGrowth)));
     if(towers.length<desiredTowers&&(!defenseMode||wall.hp/wall.maxHp>=response.repairFloor)&&u.gold>=B.structures.tower.gold+35+(defenseMode?0:response.reserve)&&u.wood>=B.structures.tower.wood){if(buildTower()!=='no-position')return;}
-    const towerTierCeiling=Math.max(1,core.tier+strategy.towerTierOffset),tower=towers.sort((a,b)=>a.tier-b.tier).find(s=>s.tier<towerTierCeiling&&affordable(s));if(tower){upgrade(tower);return;}
-    if(!own.some(s=>s.kind==='workshop')&&core.tier>=3&&u.gold>=(strategicDefense?B.structures.workshop.gold:300)&&u.wood>=B.structures.workshop.wood){if(buildUtility('workshop')!=='no-position')return;}
+    const epicTeamLock=teamProject.epicInProgress&&teamProject.epicProject?.ownerId!==u.id,towerTierCeiling=epicTeamLock?Math.min(B.legendary.tier,Math.max(1,core.tier+strategy.towerTierOffset)):Math.max(1,core.tier+strategy.towerTierOffset),tower=towers.sort((a,b)=>a.tier-b.tier).find(s=>s.tier<towerTierCeiling&&affordable(s));if(tower){upgrade(tower);return;}
     const techMilestone=pendingTechnology(match,u),techResource=specialization(u.elfSpecialization)?.resource,specialWisps=wisps.filter(w=>w.specialNodeId);
     if(!threat&&techMilestone){
       const preference={economy:0,defense:1,balanced:2}[this.elfProfile],card=ELF_TECH_CARDS[techMilestone][preference],cost=technologyCost(techMilestone).resource;
@@ -416,12 +507,25 @@ export class AIController {
     }
     const worker=wisps.filter(w=>w.readyAt<=match.time&&!w.upgradingUntil&&w.level<core.tier+1).sort((a,b)=>a.level-b.level).find(w=>u.gold>=wispUpgradeCost(w.level).gold&&u.wood>=wispUpgradeCost(w.level).wood);
     if(worker&&!defenseMode){this.actNear(match,u,core,{type:'upgradeWisp',target:worker.id});return;}
-    const utility=own.find(s=>['mine','workshop'].includes(s.kind)&&s.tier<core.tier&&affordable(s));if(utility&&!defenseMode){upgrade(utility);return;}
+    const utility=own.find(s=>s.kind==='mine'&&s.tier<core.tier&&affordable(s));if(utility&&!defenseMode){upgrade(utility);return;}
     const reserve=Math.max(120,...own.map(s=>upgradeCost(s).wood*2));
     if(u.wood>reserve&&wisps.length){this.stop(u);return;}
     this.gather(match,u,base);
   }
-  gather(match,u,base){const occupied=new Set(match.wisps.filter(w=>w.alive).map(w=>w.treeId));let target=null,best=Infinity;for(const tree of match.trees){if(tree.amount<=0||(this.elfAvoidEntities?.get(tree.id)||0)>match.time||occupied.has(tree.id)||(baseAt(match.map,tree)?.id!==base.id&&!match.canSee(u,tree)))continue;const d=distance(u,tree);if(d<best){best=d;target=tree;}}if(target)this.actNear(match,u,target,{type:'gather',target:target.id});else this.stop(u);}
+  gather(match,u,base){
+    const occupied=new Set(match.wisps.filter(w=>w.alive).map(w=>w.treeId)),usable=tree=>tree.amount>0&&(this.elfAvoidEntities?.get(tree.id)||0)<=match.time&&!occupied.has(tree.id),localStock=match.trees.filter(tree=>tree.amount>0&&baseAt(match.map,tree)?.id===base.id),local=localStock.filter(usable).sort((a,b)=>distance(u,a)-distance(u,b));
+    let target=local[0];
+    if(target)this.metrics.localGatherDecisions++;
+    else if(localStock.length){
+      // Wisps already harvesting the refuge still count as local stock. The
+      // Elf waits for that safe production instead of walking into the forest.
+      this.metrics.externalGatherBlocked++;this.stop(u);return;
+    }else{
+      const recentThreat=(this.elfThreatUntil||0)>match.time||match.visibleEnemies(u).some(entity=>entity.role==='troll');
+      if(!recentThreat){target=match.trees.filter(tree=>usable(tree)&&baseAt(match.map,tree)?.id!==base.id&&match.canSee(u,tree)).sort((a,b)=>distance(u,a)-distance(u,b))[0];if(target)this.metrics.externalGatherDecisions++;}
+    }
+    if(target)this.actNear(match,u,target,{type:'gather',target:target.id});else this.stop(u);
+  }
   troll(match,u){this.updateBaseSearchIntel(match,u);this.brain??=new TrollBrain();this.brain.tick(this,match,u);}
   explore(match,u){
     const map=match.map,c=toCell(map,u),key=index(map,c.x,c.z),radius=Math.ceil(B.vision.troll/map.cell);

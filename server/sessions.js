@@ -4,9 +4,22 @@ import { BALANCE, STATES, DEFAULT_SETTINGS, MATCH_MODES } from '../shared/config
 
 export const cleanText=(value,fallback,max=32)=>typeof value==='string'?value.trim().replace(/[\u0000-\u001f<>]/g,'').slice(0,max)||fallback:fallback;
 const reject=message=>{throw new Error(message);};
+const BOT_PROFILES={
+  troll:{name:'Grum · Predador',botId:'BOT_TROLL_ADAPTIVE_V1',strategy:'adaptive',version:'v1'},
+  elf:[
+    {name:'Elyra · Guardiã',botId:'BOT_ELF_DEFENSIVE_V1',strategy:'defensive',version:'v1'},
+    {name:'Faelar · Mercador',botId:'BOT_ELF_ECONOMY_V1',strategy:'economy',version:'v1'},
+    {name:'Aerin · Estrategista',botId:'BOT_ELF_BALANCED_V1',strategy:'balanced',version:'v1'},
+    {name:'Thalia · Sentinela',botId:'BOT_ELF_SENTINEL_V1',strategy:'sentinel',version:'v1'},
+    {name:'Lúmen · Cultivador',botId:'BOT_ELF_GROWTH_V1',strategy:'growth',version:'v1'},
+    {name:'Nym · Arcanista',botId:'BOT_ELF_ARCANE_V1',strategy:'arcane',version:'v1'},
+    {name:'Orin · Artífice',botId:'BOT_ELF_TECH_V1',strategy:'technology',version:'v1'},
+    {name:'Syla · Batedora',botId:'BOT_ELF_SCOUT_V1',strategy:'scout',version:'v1'}
+  ]
+};
 export class SessionService {
   constructor(){this.rooms=new Map();this.clients=new Map();this.rankedQueue={troll:[],elf:[]};this.parties=new Map();}
-  addClient(id,name='Viajante'){const c={id,name:cleanText(name,'Viajante',22),roomId:null,partyId:null,connected:true};this.clients.set(id,c);return c;}
+  addClient(id,name='Viajante',account=null){const c={id,name:cleanText(account?.displayName||name,'Viajante',22),userId:account?.id||null,username:account?.username||null,roomId:null,partyId:null,connected:true};this.clients.set(id,c);return c;}
   settings(input={},previous=DEFAULT_SETTINGS){
     const out={...previous},mode=Object.hasOwn(MATCH_MODES,input.mode)?input.mode:out.mode||'custom';out.mode=mode;
     for(const key of ['private','local'])if(typeof input[key]==='boolean')out[key]=input[key];
@@ -14,10 +27,18 @@ export class SessionService {
     if(mode==='custom'){
       for(const key of ['takeover','allowRoles'])if(typeof input[key]==='boolean')out[key]=input[key];
       if(Number.isInteger(input.elfSlots))out.elfSlots=Math.min(BALANCE.maxElves,Math.max(1,input.elfSlots));
-      if(Object.hasOwn(BALANCE.difficulty,input.difficulty))out.difficulty=input.difficulty;
+      if(Object.hasOwn(BALANCE.difficulty,input.difficulty)){out.difficulty=input.difficulty;out.trollDifficulty=input.difficulty;out.elfDifficulty=input.difficulty;}
+      if(Object.hasOwn(BALANCE.difficulty,input.trollDifficulty))out.trollDifficulty=input.trollDifficulty;
+      if(Object.hasOwn(BALANCE.difficulty,input.elfDifficulty))out.elfDifficulty=input.elfDifficulty;
       if(['compact','large'].includes(input.mapSize))out.mapSize=input.mapSize;
+      if(['woodland','deepForest','crossroads'].includes(input.mapStyle))out.mapStyle=input.mapStyle;
       if([20,35,50,75].includes(input.preparation))out.preparation=input.preparation;
     }else Object.assign(out,MATCH_MODES[mode].preset);
+    out.trollDifficulty=Object.hasOwn(BALANCE.difficulty,out.trollDifficulty)?out.trollDifficulty:out.difficulty;
+    out.elfDifficulty=Object.hasOwn(BALANCE.difficulty,out.elfDifficulty)?out.elfDifficulty:out.difficulty;
+    // Keep the legacy field stable for old clients and reports. New matches
+    // record both role-specific values and never use this field to drive bots.
+    out.difficulty=out.elfDifficulty;
     if(typeof input.seed==='string'&&mode!=='ranked')out.seed=cleanText(input.seed,'THORNHOLD',40);
     return out;
   }
@@ -27,7 +48,7 @@ export class SessionService {
     let code;do{code=randomBytes(4).toString('hex').slice(0,6).toUpperCase();}while(this.rooms.has(code));
     const settings=this.settings(input.settings),observer=input.role==='observer';if(settings.mode==='ranked'&&!input.matchmade)reject('Use a fila ranqueada para iniciar este modo.');if(observer&&!settings.local)reject('A simulação somente com bots está disponível em partidas locais.');if(observer&&!input.fillBots)reject('A simulação observada precisa preencher todos os slots com bots.');const salt=randomBytes(16).toString('hex');if(settings.mode==='ranked')settings.seed='RANK-'+randomBytes(8).toString('hex').toUpperCase();
     const room={id:code,name:cleanText(input.name,`${client.name} · Clareira`),hostId:client.id,state:STATES.LOBBY,settings,members:new Map([[client.id,{...client,ready:false,connected:true}]]),slots:[{id:'t0',role:'troll',closed:false,occupant:null},...Array.from({length:BALANCE.maxElves},(_,i)=>({id:'e'+i,role:'elf',closed:i>=settings.elfSlots,occupant:null}))],match:null,matchmade:input.matchmade===true,surrenderVotes:new Set(),matchSequence:0,patrolOffset:randomBytes(1)[0]%12,patrolDirection:randomBytes(1)[0]%2?1:-1,created:Date.now(),updated:Date.now(),salt,password:input.password?scryptSync(String(input.password).slice(0,64),salt,32):null};
-    client.roomId=code;if(!observer)room.slots.find(s=>s.role===(input.role==='troll'?'troll':'elf')).occupant={type:'human',clientId:client.id,name:client.name};this.rooms.set(code,room);
+    client.roomId=code;if(!observer)room.slots.find(s=>s.role===(input.role==='troll'?'troll':'elf')).occupant={type:'human',clientId:client.id,userId:client.userId||null,name:client.name};this.rooms.set(code,room);
     if(input.fillBots)for(const s of room.slots)if(!s.closed&&!s.occupant)this.addBot(room,s.id);
     return room;
   }
@@ -47,16 +68,17 @@ export class SessionService {
     if(room.members.size>=room.settings.elfSlots+1)reject('A sala está cheia.');
     if(room.password&&!timingSafeEqual(room.password,scryptSync(String(input.password||'').slice(0,64),room.salt,32)))reject('Senha incorreta.');
     room.members.set(client.id,{...client,ready:false,connected:true});client.roomId=room.id;room.emptySince=null;if(!room.members.get(room.hostId)?.connected)room.hostId=client.id;
-    const slot=room.slots.find(s=>!s.closed&&!s.occupant&&(!input.role||s.role===input.role));if(slot)slot.occupant={type:'human',clientId:client.id,name:client.name};this.invalidate(room);return room;
+    const slot=room.slots.find(s=>!s.closed&&!s.occupant&&(!input.role||s.role===input.role));if(slot)slot.occupant={type:'human',clientId:client.id,userId:client.userId||null,name:client.name};this.invalidate(room);return room;
   }
-  addBot(room,id,rankedFill=false){if(room.settings.mode==='ranked'&&!rankedFill)reject('Bots ranqueados só podem ser adicionados pelo preenchimento de teste.');const s=room.slots.find(s=>s.id===id);if(!s||s.closed||s.occupant)reject('O slot precisa estar aberto e vazio.');s.occupant={type:'bot',name:s.role==='troll'?'Grum · Troll':'Guardião '+(Number(s.id.slice(1))+1),difficulty:room.settings.difficulty};}
+  botDifficulty(room,role){return role==='troll'?room.settings.trollDifficulty:room.settings.elfDifficulty;}
+  addBot(room,id,rankedFill=false){if(room.settings.mode==='ranked'&&!rankedFill)reject('Bots ranqueados só podem ser adicionados pelo preenchimento de teste.');const s=room.slots.find(s=>s.id===id);if(!s||s.closed||s.occupant)reject('O slot precisa estar aberto e vazio.');const profile=s.role==='troll'?BOT_PROFILES.troll:BOT_PROFILES.elf[Number(s.id.slice(1))%BOT_PROFILES.elf.length];s.occupant={type:'bot',name:profile.name,botId:profile.botId,strategy:profile.strategy,version:profile.version,difficulty:this.botDifficulty(room,s.role)};}
   changeSlot(room,client,input){
     this.editable(room);if(room.settings.mode==='ranked')reject('Os papéis são definidos pela fila ranqueada.');const s=room.slots.find(s=>s.id===input.slot);if(!s)reject('Slot inválido.');
     if(input.action==='claim'){
       if(!room.settings.allowRoles&&client.id!==room.hostId)reject('O host desativou a escolha livre.');
       if(s.closed||s.occupant?.type==='human')reject('Slot indisponível.');
       for(const old of room.slots)if(old.occupant?.clientId===client.id)old.occupant=null;
-      s.occupant={type:'human',clientId:client.id,name:client.name};
+      s.occupant={type:'human',clientId:client.id,userId:client.userId||null,name:client.name};
     }else{
       this.requireHost(room,client);
       switch(input.action){
@@ -68,7 +90,7 @@ export class SessionService {
         case 'move':{
           const member=room.members.get(input.clientId);if(!member||s.closed)reject('Jogador ou slot indisponível.');
           const old=room.slots.find(s=>s.occupant?.clientId===input.clientId),previous=s.occupant;if(old)old.occupant=previous;else if(previous?.type==='human')reject('Mova o jogador atual primeiro.');
-          s.occupant={type:'human',clientId:member.id,name:member.name};break;
+          s.occupant={type:'human',clientId:member.id,userId:member.userId||null,name:member.name};break;
         }
         default:reject('Operação de slot inválida.');
       }
@@ -80,7 +102,9 @@ export class SessionService {
     if(room.slots.some(s=>s.role==='elf'&&Number(s.id.slice(1))>=settings.elfSlots&&s.occupant?.type==='human'))reject('Mova os jogadores antes de reduzir os slots.');
     if(room.members.size>settings.elfSlots+1)reject('O limite não pode ser menor que a quantidade de humanos na sala.');
     for(const s of room.slots.filter(s=>s.role==='elf')){if(Number(s.id.slice(1))>=settings.elfSlots){s.closed=true;s.occupant=null;}else if(Number(s.id.slice(1))>=room.settings.elfSlots)s.closed=false;}
-    room.settings=settings;this.invalidate(room);
+    room.settings=settings;
+    if(input.mode||Object.hasOwn(input,'difficulty')||Object.hasOwn(input,'trollDifficulty')||Object.hasOwn(input,'elfDifficulty'))for(const slot of room.slots)if(slot.occupant?.type==='bot')slot.occupant.difficulty=this.botDifficulty(room,slot.role);
+    this.invalidate(room);
   }
   startErrors(room){const errors=[],ranked=room.settings.mode==='ranked';if(room.slots.filter(s=>s.role==='troll'&&s.occupant).length!==1)errors.push('Escolha um Troll.');if(!room.slots.some(s=>s.role==='elf'&&s.occupant))errors.push('Adicione pelo menos um Elfo.');if(ranked&&(room.slots.filter(s=>s.role==='elf'&&s.occupant).length!==5||room.members.size<1||[...room.members.keys()].some(id=>!room.slots.some(s=>s.occupant?.clientId===id))||(!room.rankedBotFill&&room.slots.some(s=>s.occupant?.type==='bot'))))errors.push('Ranqueada exige 1 Troll e 5 Elfos; bots só entram pelo preenchimento de teste.');if([...room.members.values()].some(m=>m.connected&&!m.ready))errors.push('Todos os humanos precisam estar prontos.');return errors;}
   start(room,client){
@@ -89,7 +113,7 @@ export class SessionService {
     const match=new Match({...room.settings,routeVariant,trollPatrolStart:start,trollPatrolDirection:direction},room.slots);room.matchSequence=sequence+1;
     room.state=STATES.LOADING;room.match=match;room.logged=false;room.updated=Date.now();return match;
   }
-  returnToLobby(room,client){this.requireHost(room,client);if(room.state!==STATES.END)reject('A revanche fica disponível no resultado.');room.state=STATES.RETURN;room.match=null;room.surrenderVotes.clear();if(room.settings.mode==='ranked')room.settings.seed='RANK-'+randomBytes(8).toString('hex').toUpperCase();for(const m of room.members.values())if(!m.connected){const slot=room.slots.find(s=>s.occupant?.clientId===m.id);if(slot)slot.occupant=room.settings.takeover?{type:'bot',name:m.name+' · IA',difficulty:room.settings.difficulty}:null;room.members.delete(m.id);const c=this.clients.get(m.id);if(c)c.roomId=null;}room.state=STATES.LOBBY;this.invalidate(room);}
+  returnToLobby(room,client){this.requireHost(room,client);if(room.state!==STATES.END)reject('A revanche fica disponível no resultado.');room.state=STATES.RETURN;room.match=null;room.surrenderVotes.clear();if(room.settings.mode==='ranked')room.settings.seed='RANK-'+randomBytes(8).toString('hex').toUpperCase();for(const m of room.members.values())if(!m.connected){const slot=room.slots.find(s=>s.occupant?.clientId===m.id);if(slot)slot.occupant=room.settings.takeover?{type:'bot',name:m.name+' · IA',difficulty:this.botDifficulty(room,slot.role)}:null;room.members.delete(m.id);const c=this.clients.get(m.id);if(c)c.roomId=null;}room.state=STATES.LOBBY;this.invalidate(room);}
   createParty(client){if(this.room(client))reject('Saia da sala atual primeiro.');this.leaveParty(client);let id;do{id=randomBytes(3).toString('hex').toUpperCase();}while(this.parties.has(id));this.parties.set(id,{id,leaderId:client.id,members:[client.id]});client.partyId=id;return this.partyStatus(client);}
   joinParty(client,code){if(this.room(client))reject('Saia da sala atual primeiro.');const party=this.parties.get(String(code||'').trim().toUpperCase());if(!party)reject('Grupo não encontrado.');if(party.members.length>=5)reject('O grupo já possui 5 Elfos.');if(this.queued(client))reject('Cancele a fila primeiro.');this.leaveParty(client);party.members.push(client.id);client.partyId=party.id;return this.partyStatus(client);}
   leaveParty(client){const party=this.parties.get(client.partyId);if(!party){client.partyId=null;return;}this.dequeueRanked(client);party.members=party.members.filter(id=>id!==client.id);client.partyId=null;if(!party.members.length)this.parties.delete(party.id);else if(party.leaderId===client.id)party.leaderId=party.members[0];}
@@ -133,13 +157,13 @@ export class SessionService {
     this.dequeueRanked(client);const room=this.room(client);if(!room){if(explicit)client.roomId=null;return;}
     const member=room.members.get(client.id);if(member){member.connected=false;member.ready=false;}
     const slot=room.slots.find(s=>s.occupant?.clientId===client.id);
-    if(room.match&&slot){const u=room.match.unit(slot.id);if(u){u.input={x:0,z:0};if(room.settings.takeover)room.match.setController(slot.id,'bot',room.settings.difficulty);}}
-    if(room.state===STATES.LOBBY||explicit){if(slot){slot.occupant=room.match?{type:'bot',name:client.name+' · IA',difficulty:room.settings.difficulty}:null;}room.members.delete(client.id);client.roomId=null;}
+    if(room.match&&slot){const u=room.match.unit(slot.id);if(u){u.input={x:0,z:0};if(room.settings.takeover)room.match.setController(slot.id,'bot',this.botDifficulty(room,slot.role));}}
+    if(room.state===STATES.LOBBY||explicit){if(slot){slot.occupant=room.match?{type:'bot',name:client.name+' · IA',difficulty:this.botDifficulty(room,slot.role),userId:client.userId||null,clientId:client.id}:null;}room.members.delete(client.id);client.roomId=null;}
     if(room.hostId===client.id){const next=[...room.members.values()].find(m=>m.connected);if(next)room.hostId=next.id;}
     if(![...room.members.values()].some(m=>m.connected))room.emptySince=Date.now();room.updated=Date.now();
   }
   resume(client){const room=this.room(client);if(!room)return;const m=room.members.get(client.id);if(m)m.connected=true;room.emptySince=null;const s=room.slots.find(s=>s.occupant?.clientId===client.id);if(room.match&&s)room.match.setController(s.id,'human');if(!room.members.get(room.hostId)?.connected)room.hostId=client.id;}
   publicRoom(room){return {id:room.id,name:room.name,state:room.state,mode:room.settings.mode,region:room.settings.region,players:[...room.members.values()].filter(m=>m.connected).length,capacity:room.settings.elfSlots+1,bots:room.slots.filter(s=>s.occupant?.type==='bot').length,password:!!room.password};}
   list(){return [...this.rooms.values()].filter(r=>r.settings.mode!=='ranked'&&!r.settings.private&&!r.settings.local&&[...r.members.values()].some(m=>m.connected)).map(r=>this.publicRoom(r));}
-  serialize(room){const votes={troll:0,elf:0};for(const id of room.surrenderVotes){const role=room.slots.find(s=>s.occupant?.clientId===id)?.role;if(role)votes[role]++;}return {id:room.id,name:room.name,hostId:room.hostId,state:room.state,settings:room.settings,matchmade:room.matchmade,rankedBotFill:!!room.rankedBotFill,members:[...room.members.values()].map(({id,name,ready,connected})=>({id,name,ready,connected})),slots:room.slots.map(s=>({...s,occupant:s.occupant?{...s.occupant,ready:s.occupant.type==='bot'||!!room.members.get(s.occupant.clientId)?.ready}:null})),surrender:{available:(room.match?.time||0)>=600,votes,needed:{troll:1,elf:this.surrenderThreshold(room,'elf')}},errors:this.startErrors(room)};}
+  serialize(room){const votes={troll:0,elf:0};for(const id of room.surrenderVotes){const role=room.slots.find(s=>s.occupant?.clientId===id)?.role;if(role)votes[role]++;}return {id:room.id,name:room.name,hostId:room.hostId,state:room.state,settings:room.settings,matchmade:room.matchmade,rankedBotFill:!!room.rankedBotFill,members:[...room.members.values()].map(({id,name,ready,connected})=>({id,name,ready,connected})),slots:room.slots.map(s=>{const occupant=s.occupant?{type:s.occupant.type,clientId:s.occupant.clientId||null,name:s.occupant.name,difficulty:s.occupant.difficulty,strategy:s.occupant.strategy||null,ready:s.occupant.type==='bot'||!!room.members.get(s.occupant.clientId)?.ready}:null;return {...s,occupant};}),surrender:{available:(room.match?.time||0)>=600,votes,needed:{troll:1,elf:this.surrenderThreshold(room,'elf')}},errors:this.startErrors(room)};}
 }

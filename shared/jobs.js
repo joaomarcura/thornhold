@@ -14,7 +14,8 @@ export function demolitionRefund(entity){
   if(!entity?.kind||entity.progress<1||entity.hp<=0)return null;
   const construction=entity.constructionCost||B.structures[entity.kind],cost=entity.investmentCost?{...entity.investmentCost}:{gold:construction.gold||0,wood:construction.wood||0,essence:0};
   if(!entity.investmentCost)for(let tier=1;tier<(entity.tier||1);tier++){const upgrade=upgradeCost({...entity,tier});cost.gold+=upgrade.gold;cost.wood+=upgrade.wood;cost.essence=(cost.essence||0)+(upgrade.essence||0);}
-  return {gold:Math.floor((cost.gold||0)*.75),wood:Math.floor((cost.wood||0)*.75),...(cost.essence?{essence:Math.floor(cost.essence*.75)}:{})};
+  const specialEntries=Object.entries(cost.specialResources||{}).filter(([,value])=>value>0),special=specialEntries.length===1?{specialResource:specialEntries[0][0],specialAmount:Math.floor(specialEntries[0][1]*.75)}:{};
+  return {gold:Math.floor((cost.gold||0)*.75),wood:Math.floor((cost.wood||0)*.75),...(cost.essence?{essence:Math.floor(cost.essence*.75)}:{}),...special};
 }
 export function cancelJob(m,u,id){
   const e=m.entity(id);

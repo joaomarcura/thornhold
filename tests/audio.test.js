@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { HEROIC_PROGRESSION, normalizeVolume } from '../client/audio.js';
+import { AUDIO_CATEGORIES, HEROIC_PROGRESSION, normalizeVolume } from '../client/audio.js';
 
 test('Volume do mixer é normalizado e mantém um padrão audível',()=>{
   assert.equal(normalizeVolume(-1),0);
@@ -13,3 +13,4 @@ test('Trilha heroica possui uma progressão completa e frequências válidas',()
   assert.equal(HEROIC_PROGRESSION.length,4);
   assert.ok(HEROIC_PROGRESSION.every(chord=>chord.length===4&&chord.every(frequency=>frequency>100&&frequency<500)));
 });
+test('Mixer expõe todas as categorias persistentes',()=>assert.deepEqual(AUDIO_CATEGORIES,['master','music','sfx','ambient','ui']));

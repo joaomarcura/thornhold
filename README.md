@@ -1,6 +1,8 @@
 # THORNHOLD — A última clareira
 
-Jogo 3D em terceira pessoa: um Troll caça de um a oito Elfos que precisam explorar, construir economia e defender suas clareiras. Código, modelos geométricos, interface, mapa e efeitos sonoros originais. Candidata **0.2.0-alpha.2**, com simulação autoritativa e multiplayer WebSocket real.
+Jogo 3D em primeira ou terceira pessoa: um Troll caça de um a oito Elfos que precisam explorar, construir economia e defender suas clareiras. Código, modelos geométricos, interface, mapas procedurais e efeitos sonoros originais. Candidata **0.5.0-alpha.1**, com simulação autoritativa, multiplayer WebSocket e fundação competitiva persistente.
+
+Arquitetura da câmera, viewmodels, áudio e arquétipos de mapa: [V3 — câmera, impacto e mundo](docs/V3-IMMERSION-ARCHITECTURE.md).
 
 ![Mapa de Thornhold com doze refúgios, floresta e trilhas](docs/images/mapa-thornhold.png)
 
@@ -15,7 +17,13 @@ npm start
 
 Abra **http://localhost:3000**. No Windows, também é possível executar **Iniciar Thornhold.cmd**. As dependências já instaladas permitem jogar sem CDN ou conexão com serviços externos.
 
-Para testes manuais, use `npm run start:dev`. O botão **DEV · F10** oferece recursos e velocidades 1×, 2×, 4× e 8×. O comando `npm start` continua seguro para produção e não expõe essas ferramentas.
+Contas, ranks, histórico e estatísticas ficam em `data/thornhold.sqlite`. O link **Entrar / Perfil** abre a plataforma competitiva. Para executar em Docker com volume persistente:
+
+```powershell
+docker compose up --build
+```
+
+Para testes manuais, use `npm run start:dev`. O botão **DEV · F10** oferece recursos e velocidades 1×, 2×, 4×, 6×, 8× e 16×. O comando `npm start` continua seguro para produção e não expõe essas ferramentas.
 
 A interface inicia em português. Use o botão **EN/PT** no cabeçalho ou no HUD para alternar para inglês durante a partida; a preferência fica salva neste navegador.
 
@@ -75,7 +83,7 @@ Quando um Elfo morre, seus recursos são perdidos e todas as estruturas e Wisps 
 
 O Elfo eliminado retorna como Espírito controlável com visão curta. Ele não causa dano nem impede a vitória do Troll, mas pode revelar uma área de 18 m por 10 segundos a cada 60 segundos e reparar Barricadas a 50% da velocidade-base. O Troll vê e pode matar o Espírito por 25 de ouro; essa segunda morte não conta como nova eliminação e encerra a participação ativa do jogador.
 
-A partida termina no máximo aos 60 minutos. Se nenhum lado cumprir sua condição de vitória antes, vence a equipe com mais pontos; empate favorece os defensores. No nível 10, Núcleo, Barricada e Torre tornam-se Lendários; a progressão continua até o nível Épico 20. Para o Troll, Dano Físico + Dano Estrutural somando 12 libera a Espada Lendária: qualquer golpe executa uma estrutura que termine abaixo de 15% de HP. Atributos do Troll e Wisps também têm limite 20.
+A partida termina no máximo aos 60 minutos. Se nenhum lado cumprir sua condição de vitória antes, vence a equipe com mais pontos; empate favorece os defensores. No nível 10, Núcleo, Barricada e Torre tornam-se Lendários; estruturas chegam ao nível Épico 20 e ao marco Ascendente 30. O nível 20 usa o mineral da especialização do refúgio, e o Projeto Épico coordena Núcleo, Barricada, Torre, Mina, Oficina e estrutura exclusiva. Para o Troll, Dano Físico + Dano Estrutural somando 12 libera a Espada Lendária: qualquer golpe executa uma estrutura que termine abaixo de 15% de HP. Atributos do Troll e Wisps mantêm limite 20.
 
 Obras precisam de um construtor vivo por perto. A barricada encaixa somente no portão da sua clareira. Elfos atravessam portões aliados; o Troll precisa destruí-los. Após uma ruptura, a entrada fica 12 segundos sem reconstrução e não aceita novas fundações com o Troll a menos de 5 metros.
 
@@ -96,12 +104,12 @@ O Troll aparece como um losango laranja quando a equipe o avista. Ao sair da vis
 - Criação/entrada por código e senha, browser público, filtros, Quick Play, troca de papel, mover humanos, adicionar/remover bots, abrir/fechar slots, Ready, host migrado, resultado e revanche.
 - Um único `Match` para humanos e IA. Desconexões podem transferir o mesmo personagem para IA. Recarregar a aba retoma a sessão por token enquanto o servidor e a sala permanecem ativos.
 - Mapa determinístico com doze refúgios de três tamanhos e quantidades diferentes de árvores, cada uma com estoque atual de 1.000 madeiras, além de platôs e baixadas ligados por rampas. Trilhas com bifurcações atravessam uma floresta sólida; o minimapa revela o terreno explorado. Cada clareira tem um único portão validado pelo servidor.
-- Núcleo com renda crescente, barricada reparável, cinco torres por Elfo, mina e oficina. A Torre padrão usa o antigo perfil de Balista; especializações permanecem isoladas e desligadas da progressão/UI. Obras, coleta, melhorias e destruição usam recursos reais e alteram o estado compartilhado.
+- Núcleo com renda crescente, barricada reparável, limite compartilhado de duas torres por clareira, minas e oficina. A Torre padrão usa o antigo perfil de Balista; especializações evoluem com a progressão do Núcleo. Obras, coleta, melhorias e destruição usam recursos reais e alteram o estado compartilhado.
 - Wisps formados no núcleo: um por árvore, escolha automática da árvore livre mais próxima, produção contínua sem consumir o tronco e evolução até o nível 20. Árvores esgotadas pela coleta manual rebrotam após 35 segundos se não houver uma construção no local.
 - Forja física do Troll no Santuário, com nove equipamentos, três espaços e sugestões de Cerco, Caçador e Sustentação. Compras e trocas são validadas pelo servidor; atributos evoluem até o nível 20. Estruturas tornam-se Lendárias no nível 10 e Épicas no nível 20.
 - Ataques leves/pesados com preparação e alcance verificados no impacto, combo de três acertos, esquiva que cancela a preparação e fortalece o próximo golpe, rugido e feedback de ruptura. Dano aplicado gera ouro, limitado pelo HP real e pelo orçamento de recompensa da estrutura.
 - Visão por distância e linha de visão. O servidor omite inimigos escondidos e sua economia dos snapshots. Bots do Troll descobrem terreno e alvos pela visão; não consultam o cadastro de bases para caçá-las.
-- Melhorias de estruturas e atributos do Troll ficam disponíveis sem bloqueio temporal, até o nível 20. O Núcleo exige uma Barricada ativa: níveis 2–3 pedem Barricada 1, níveis 4–5 pedem Barricada 2, e assim por diante. Aos 3:30, a Era do Cerco ainda amplia recursos externos e o bônus de cerco; inatividade nunca causa dano ao Troll.
+- Melhorias não possuem bloqueio temporal. Estruturas chegam ao nível 30; atributos do Troll e Wisps mantêm limite 20. O Núcleo exige uma Barricada ativa: níveis 2–3 pedem Barricada 1, níveis 4–5 pedem Barricada 2, e assim por diante. Aos 3:30, a Era do Cerco ainda amplia recursos externos e o bônus de cerco; inatividade nunca causa dano ao Troll.
 - Transferência de recursos, assistência a obras e reparo aliado. Elfos eliminados acompanham a visão da equipe e conservam um sinal de ajuda limitado.
 - Modelos estilizados procedurais, animação de caminhada/ataque, projéteis, partículas, estágios de dano, áudio sintetizado, HUD, seleção 3D, ghost e minimapa de exploração.
 
@@ -113,6 +121,9 @@ O Troll aparece como um losango laranja quando a equipe o avista. Ao sair da vis
 ```powershell
 npm run verify
 npm test
+npm run test:performance:browser
+npm run test:load
+npm run test:load:mature
 npm run balance
 npm run simulate -- 240
 npm run audit:combat
@@ -125,6 +136,10 @@ npm run audit:progression -- 6 artifacts/progression-current-20hz.json
 
 - `npm test`: regras, física, economia, fog, mapa, simulações completas e cenários de rede A–G com conexões WebSocket independentes.
 - `npm run verify`: sintaxe, testes de regras/rede e os fluxos críticos de navegador para upgrades, recursos, stun, reassentamento, placar, resultado, alternância PT-BR/EN e preferências de acessibilidade.
+- `npm run test:performance:browser`: mede FPS, frame p95, draw calls, triângulos, DPR adaptativo e long tasks em 1920×1080.
+- `npm run test:load`: mede oito salas 1×5 e 48 conexões WebSocket durante o early game.
+- `npm run test:load:mature`: aquece quatro salas em 16×, retorna para 1× e mede partidas com economia, estruturas e Wisps ativos.
+- `npm run test:platform:browser`: valida cadastro, sessão, perfil, ranking, histórico, detalhes, leaderboard, conquistas e logout no navegador real.
 - `npm run balance`: HP, DPS, tempo para romper barricada, tempo para matar o Troll e retorno do investimento econômico por tier. Gera `artifacts/balance.json`.
 - `npm run simulate -- 100`: baseline determinístico exclusivamente no lobby padrão 1 Troll × 5 Elfos, dificuldade Normal. Gera `artifacts/simulations.json`, incluindo win rate, duração, dano, renda, primeira ruptura, melhorias e sobreviventes. Cenários menores existem somente em testes funcionais isolados e nunca entram na medição de balanceamento.
 - Patrulha do Troll, preferência de refúgios, perfil econômico/defensivo e layout das construções élficas variam com a seed. A mesma seed continua reproduzindo exatamente o mesmo plano para diagnóstico.
@@ -161,9 +176,20 @@ docs/         Arquitetura e escopo de validação
 artifacts/    Relatórios e capturas gerados; ignorado pelo Git
 ```
 
+## Plataforma competitiva
+
+- Conta com usuário/e-mail únicos, senha derivada por `scrypt` e sessão opaca em cookie `HttpOnly`, `SameSite=Lax` e `Secure` em produção.
+- Temporada 0 isolada, MMR interno, Rating visível e tiers de Ferro a Desafiante configurados em um único módulo.
+- Todas as partidas concluídas atravessam o mesmo pipeline de ranking enquanto `RANKED_SIMULATION_ENABLED=true`, preservando `matchType` e `rankedStatus`.
+- Bots têm identidades persistentes por estratégia e usam exatamente o mesmo `RankingEngine` dos humanos.
+- Match, participantes, estatísticas, rating e histórico são gravados atomicamente; `ranked_events` e chaves únicas impedem processamento duplicado.
+- Leaderboard paginado filtra papel, humanos/bots e temporada. Scores de performance são apenas diagnóstico e não alteram rating.
+
+Detalhes de arquitetura, APIs, segurança e operação: [Plataforma competitiva](docs/PLATAFORMA-COMPETITIVA.md).
+
 ## Limites desta entrega
 
-É um slice desktop com arte procedural e persistência de sessão em memória. Reiniciar o servidor encerra suas salas. Não inclui autenticação de conta, ranking, relay/NAT traversal, voz, matchmaking entre servidores, assets artísticos finais nem controles touch. O modo observador tem informação completa e deve ser usado para testes ou espectadores confiáveis; jogadores eliminados recebem somente a visão da equipe. A arquitetura não pretende oferecer proteção contra conluio entre espectadores e jogadores.
+É um slice desktop com arte procedural. Contas e competição persistem; salas e partidas ativas continuam em memória e são encerradas ao reiniciar o servidor. Não inclui relay/NAT traversal, voz, matchmaking entre servidores, recuperação de partida ativa, assets artísticos finais nem controles touch. O modo observador tem informação completa e deve ser usado para testes ou espectadores confiáveis; jogadores eliminados recebem somente a visão da equipe. A arquitetura não pretende oferecer proteção contra conluio entre espectadores e jogadores.
 
 O servidor está implementado para operação local/LAN e publicação em um host Node persistente; **nenhum serviço público foi contratado ou publicado automaticamente**.
 

@@ -10,6 +10,8 @@ param registryName string
 param location string = resourceGroup().location
 param environmentName string = '${appName}-env'
 param logWorkspaceName string = '${appName}-logs'
+param storageAccountName string = take('st${uniqueString(resourceGroup().id, appName)}', 24)
+param dataShareName string = 'thornhold-data'
 param cpu string = '0.5'
 param memory string = '1Gi'
 
@@ -90,6 +92,46 @@ resource environment 'Microsoft.App/managedEnvironments@2024-03-01' = {
   }
 }
 
+resource dataStorage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+  name: storageAccountName
+  location: location
+  tags: commonTags
+  sku: { name: 'Standard_LRS' }
+  kind: 'StorageV2'
+  properties: {
+    allowBlobPublicAccess: false
+    minimumTlsVersion: 'TLS1_2'
+    supportsHttpsTrafficOnly: true
+  }
+}
+
+resource dataFileService 'Microsoft.Storage/storageAccounts/fileServices@2023-05-01' = {
+  parent: dataStorage
+  name: 'default'
+}
+
+resource dataShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2023-05-01' = {
+  parent: dataFileService
+  name: dataShareName
+  properties: {
+    enabledProtocols: 'SMB'
+    shareQuota: 5
+  }
+}
+
+resource environmentStorage 'Microsoft.App/managedEnvironments/storages@2023-05-01' = {
+  parent: environment
+  name: 'thornhold-data'
+  properties: {
+    azureFile: {
+      accountName: dataStorage.name
+      accountKey: dataStorage.listKeys().keys[0].value
+      shareName: dataShare.name
+      accessMode: 'ReadWrite'
+    }
+  }
+}
+
 resource app 'Microsoft.App/containerApps@2024-03-01' = {
   name: appName
   location: location
@@ -143,12 +185,21 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'DEPLOY_ENV', value: 'azure-production' }
             { name: 'TELEMETRY_MODE', value: 'stdout' }
             { name: 'TELEMETRY_PROVIDER', value: 'azure' }
+            { name: 'DATABASE_PATH', value: '/app/data/thornhold.sqlite' }
+            { name: 'DATABASE_JOURNAL_MODE', value: 'DELETE' }
+            { name: 'RANKED_SIMULATION_ENABLED', value: 'true' }
             { name: 'TRUST_PROXY', value: '1' }
             { name: 'MAX_ROOMS', value: '200' }
             { name: 'MAX_CONNECTIONS', value: '1200' }
             { name: 'MAX_CONNECTIONS_PER_IP', value: '24' }
             { name: 'SHUTDOWN_GRACE_MS', value: '20000' }
             { name: 'METRICS_TOKEN', secretRef: 'metrics-token' }
+          ]
+          volumeMounts: [
+            {
+              volumeName: 'thornhold-data'
+              mountPath: '/app/data'
+            }
           ]
           probes: [
             {
@@ -177,6 +228,13 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           ]
         }
       ]
+      volumes: [
+        {
+          name: 'thornhold-data'
+          storageType: 'AzureFile'
+          storageName: environmentStorage.name
+        }
+      ]
       scale: {
         minReplicas: minReplicas
         maxReplicas: maxReplicas
@@ -194,7 +252,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
       terminationGracePeriodSeconds: 30
     }
   }
-  dependsOn: [acrPull]
+  dependsOn: [acrPull, environmentStorage]
 }
 
 resource budget 'Microsoft.Consumption/budgets@2024-08-01' = if (!empty(budgetEmail)) {

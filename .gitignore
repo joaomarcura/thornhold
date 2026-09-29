@@ -1,6 +1,8 @@
 node_modules/
 artifacts/
 telemetry/
+data/
+.azure-bicep-test/
 *.log
 .env
 .env.*

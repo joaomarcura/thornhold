@@ -1,6 +1,24 @@
-const COLLECTIONS=['units','structures','wisps','trees','debugTowers'];
+// Collections with stable ids are diffed item by item. Scoreboard resources
+// and special deposits change frequently in mature matches; treating either as
+// one opaque value resent the complete array for a one-field change.
+const COLLECTIONS=['units','structures','wisps','trees','specialNodes','scoreboard','debugTowers'];
 
-const equal=(a,b)=>a===b||(a&&b&&typeof a==='object'&&typeof b==='object'&&JSON.stringify(a)===JSON.stringify(b));
+// Snapshot diffing runs for every connected viewer at the network cadence.
+// Compare in place to avoid allocating two complete JSON strings for every
+// nested value on every snapshot.
+function equal(a,b){
+  if(a===b)return true;
+  if(!a||!b||typeof a!=='object'||typeof b!=='object')return false;
+  if(Array.isArray(a)!==Array.isArray(b))return false;
+  if(Array.isArray(a)){
+    if(a.length!==b.length)return false;
+    for(let i=0;i<a.length;i++)if(!equal(a[i],b[i]))return false;
+    return true;
+  }
+  const aKeys=Object.keys(a),bKeys=Object.keys(b);if(aKeys.length!==bKeys.length)return false;
+  for(const key of aKeys)if(!Object.hasOwn(b,key)||!equal(a[key],b[key]))return false;
+  return true;
+}
 
 function objectPatch(previous,next){
   const set={},unset=[];

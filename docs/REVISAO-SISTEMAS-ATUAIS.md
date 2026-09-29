@@ -24,7 +24,6 @@ Estes sistemas participam de uma partida normal e devem ser preservados:
 
 O código os executa, mas o jogador dificilmente entende sua influência:
 
-- Pressão de Cerco tardia sobre Barricadas;
 - Threat Income e recompensa escalável do Troll;
 - Siege Parity usado na escolha de fortalezas pela IA;
 - bônus e custos avançados dos três caminhos élficos;
@@ -32,7 +31,7 @@ O código os executa, mas o jogador dificilmente entende sua influência:
 - orçamento de perseguição, memória de cercos fracassados e troca de estratégia do Troll bot;
 - pontuação que decide a partida aos 60 minutos.
 
-Antes de criar novos sistemas, a interface deve explicar os que afetam decisões humanas: origem da renda, condição lendária, pressão acumulada e composição do placar.
+Antes de criar novos sistemas, a interface deve explicar os que afetam decisões humanas: origem da renda, condição lendária e composição do placar.
 
 ## Implementado, mas desligado ou incompleto
 
@@ -56,7 +55,7 @@ Pedras ancestrais e Fonte do luar são somente marcos visuais. Não têm objetiv
 - O menu de controles ainda exibia `E — Interagir / coletar`, embora a ação contextual tenha sido consolidada em `R`. O binding morto foi removido da interface.
 - Documentação ainda dizia loja em `B`, cinco Torres e ausência de limite de tempo. Foi corrigida para Forja em `G`, retorno em `B`, duas Torres e 60 minutos.
 - Scripts antigos de navegador ainda carregam fluxos históricos com `E`. Eles não entram no runtime nem em `npm test`, mas devem ser revisados antes de voltar ao pipeline principal.
-- A flag geral `breachEnabled` inicia desligada, enquanto as regras tardias e de duelo final podem ativar Breach Momentum separadamente. O comportamento é intencional, porém o nome da flag não descreve todo o sistema.
+- Pressão de Cerco, seus stacks, multiplicador de dano, penalidade de reparo, configuração e UI foram removidos. Siege Parity e o bônus explícito de final de partida permanecem sistemas separados.
 
 ## Complexidade que merece redução
 

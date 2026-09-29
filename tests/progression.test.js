@@ -1,14 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Match } from '../shared/simulation.js';
-import { BALANCE as B, STATES, distance, wispCost, wispIncome, structureHP, structureRewardHP, tierScale, combatTierScale, lateTierScale, wallTierScale, towerDamage, trollLateThreatIncome, trollCost, upgradeCost, mineEconomy, resourceProducer, essenceIncome, repairPower } from '../shared/config.js';
+import { BALANCE as B, STATES, distance, wispCost, wispIncome, structureHP, structureRewardHP, tierScale, combatTierScale, lateTierScale, wallTierScale, towerDamage, trollLateThreatIncome, trollLateThreatMultiplier, trollCost, upgradeCost, mineEconomy, resourceProducer, essenceIncome, repairPower } from '../shared/config.js';
 import { combatStats, ITEMS, EQUIPMENT_SLOTS, ITEM_RARITIES, itemEffects, itemRarity, itemUpgradeCost } from '../shared/equipment.js';
 import { jobRefund } from '../shared/jobs.js';
 import { availableTrees } from '../shared/wisps.js';
 import { siegeParity } from '../shared/siege-balance.js';
 import { shopMarkup } from '../client/shop.js';
 import { applySnapshotDelta, createSnapshotDelta } from '../shared/snapshot-delta.js';
-import { technologyEffects } from '../shared/elf-progression.js';
+import { chooseTechnology, technologyEffects } from '../shared/elf-progression.js';
+import { epicProjectCostPlan, epicProjectEntries, epicProjectResourceNeed } from '../shared/elf-team-director.js';
 
 function match(){return new Match({seed:'PROGRESSION'},[
   {id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},
@@ -34,12 +35,49 @@ function arena(){
 function ready(m,t){advance(m,Math.max(0,(t.cooldowns.attack||0)-m.time)+.05);}
 
 test('Barricadas preservam o early game e limitam a curva tardia',()=>{
-  assert.equal(B.structures.wall.hp,2310);assert.equal(structureHP('wall',1),2310);
-  for(let tier=1;tier<=9;tier++)assert.equal(structureHP('wall',tier),2310*tierScale(B.structures.wall.growth,tier));
+  assert.equal(B.structures.wall.hp,2541);assert.equal(structureHP('wall',1),2541);
+  for(let tier=1;tier<=9;tier++)assert.equal(structureHP('wall',tier),2541*tierScale(B.structures.wall.growth,tier));
   for(let tier=2;tier<=B.maxTier;tier++)assert.ok(structureHP('wall',tier)>structureHP('wall',tier-1));
-  assert.equal(structureHP('wall',10),2310*wallTierScale(10)*B.legendary.wallHealth);
+  assert.equal(structureHP('wall',10),2541*wallTierScale(10)*B.legendary.wallHealth);
   assert.ok(structureHP('wall',10)<structureHP('wall',9)*1.35);
   assert.ok(structureHP('wall',20)<150000);
+});
+test('Estruturas Épicas recebem um salto defensivo e ofensivo explícito',()=>{
+  assert.ok(Math.abs(structureHP('wall',20)/structureRewardHP('wall',20)-B.legendary.wallHealth*B.epic.wallHealth)<1e-9);
+  assert.ok(Math.abs(structureHP('tower',20)/structureRewardHP('tower',20)-B.epic.towerHealth)<1e-9);
+  assert.ok(Math.abs(towerDamage(20)/(B.structures.tower.damage*combatTierScale(B.structures.tower.growth,20))-B.epic.towerDamage)<1e-9);
+});
+test('Nível 20 usa o mineral da especialização e conclui os seis marcos do Projeto Épico',()=>{
+  const m=match(),{e,core,wall,b}=baseFixture(m);m.state=STATES.ACTIVE;Object.assign(e,{elfSpecialization:'fortress',gold:1e9,wood:1e9,x:core.x,z:core.z});e.specialResources.crystal=200;
+  const make=(id,kind,tier=20)=>({id,kind,owner:e.id,baseId:b.id,x:core.x,z:core.z,tier,hp:10000,maxHp:10000,progress:1,upgrading:0,lastHit:-100,branch:'power'}),tower=make('project-tower','tower'),mine=make('project-mine','mine'),workshop=make('project-workshop','workshop'),bastion=make('project-bastion','bastion');Object.assign(core,{tier:19,hp:10000,maxHp:10000});Object.assign(wall,{tier:20,hp:10000,maxHp:10000});m.structures.push(tower,mine,workshop,bastion);m.elfEpicProject={coreId:core.id,wallId:wall.id,towerId:tower.id,mineId:mine.id,workshopId:workshop.id,signatureId:bastion.id,signatureKind:'bastion',resource:'crystal',ownerId:e.id,baseId:b.id,startedAt:m.time,designatedAt:m.time,resources:{gold:0,wood:0,essence:0,specialResources:{}}};
+  const cost=upgradeCost(core,e.elfPath,e.elfSpecialization),before=e.specialResources.crystal;assert.equal(cost.essence,undefined);assert.equal(cost.specialResource,'crystal');assert.equal(cost.specialAmount,B.epic.resourceCost.core);assert.equal(m.act(e.id,{type:'upgrade',target:core.id}),undefined);assert.equal(e.specialResources.crystal,before-cost.specialAmount);advance(m,11);assert.equal(core.tier,20);assert.ok(m.elfEpicProject.completedAt);assert.equal(m.elfEpicProject.resources.specialResources.crystal,cost.specialAmount);
+});
+test('Projeto Épico reserva somente o próximo bloco executável',()=>{
+  const m=match(),{e,core,wall,b}=baseFixture(m);Object.assign(e,{elfSpecialization:'fortress',x:core.x,z:core.z});core.tier=10;wall.tier=10;
+  const make=(id,kind)=>({id,kind,owner:e.id,baseId:b.id,x:core.x,z:core.z,tier:20,hp:10000,maxHp:10000,progress:1,upgrading:0}),tower=make('reserve-tower','tower'),mine=make('reserve-mine','mine'),workshop=make('reserve-workshop','workshop'),bastion=make('reserve-bastion','bastion');core.tier=19;wall.tier=20;m.structures.push(tower,mine,workshop,bastion);
+  m.elfEpicProject={coreId:core.id,wallId:wall.id,towerId:tower.id,mineId:mine.id,workshopId:workshop.id,signatureId:bastion.id,signatureKind:'bastion',resource:'crystal',ownerId:e.id,baseId:b.id,startedAt:m.time,resources:{gold:0,wood:0,essence:0,specialResources:{}}};
+  const expected=B.epic.resourceCost.core,plan=epicProjectCostPlan(m,m.elfEpicProject);
+  assert.equal(plan.targetId,core.id);assert.equal(plan.fromTier,19);assert.equal(plan.toTier,20);assert.equal(plan.levels,1);
+  assert.equal(epicProjectResourceNeed(m,m.elfEpicProject),expected);e.specialResources.crystal=expected+29;
+  assert.match(chooseTechnology(m,e,'efficient-production'),/reservado para o Projeto Épico/);e.specialResources.crystal++;
+  assert.equal(chooseTechnology(m,e,'efficient-production'),null);assert.equal(e.specialResources.crystal,expected);
+});
+test('Projeto Épico calcula a reserva restante de ouro, madeira, essência e mineral',()=>{
+  const m=match(),{e,core,wall,b}=baseFixture(m);Object.assign(e,{elfSpecialization:'fortress',elfPath:'defense'});core.tier=9;wall.tier=10;
+  const make=(id,kind,tier)=>({id,kind,owner:e.id,baseId:b.id,x:core.x,z:core.z,tier,hp:10000,maxHp:10000,progress:1,upgrading:0}),tower=make('plan-tower','tower',9),mine=make('plan-mine','mine',9),workshop=make('plan-workshop','workshop',9),bastion=make('plan-bastion','bastion',9);m.structures.push(tower,mine,workshop,bastion);
+  const project={coreId:core.id,wallId:wall.id,towerId:tower.id,mineId:mine.id,workshopId:workshop.id,signatureId:bastion.id,signatureKind:'bastion',resource:'crystal',ownerId:e.id,baseId:b.id};
+  const plan=epicProjectCostPlan(m,project);assert.ok(plan.gold>0);assert.ok(plan.wood>0);assert.ok(plan.essence>0);assert.equal(plan.specialResource,'crystal');assert.equal(plan.specialAmount,epicProjectResourceNeed(m,project));assert.equal(plan.targetId,core.id);assert.equal(plan.levels,2);assert.equal(plan.toTier,11);
+});
+test('Nova especialização atualiza Projeto Épico e Wisp especial atomicamente',()=>{
+  const m=match(),{e,core,wall,b}=baseFixture(m);core.tier=10;wall.tier=10;Object.assign(e,{elfSpecialization:null,previousElfSpecialization:'fortress',specializationReselectionPending:true,x:core.x,z:core.z});
+  const make=(id,kind)=>({id,kind,owner:e.id,baseId:b.id,x:core.x,z:core.z,tier:10,hp:10000,maxHp:10000,progress:1,upgrading:0,epicProject:true}),tower=make('sync-tower','tower'),mine=make('sync-mine','mine'),workshop=make('sync-workshop','workshop'),oldSignature=make('sync-bastion','bastion');m.structures.push(tower,mine,workshop,oldSignature);
+  const crystalNode=m.specialNodes.find(node=>node.resource==='crystal'),wisp={id:'sync-wisp',owner:e.id,alive:true,specialResource:'crystal',specialNodeId:crystalNode?.id||'old-crystal'};m.wisps.push(wisp);
+  m.elfEpicProject={coreId:core.id,wallId:wall.id,towerId:tower.id,mineId:mine.id,workshopId:workshop.id,signatureId:oldSignature.id,signatureKind:'bastion',resource:'crystal',ownerId:e.id,baseId:b.id,startedAt:m.time,resources:{gold:0,wood:0,essence:0,specialResources:{}}};
+  assert.equal(m.act(e.id,{type:'chooseElfSpecialization',key:'industrial'}),null);assert.equal(m.elfEpicProject.signatureKind,null);assert.equal(m.elfEpicProject.signatureId,null);assert.equal(m.elfEpicProject.resource,'ancientWood');assert.equal(m.elfEpicProject.recoveringKind,null);assert.equal(m.elfEpicProject.resourcePlan.resource,'ancientWood');assert.equal(wisp.specialResource,'ancientWood');assert.equal(m.specialNodes.find(node=>node.id===wisp.specialNodeId)?.resource,'ancientWood');assert.equal(oldSignature.epicProject,false);assert.equal(epicProjectEntries(m.elfEpicProject).length,4);
+});
+test('Concentração do Projeto Épico reduz somente o custo de seus marcos até o nível 20',()=>{
+  const ordinary={kind:'core',tier:14},focused={...ordinary,epicProject:true},normal=upgradeCost(ordinary,'defense','industrial'),project=upgradeCost(focused,'defense','industrial');
+  assert.equal(project.gold,Math.round(normal.gold*B.epic.projectCostMultiplier));assert.equal(project.wood,Math.round(normal.wood*B.epic.projectCostMultiplier));focused.tier=20;ordinary.tier=20;assert.deepEqual(upgradeCost(focused,'defense','industrial'),upgradeCost(ordinary,'defense','industrial'));
 });
 test('V3.3 preserva níveis 1–9 e suaviza combate e fortificações após o Lendário',()=>{
   for(let tier=1;tier<=9;tier++)assert.equal(combatTierScale(B.structures.tower.growth,tier),tierScale(B.structures.tower.growth,tier));
@@ -57,8 +95,12 @@ test('Economia tardia desacelera sem alterar os níveis 1–9',()=>{
     assert.equal(wisp(tier),B.wisps.income*Math.pow(B.wisps.incomeGrowth,tier-1));
   }
   assert.equal(lateTierScale(B.structures.core.growth,9),tierScale(B.structures.core.growth,9));
-  assert.ok(core(20)<80);assert.ok(mine(20)<70);assert.ok(wisp(20)<25);
+  assert.ok(core(20)<80);assert.ok(mine(20)<105);assert.ok(mine(20)/mine(19)>B.epic.mineProduction);assert.ok(wisp(20)<25);
   assert.ok(core(20)>core(10));assert.ok(mine(20)>mine(10));assert.ok(wisp(20)>wisp(10));
+});
+test('Curva econômica B25 torna o projeto nível 20 financiável sem baratear o early game',()=>{
+  const kinds=['core','wall','tower','mine','workshop'],remaining=kinds.reduce((total,kind)=>total+Array.from({length:20-14},(_,i)=>upgradeCost({kind,tier:14+i},null,'industrial').gold).reduce((a,b)=>a+b,0),0);
+  assert.equal(B.progression.lateStructureCostGrowth,1.14);assert.equal(B.progression.lateStructureWoodCostGrowth,1.14);assert.ok(remaining<340000,`reserva tardia ainda inviável: ${remaining}`);assert.deepEqual(upgradeCost({kind:'core',tier:8}),{gold:2278,wood:288});
 });
 test('Renda de ameaça do Troll cresce somente no late game',()=>{
   assert.equal(trollLateThreatIncome(899,439,1),null);assert.equal(trollLateThreatIncome(900,439,0),null);
@@ -66,26 +108,12 @@ test('Renda de ameaça do Troll cresce somente no late game',()=>{
   const raw=B.economy.trollLateThreatBase+B.economy.trollLateThreatLogScale*Math.log1p(439/B.economy.trollLateThreatReference)+B.economy.trollLateThreatMatureBase+3*B.economy.trollLateThreatLegendary;
   const expected=raw<=B.economy.trollLateThreatSoftCap?raw:B.economy.trollLateThreatSoftCap+(raw-B.economy.trollLateThreatSoftCap)*B.economy.trollLateThreatOverflowRate;
   assert.ok(Math.abs(trollLateThreatIncome(900,439,1,3)-expected)<1e-9);assert.equal(trollLateThreatIncome(900,100000,5,20),B.economy.trollLateThreatCap);
+  assert.equal(trollLateThreatMultiplier(15),1);assert.ok(trollLateThreatIncome(900,439,1,3,20)<expected);assert.ok(trollLateThreatIncome(900,439,1,3,20)>=expected*B.economy.trollLateThreatMinimum);
 });
-test('Breach Momentum aumenta dano contínuo e reduz reparo da Barricada',()=>{
-  const m=match(),t=m.unit('t'),e=m.unit('e'),wall={id:'breach-wall',kind:'wall',owner:e.id,baseId:'breach-base',x:t.x,z:t.z+2,hp:231000,maxHp:231000,tier:B.legendary.tier,progress:1,bounty:500,lastHit:-100};m.settings.breachEnabled=true;m.state=STATES.ACTIVE;m.time=80;m.structures.push(wall);Object.assign(e,m.map.bases[0]);Object.assign(m.unit('ally'),m.map.bases[1]);t.yaw=0;
-  m.setController(t.id,'bot');m.controllers.get(t.id).brain={state:'breach'};
-  assert.equal(m.addBreachMomentum(wall,true,t).stacks,0);m.time+=3.1;assert.equal(m.addBreachMomentum(wall,true,t).stacks,1,'heavy não pula múltiplos stacks');
-  const before=wall.hp,base=m.trollStats(t).damage*m.trollStats(t).siege,damageScale=1+B.breachMomentum.damagePerStack;m.damage(wall,base*damageScale,t,'melee');assert.ok(Math.abs((before-wall.hp)-base*damageScale)<.01);
-  wall.hp-=10000;Object.assign(e,{x:wall.x,z:wall.z});const damaged=wall.hp,repairScale=1-B.breachMomentum.repairPenaltyPerStack,repairBase=repairPower(wall);m.act(e.id,{type:'repair',target:wall.id});assert.ok(Math.abs((wall.hp-damaged)-repairBase*repairScale)<.01);
-  m.time+=B.breachMomentum.decayDelay+B.breachMomentum.decaySeconds+.01;assert.equal(m.breachMomentum(wall).stacks,0);
-});
-test('Duelo final libera pressão de cerco para Troll humano sem ativar o early game',()=>{
-  const m=match(),t=m.unit('t'),wall={id:'final-wall',kind:'wall',owner:'e',baseId:'final-base',x:t.x,z:t.z+2,hp:231000,maxHp:231000,tier:10,progress:1,lastHit:-100};m.state=STATES.ACTIVE;m.structures.push(wall);m.unit('ally').alive=false;
-  m.time=m.preparation+719;assert.equal(m.addBreachMomentum(wall,true,t).stacks,0);
-  m.time=m.preparation+720;assert.equal(m.addBreachMomentum(wall,true,t).stacks,0);m.time+=B.breachMomentum.firstStackSeconds+.1;assert.equal(m.addBreachMomentum(wall,true,t).stacks,1);
-  const snapshot=m.snapshot(t.id),visible=snapshot.structures.find(s=>s.id===wall.id);assert.equal(visible.breachStacks,1);assert.ok(visible.effects.some(effect=>effect.id==='breach-pressure'));
-});
-test('Barricada Lendária acumula pressão tardia sem exigir duelo final',()=>{
-  const m=match(),t=m.unit('t'),wall={id:'late-wall',kind:'wall',owner:'e',baseId:'late-base',x:t.x,z:t.z+2,hp:50000,maxHp:50000,tier:10,legendary:true,progress:1,lastHit:-100};m.state=STATES.ACTIVE;m.structures.push(wall);
-  m.time=m.preparation+B.breachMomentum.unlockSeconds-1;assert.equal(m.addBreachMomentum(wall,true,t).stacks,0);
-  m.time=m.preparation+B.breachMomentum.unlockSeconds;assert.equal(m.addBreachMomentum(wall,true,t).stacks,0);m.time+=B.breachMomentum.firstStackSeconds+.1;assert.equal(m.addBreachMomentum(wall,true,t).stacks,1);
-  assert.equal(wall.breachLateActive,true);m.time+=B.breachMomentum.decayDelay-1;assert.equal(m.breachMomentum(wall).stacks,1);
+test('Pressão de Cerco foi removida sem alterar reparo ou Siege Parity',()=>{
+  const m=match(),e=m.unit('e'),wall={id:'plain-wall',kind:'wall',owner:e.id,baseId:m.map.bases[0].id,x:e.x,z:e.z,hp:10000,maxHp:20000,tier:B.legendary.tier,legendary:true,progress:1,lastHit:-100};m.state=STATES.ACTIVE;m.time=m.preparation+1800;m.structures.push(wall);Object.assign(e,{x:wall.x,z:wall.z});
+  assert.equal(B.breachMomentum,undefined);assert.equal(m.addBreachMomentum,undefined);const before=wall.hp,expected=repairPower(wall);m.act(e.id,{type:'repair',target:wall.id});assert.ok(Math.abs((wall.hp-before)-expected)<.01);
+  const visible=m.snapshot(e.id).structures.find(row=>row.id===wall.id);assert.equal('breachStacks' in visible,false);assert.equal(visible.effects.some(effect=>effect.id==='breach-pressure'),false);
 });
 test('Siege Parity cai com torres e reparo e mede uma fortaleza real',()=>{
   const m=match(),t=m.unit('t'),e=m.unit('e'),base=m.map.bases[0];m.state=STATES.ACTIVE;Object.assign(t.levels,{damage:10,speed:10,health:10,armor:10,regen:10,movement:10,siege:10,utility:10});t.maxHp=m.trollStats(t).maxHp;t.hp=t.maxHp;e.elfPath='defense';
@@ -121,13 +149,12 @@ test('Melhorias são compromissos; apenas obra e formação podem ser canceladas
   m.act('e',{type:'trainWisp',target:core.id});advance(m,7);const worker=m.wisps[1];m.act('e',{type:'upgradeWisp',target:worker.id});advance(m,1);assert.match(m.act('e',{type:'cancelJob',target:worker.id}),/não podem/);advance(m,5);assert.equal(worker.level,2);assert.ok(m.snapshot('e').wisps[0].income>0);
 });
 
-test('Núcleo 5 oferece especialização permanente e libera somente sua estrutura assinatura',()=>{
+test('Núcleo 5 oferece especialização e mantém a Refinaria aposentada',()=>{
   const m=match(),{e,core,b}=baseFixture(m);core.tier=5;core.maxHp=structureHP('core',5);core.hp=core.maxHp;Object.assign(e,{x:core.x+2,z:core.z});
   assert.equal(m.act(e.id,{type:'chooseElfSpecialization',key:'industrial'}),null);assert.equal(e.elfSpecialization,'industrial');
-  assert.match(m.act(e.id,{type:'chooseElfSpecialization',key:'fortress'}),/permanente/);
-  const spots=[];for(let z=-6;z<=6;z+=2)for(let x=-6;x<=6;x+=2)spots.push({x:b.x+x,z:b.z+z});
-  const refinery=spots.find(p=>m.placement(e,'refinery',p.x,p.z)===null);assert.ok(refinery);assert.equal(m.placement(e,'bastion',refinery.x,refinery.z),'Esta construção pertence a outra especialização.');
-  assert.equal(m.act(e.id,{type:'build',kind:'refinery',...refinery}),undefined);Object.assign(e,refinery);advance(m,7);assert.equal(m.structures.find(s=>s.kind==='refinery').progress,1);
+  assert.match(m.act(e.id,{type:'chooseElfSpecialization',key:'fortress'}),/permanece até/);
+  const spot={x:b.x+4,z:b.z+4};assert.equal(m.placement(e,'refinery',spot.x,spot.z),'Construção indisponível.');assert.equal(m.placement(e,'bastion',spot.x,spot.z),'Esta construção pertence a outra especialização.');
+  assert.equal(m.act(e.id,{type:'build',kind:'refinery',...spot}),'Construção indisponível.');assert.equal(m.structures.some(s=>s.kind==='refinery'),false);
 });
 
 test('Núcleos 8, 12 e 16 oferecem uma carta tecnológica paga pelo recurso da especialização',()=>{
@@ -163,7 +190,7 @@ test('Upgrade All evolui cada Wisp elegível exatamente uma vez',()=>{
 test('Cura do Troll usa cargas, persiste sob dano e recarrega lentamente',()=>{
   const m=match(),t=m.unit('t');m.state=STATES.ACTIVE;m.time=80;t.hp=t.maxHp*.4;t.lastHit=m.time;
   assert.equal(m.act(t.id,{type:'heal'}),undefined);assert.equal(t.healCharges,1);advance(m,3);m.damage(t,20,m.unit('e'),'tower','test-tower');advance(m,3.1);
-  assert.ok(Math.abs(m.telemetry.healing.consumable-t.maxHp*.2)<2);assert.equal(m.telemetry.healing.uses,1);assert.equal(t.healingUntil,0);
+  assert.ok(Math.abs(m.telemetry.healing.consumable-t.maxHp*B.troll.healPercent)<2);assert.equal(B.troll.healPercent,.16);assert.equal(m.telemetry.healing.uses,1);assert.equal(t.healingUntil,0);
   m.time=t.healRechargeAt; m.step(.05);assert.equal(t.healCharges,2);
 });
 
@@ -222,13 +249,17 @@ test('Fogo de torre reduz somente a regeneração de combate do Troll',()=>{
   pressured.t.lastHit=pressured.m.time-10;pressured.t.lastTowerHit=-100;pressured.m.step(.05);assert.ok(pressured.m.telemetry.healing.restRegen>0);
 });
 
-test('Torres Lendárias concentradas suprimem sustain em 30% e 50%',()=>{
+test('Torres Lendárias concentradas suprimem sustain em 45% e 68% por dez segundos',()=>{
   const m=match(),t=m.unit('t');m.state=STATES.ACTIVE;m.time=100;
   const tower=i=>({id:`legendary-${i}`,kind:'tower',owner:'e',x:t.x,z:t.z+5,tier:10,hp:1000,maxHp:1000,progress:1,legendary:true,beamTarget:t.id,disabledUntil:0});
   m.structures.push(tower(1));assert.deepEqual(m.legendarySustainPressure(t),{towers:1,multiplier:1});
-  m.structures.push(tower(2));assert.deepEqual(m.legendarySustainPressure(t),{towers:2,multiplier:.7});
-  m.structures.push(tower(3));assert.deepEqual(m.legendarySustainPressure(t),{towers:3,multiplier:.5});
-  m.structures[1].disabledUntil=m.time+1;assert.deepEqual(m.legendarySustainPressure(t),{towers:2,multiplier:.7});
+  m.structures.push(tower(2));assert.deepEqual(m.legendarySustainPressure(t),{towers:2,multiplier:.55});
+  m.structures.push(tower(3));assert.deepEqual(m.legendarySustainPressure(t),{towers:3,multiplier:.32});
+  m.structures[1].disabledUntil=m.time+1;assert.deepEqual(m.legendarySustainPressure(t),{towers:2,multiplier:.55});
+  for(const structure of m.structures){structure.beamTarget=null;structure.lastLegendaryHitAt=m.time;}
+  assert.deepEqual(m.legendarySustainPressure(t),{towers:3,multiplier:.32},'a pressão persiste após o Troll sair do feixe');
+  t.x+=20;t.hp=t.maxHp*.5;t.lastHit=m.time-20;const before=t.hp,restRate=combatStats(t).restRegen;m.step(.05);assert.ok(Math.abs((t.hp-before)-t.maxHp*restRate*.32*.05)<1e-8,'a memória também reduz regeneração passiva fora de combate');
+  m.time+=B.legendary.sustainPressureMemory+.01;assert.deepEqual(m.legendarySustainPressure(t),{towers:0,multiplier:1});
 });
 
 test('Barricada se recompõe levemente somente fora de cerco',()=>{
@@ -353,11 +384,11 @@ test('Loja reflete custo, nível e atributos autoritativos depois de uma compra'
   assert.equal(patched.units.find(u=>u.id===t.id).levels.damage,1,'O delta precisa transportar a compra para o navegador');
 });
 
-test('Nível 10 é Lendário, nível 20 é Épico e somente 20 bloqueia novas melhorias',()=>{
-  const m=match(),{e,core,wall}=baseFixture(m);Object.assign(e,{gold:1000000,wood:1000000,essence:1000000});wall.tier=5;
+test('Estruturas chegam ao nível 30 com marcos Lendário, Épico e Ascendente',()=>{
+  const m=match(),{e,core,wall}=baseFixture(m);Object.assign(e,{gold:1e12,wood:1e12,essence:1e12,elfSpecialization:'industrial'});e.specialResources.ancientWood=1e12;wall.tier=9;
   core.tier=9;core.maxHp=structureHP('core',9);core.hp=core.maxHp*.75;Object.assign(e,{x:core.x+2,z:core.z});const income9=resourceProducer(core).amount;
   assert.equal(m.act(e.id,{type:'upgrade',target:core.id}),undefined);advance(m,11);assert.equal(core.tier,10);assert.equal(core.legendary,true);assert.ok(Math.abs(core.hp/core.maxHp-.75)<.001);assert.ok(Math.abs(resourceProducer(core).amount/income9-B.legendary.coreIncome*lateTierScale(B.structures.core.growth,10)/lateTierScale(B.structures.core.growth,9))<1e-9);
-  wall.tier=20;wall.maxHp=structureHP('wall',20);wall.hp=wall.maxHp;for(let tier=11;tier<=20;tier++){assert.equal(m.act(e.id,{type:'upgrade',target:core.id}),undefined);advance(m,11);assert.equal(core.tier,tier);}assert.equal(core.epic,true);assert.match(m.act(e.id,{type:'upgrade',target:core.id}),/máximo/);
+  wall.tier=30;wall.maxHp=structureHP('wall',30);wall.hp=wall.maxHp;for(let tier=11;tier<=30;tier++){assert.equal(m.act(e.id,{type:'upgrade',target:core.id}),undefined);advance(m,11);assert.equal(core.tier,tier);if(tier===20)assert.equal(core.epic,true);}assert.equal(core.advanced,true);assert.match(m.act(e.id,{type:'upgrade',target:core.id}),/máximo/);
   wall.tier=9;wall.maxHp=structureHP('wall',9);wall.hp=wall.maxHp*.6;wall.bounty=500;wall.bountyFactor=1.3;Object.assign(e,{x:wall.x,z:wall.z});const bounty=wall.bounty,expectedDelta=(structureRewardHP('wall',10)-structureRewardHP('wall',9))*B.troll.goldPerDamage*wall.bountyFactor;
   assert.equal(m.act(e.id,{type:'upgrade',target:wall.id}),undefined);advance(m,11);assert.equal(wall.legendary,true);assert.equal(wall.maxHp,structureRewardHP('wall',10)*B.legendary.wallHealth);assert.ok(Math.abs(wall.hp/wall.maxHp-.6)<.001);assert.ok(Math.abs(wall.bounty-bounty-expectedDelta)<.01);
 });
@@ -413,8 +444,22 @@ test('Estruturas e atributos continuam evoluindo após tier 4 sem custo grátis'
   assert.equal(core.tier,10);assert.equal(t.levels.damage,9);assert.ok(trollCost('damage',9)>trollCost('damage',8));assert.ok(structureHP('wall',10)>structureHP('wall',9));
 });
 
+test('Custo estrutural preserva economia e aplica desconto direcionado às fortificações',()=>{
+  const legacy=(kind,tier)=>Math.round(B.structures[kind].upgradeGold*Math.pow(1.9,Math.min(3,tier-1))*Math.pow(B.progression.costGrowth,Math.max(0,tier-4)));
+  assert.equal(upgradeCost({kind:'core',tier:9}).gold,legacy('core',9));
+  assert.equal(upgradeCost({kind:'mine',tier:9}).gold,legacy('mine',9));
+  assert.equal(upgradeCost({kind:'tower',tier:8}).gold,Math.round(legacy('tower',8)*B.elfProgression.defenseUpgradeCost.tower.earlyGold));
+  assert.equal(upgradeCost({kind:'tower',tier:9}).gold,Math.round(legacy('tower',9)*B.elfProgression.defenseUpgradeCost.tower.lateGold));
+  assert.equal(upgradeCost({kind:'wall',tier:9}).gold,Math.round(legacy('wall',9)*B.elfProgression.defenseUpgradeCost.wall.lateGold));
+  assert.ok(upgradeCost({kind:'core',tier:14}).gold<legacy('core',14));
+  assert.ok(upgradeCost({kind:'core',tier:14}).gold>upgradeCost({kind:'core',tier:13}).gold);
+  assert.ok(upgradeCost({kind:'tower',tier:14}).gold<legacy('tower',14));
+  const tier16=upgradeCost({kind:'tower',tier:15}),withoutEpicBand=Math.round(tier16.gold/B.elfProgression.defenseUpgradeCost.tower.epicBand);
+  assert.ok(tier16.gold/withoutEpicBand>=.77&&tier16.gold/withoutEpicBand<=.79,'níveis 16–20 recebem cerca de 22% de desconto adicional');
+});
+
 test('Minas ganham uma vaga por tier do Núcleo e escalam custo e produção',()=>{
-  const m=match(),{e,core,b}=baseFixture(m);e.x=b.x;e.z=b.z;
+  const m=match(),{e,core,wall,b}=baseFixture(m);e.x=b.x;e.z=b.z;
   const points=[];for(const dx of [-4.4,-2.2,0,2.2,4.4])for(const dz of [-4.4,-2.2,0,2.2,4.4])if(dx||dz)points.push({x:b.x+dx,z:b.z+dz});
   const firstPoint=points.find(p=>m.placement(e,'mine',p.x,p.z)===null);assert.ok(firstPoint);const firstCost=mineEconomy(1).cost,before=e.gold;
   assert.equal(m.act(e.id,{type:'build',kind:'mine',...firstPoint}),undefined);const first=m.structures.at(-1);assert.equal(e.gold,before-firstCost.gold);assert.deepEqual(first.constructionCost,firstCost);advance(m,6);
@@ -422,7 +467,7 @@ test('Minas ganham uma vaga por tier do Núcleo e escalam custo e produção',()
   e.x=core.x+3;e.z=core.z;e.gold=e.wood=1000000;assert.equal(m.act(e.id,{type:'upgrade',target:core.id}),undefined);advance(m,5);assert.equal(core.tier,2);
   e.x=b.x;e.z=b.z;const secondPoint=points.find(p=>m.placement(e,'mine',p.x,p.z)===null);assert.ok(secondPoint);const secondCost=mineEconomy(2).cost,gold=e.gold;
   assert.equal(m.act(e.id,{type:'build',kind:'mine',...secondPoint}),undefined);assert.equal(e.gold,gold-secondCost.gold);advance(m,6);assert.equal(first.coreTier,2);const tier2Income=resourceProducer(first).amount;
-  e.x=core.x+3;e.z=core.z;assert.equal(m.act(e.id,{type:'upgrade',target:core.id}),undefined);advance(m,6);assert.equal(first.coreTier,3);assert.ok(resourceProducer(first).amount>tier2Income);assert.equal(mineEconomy(5).capacity,5);
+  wall.tier=2;e.x=core.x+3;e.z=core.z;assert.equal(m.act(e.id,{type:'upgrade',target:core.id}),undefined);advance(m,6);assert.equal(first.coreTier,3);assert.ok(resourceProducer(first).amount>tier2Income);assert.equal(mineEconomy(5).capacity,5);
 });
 
 test('Níveis extremos mantêm números finitos e ações com tempo de resposta legível',()=>{
@@ -523,14 +568,14 @@ test('Ouro estrutural recebe retorno decrescente, mas dano contra Elfos mantém 
   const wall={id:'gold-wall',kind:'wall',owner:e.id,baseId:'gold-base',x:t.x,z:t.z+2,tier:1,hp:10000,maxHp:10000,progress:1,bounty:10000,lastHit:-100};early.structures.push(wall);const wallStart=t.gold;early.damage(wall,10,t,'melee');const structuralGold=t.gold-wallStart;assert.ok(structuralGold<baseline&&structuralGold>=baseline*B.economy.trollDamageGoldMinimum);assert.ok(t.stats.goldFromDamageDiminished>0);
   const late=match(),lateTroll=late.unit('t'),lateElf=late.unit('e');late.state=STATES.ACTIVE;late.time=late.preparation+B.economy.trollDamageGoldDiminishingStart+300;const lateStart=lateTroll.gold,grossStart=lateTroll.stats.goldFromDamageGross;late.damage(lateElf,10,lateTroll,'melee');assert.equal(lateTroll.gold-lateStart,lateTroll.stats.goldFromDamageGross-grossStart);assert.equal(lateTroll.stats.goldFromDamageDiminished,0);
 });
-test('V3.2 produz Essência e especializa clareiras em Economia, Defesa ou Tecnologia',()=>{
-  const setup=()=>{const m=match(),{e,core,wall}=baseFixture(m),workshop={id:'essence-workshop',kind:'workshop',owner:e.id,baseId:core.baseId,x:core.x+2,z:core.z,tier:4,hp:1000,maxHp:1000,progress:1,upgrading:0,lastHit:-100,bounty:100};m.state=STATES.ACTIVE;m.structures.push(workshop);Object.assign(e,{x:workshop.x,z:workshop.z,essence:B.elfIncremental.pathCost});return {m,e,core,wall,workshop};};
-  const economy=setup(),gold=economy.e.gold;assert.equal(essenceIncome(economy.workshop),B.elfIncremental.essenceBaseRate);assert.equal(economy.m.act(economy.e.id,{type:'chooseElfPath',target:economy.workshop.id,path:'economy'}),null);advance(economy.m,1);assert.equal(economy.e.elfPath,'economy');assert.ok(economy.e.gold-gold>resourceProducer(economy.core).amount);assert.ok(economy.e.essence>0);assert.match(economy.m.act(economy.e.id,{type:'chooseElfPath',target:economy.workshop.id,path:'defense'}),/já possui/);
-  const defense=setup(),hp=defense.core.maxHp;assert.equal(defense.m.act(defense.e.id,{type:'chooseElfPath',target:defense.workshop.id,path:'defense'}),null);assert.ok(Math.abs(defense.core.maxHp/hp-B.elfIncremental.paths.defense.structureHp)<.001);
-  const technology=setup();assert.equal(technology.m.act(technology.e.id,{type:'chooseElfPath',target:technology.workshop.id,path:'technology'}),null);assert.equal(upgradeCost({kind:'core',tier:9},'technology').essence,Math.ceil(B.elfIncremental.legendaryCost*.75));technology.core.tier=4;technology.wall.tier=2;technology.e.gold=technology.e.wood=1000000;technology.e.x=technology.core.x;technology.e.z=technology.core.z;assert.equal(technology.m.act(technology.e.id,{type:'upgrade',target:technology.core.id}),undefined);assert.ok(technology.core.upgradeDuration<(B.construction.upgradeSeconds+4));
+test('Núcleo produz Essência e especializa clareiras em Economia, Defesa ou Tecnologia',()=>{
+  const setup=()=>{const m=match(),{e,core,wall}=baseFixture(m);m.state=STATES.ACTIVE;core.tier=4;Object.assign(e,{x:core.x,z:core.z,essence:B.elfIncremental.pathCost});return {m,e,core,wall};};
+  const economy=setup(),gold=economy.e.gold;assert.equal(essenceIncome(economy.core),B.elfIncremental.essenceBaseRate);assert.equal(economy.m.act(economy.e.id,{type:'chooseElfPath',target:economy.core.id,path:'economy'}),null);advance(economy.m,1);assert.equal(economy.e.elfPath,'economy');assert.ok(economy.e.gold-gold>resourceProducer(economy.core).amount);assert.ok(economy.e.essence>0);assert.match(economy.m.act(economy.e.id,{type:'chooseElfPath',target:economy.core.id,path:'defense'}),/já possui/);
+  const defense=setup(),hp=defense.core.maxHp;assert.equal(defense.m.act(defense.e.id,{type:'chooseElfPath',target:defense.core.id,path:'defense'}),null);assert.ok(Math.abs(defense.core.maxHp/hp-B.elfIncremental.paths.defense.structureHp)<.001);
+  const technology=setup();assert.equal(technology.m.act(technology.e.id,{type:'chooseElfPath',target:technology.core.id,path:'technology'}),null);assert.equal(upgradeCost({kind:'core',tier:9},'technology').essence,Math.ceil(B.elfIncremental.legendaryCost*.75));technology.wall.tier=4;technology.e.gold=technology.e.wood=1000000;assert.equal(technology.m.act(technology.e.id,{type:'upgrade',target:technology.core.id}),undefined);assert.ok(technology.core.upgradeDuration<(B.construction.upgradeSeconds+4));
 });
 test('Especializações registram produção, mitigação, cura e dano reais',()=>{
-  const industrial=match(),i=industrial.unit('e'),core={id:'impact-core',kind:'core',owner:i.id,baseId:'impact-base',x:i.x,z:i.z,tier:8,hp:1000,maxHp:1000,progress:1,lastHit:-100},refinery={id:'impact-refinery',kind:'refinery',owner:i.id,baseId:'impact-base',x:i.x+2,z:i.z,tier:5,hp:1000,maxHp:1000,progress:1,lastHit:-100,overdriveUntil:100};industrial.state=STATES.ACTIVE;industrial.time=50;i.elfSpecialization='industrial';industrial.structures.push(core,refinery);industrial.step(.1);assert.ok(i.stats.specializationImpact.refineryBonusGold>0);assert.ok(i.stats.specializationImpact.overdriveBonusGold>0);
+  const industrial=match(),i=industrial.unit('e'),core={id:'impact-core',kind:'core',owner:i.id,baseId:'impact-base',x:i.x,z:i.z,tier:8,hp:1000,maxHp:1000,progress:1,lastHit:-100,overdriveUntil:100};industrial.state=STATES.ACTIVE;industrial.time=50;i.elfSpecialization='industrial';industrial.structures.push(core);industrial.step(.1);assert.equal(i.stats.specializationImpact.refineryBonusGold,0);assert.ok(i.stats.specializationImpact.overdriveBonusGold>0);
   const fortress=match(),f=fortress.unit('e'),ft=fortress.unit('t'),wall={id:'impact-wall',kind:'wall',owner:f.id,baseId:'impact-fort',x:f.x,z:f.z,tier:8,hp:500,maxHp:1000,progress:1,lastHit:-100,fortifiedUntil:100},bastion={id:'impact-bastion',kind:'bastion',owner:f.id,baseId:'impact-fort',x:f.x+1,z:f.z,tier:6,hp:1000,maxHp:1000,progress:1,lastHit:-100};fortress.state=STATES.ACTIVE;fortress.time=50;f.elfSpecialization='fortress';fortress.structures.push(wall,bastion);fortress.step(.1);assert.ok(f.stats.specializationImpact.bastionHealing>0);const before=wall.hp;fortress.damage(wall,100,ft,'melee');assert.ok(before-wall.hp<100);assert.ok(f.stats.specializationImpact.fortifiedDamagePrevented>0);
   const arcane=match(),a=arcane.unit('e'),at=arcane.unit('t');arcane.state=STATES.ACTIVE;arcane.time=50;Object.assign(at,{hp:100000,maxHp:100000});a.elfSpecialization='arcane';const tower={id:'impact-arcane',kind:'arcaneTower',owner:a.id,baseId:'impact-arc',x:at.x,z:at.z+4,tier:7,hp:1000,maxHp:1000,progress:1,lastHit:-100,lastShot:-100};arcane.structures.push(tower);advance(arcane,4);assert.ok(a.stats.specializationImpact.arcaneDamage>0);const report=arcane.result().telemetry.specializations;assert.equal(report.structures.arcaneTower.maxTier,7);assert.ok(report.impact.arcaneDamage>0);
 });

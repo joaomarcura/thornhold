@@ -5,10 +5,11 @@ const round=value=>Math.round(value*100)/100;
 
 export class RuntimeMetrics {
   constructor({tickBudgetMs=50,maxSamples=1200}={}){
-    this.startedAt=Date.now();this.tickBudgetMs=tickBudgetMs;this.maxSamples=maxSamples;this.tickSamples=[];
-    this.tickCount=0;this.tickOverruns=0;this.inboundMessages=0;this.outboundMessages=0;this.inboundBytes=0;this.outboundBytes=0;this.droppedMessages=0;this.connectionsAccepted=0;
-    this.snapshotCount=0;this.fullSnapshots=0;this.deltaSnapshots=0;this.snapshotBytes=0;this.snapshotBuildMs=[];this.snapshotSerializeMs=[];
-    this.roomTicks=new Map();
+    this.tickBudgetMs=tickBudgetMs;this.maxSamples=maxSamples;this.reset();
+  }
+  reset(){
+    this.startedAt=Date.now();this.tickSamples=[];this.tickCount=0;this.tickOverruns=0;this.inboundMessages=0;this.outboundMessages=0;this.inboundBytes=0;this.outboundBytes=0;this.droppedMessages=0;this.connectionsAccepted=0;
+    this.snapshotCount=0;this.fullSnapshots=0;this.deltaSnapshots=0;this.snapshotBytes=0;this.snapshotBuildMs=[];this.snapshotSerializeMs=[];this.roomTicks=new Map();
   }
   now(){return performance.now();}
   recordTick(durationMs){this.tickCount++;if(durationMs>this.tickBudgetMs)this.tickOverruns++;this.tickSamples.push(durationMs);if(this.tickSamples.length>this.maxSamples)this.tickSamples.splice(0,this.tickSamples.length-this.maxSamples);}

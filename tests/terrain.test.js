@@ -8,13 +8,21 @@ import { TacticalMap } from '../client/tactical-map.js';
 test('Refúgios variam em espaço, madeira e altura; núcleos e portões permanecem planos',()=>{
   for(const size of ['compact','large'])for(let seed=0;seed<20;seed++){
     const map=generateMap('terrain-'+seed,size);
-    assert.equal(map.version,3);assert.equal(map.bases.length,12);assert.ok(new Set(map.bases.map(b=>b.rx*b.rz)).size>=3);
+    assert.equal(map.version,4);assert.equal(map.bases.length,12);assert.ok(new Set(map.bases.map(b=>b.rx*b.rz)).size>=3);
     assert.equal(new Set(map.bases.map(b=>b.wood)).size,3);
     assert.ok(map.trees.every(t=>t.amount===BALANCE.economy.treeStock));
     assert.ok(map.bases.some(b=>b.height<0)&&map.bases.some(b=>b.height>0));
     for(const b of map.bases){assert.ok(flatGround(map,b.x,b.z,4.5),`core ${seed} ${b.id}`);assert.ok(flatGround(map,b.gate.x,b.gate.z,1.55),`gate ${seed} ${b.id}`);assert.ok(Math.abs(heightAt(map,b.x,b.z)-b.height)<.001);assert.equal(map.trees.filter(t=>t.baseId===b.id).length,b.capacity);}
     for(const d of map.decor){const c=toCell(map,d);assert.equal(map.grid[index(map,c.x,c.z)],1,'Cenário sólido não invade o corredor');}
   }
+});
+
+test('Protótipos de mapa preservam bases válidas e produzem topologias distintas',()=>{
+  const maps=['woodland','deepForest','crossroads'].map(style=>generateMap('MAP-PROTOTYPE','compact',style));
+  assert.deepEqual(maps.map(map=>map.style),['woodland','deepForest','crossroads']);
+  for(const map of maps){assert.equal(map.bases.length,12);assert.ok(map.validation.every(row=>row.valid));for(const base of map.bases)assert.ok(pathfind(map,map.trollSpawn,base).length);}
+  const walkableCount=map=>map.grid.filter(cell=>cell===0).length;
+  assert.ok(walkableCount(maps[1])<walkableCount(maps[0]));assert.ok(walkableCount(maps[2])>walkableCount(maps[0]));
 });
 
 test('V3.1 amplia lateralmente as bases e organiza Core, Industrial e Frontline sem mover o portão',()=>{

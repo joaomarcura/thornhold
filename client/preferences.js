@@ -22,22 +22,23 @@ function load(){
   let saved={};try{saved=JSON.parse(storage()?.getItem(STORAGE_KEY)||'{}')||{};}catch{}
   const scale=SCALES.includes(Number(saved.scale))?Number(saved.scale):1;
   const bindings={...DEFAULT_BINDINGS,...(saved.bindings||{})};if((saved.bindingVersion||0)<2){bindings.upgrade='KeyQ';bindings.heal='KeyR';}if((saved.bindingVersion||0)<3){bindings.recall='KeyB';bindings.shop='KeyG';}
-  return {scale,reducedMotion:saved.reducedMotion===true,bindingVersion:3,bindings};
+  return {scale,reducedMotion:saved.reducedMotion===true,cameraMode:saved.cameraMode==='third'?'third':'first',bindingVersion:3,bindings};
 }
 function save(){try{storage()?.setItem(STORAGE_KEY,JSON.stringify(preferences));}catch{}applyPreferences();return getPreferences();}
-export function getPreferences(){return {scale:preferences.scale,reducedMotion:preferences.reducedMotion,bindings:{...preferences.bindings}};}
+export function getPreferences(){return {scale:preferences.scale,reducedMotion:preferences.reducedMotion,cameraMode:preferences.cameraMode,bindings:{...preferences.bindings}};}
 export function binding(action){return preferences.bindings[action]||DEFAULT_BINDINGS[action];}
 export function matches(event,action){return event.code===binding(action);}
 export function held(keys,action){const code=binding(action);return keys.has(code)||(action==='sprint'&&code==='ShiftLeft'&&keys.has('ShiftRight'));}
 export function setScale(value){const scale=SCALES.includes(Number(value))?Number(value):1;preferences={...preferences,scale};return save();}
 export function setReducedMotion(value){preferences={...preferences,reducedMotion:!!value};return save();}
+export function setCameraMode(value){preferences={...preferences,cameraMode:value==='third'?'third':'first'};return save();}
 export function setBinding(action,code){
   if(!DEFAULT_BINDINGS[action]||!code||RESERVED.has(code))return {ok:false,reason:'reserved'};
   const bindings={...preferences.bindings},contextual=new Set(['upgrade:heavy','heavy:upgrade','repair:heal','heal:repair']),other=Object.keys(bindings).find(key=>key!==action&&bindings[key]===code&&!contextual.has(`${action}:${key}`));
   if(other)bindings[other]=bindings[action];
   bindings[action]=code;preferences={...preferences,bindings};save();return {ok:true,swapped:other||null};
 }
-export function resetPreferences(){preferences={scale:1,reducedMotion:false,bindingVersion:3,bindings:{...DEFAULT_BINDINGS}};return save();}
+export function resetPreferences(){preferences={scale:1,reducedMotion:false,cameraMode:'first',bindingVersion:3,bindings:{...DEFAULT_BINDINGS}};return save();}
 export function keyLabel(code){
   if(!code)return '—';
   const names={Space:'Espaço',Tab:'Tab',ShiftLeft:'Shift',ShiftRight:'Shift',ArrowUp:'↑',ArrowDown:'↓',ArrowLeft:'←',ArrowRight:'→',Backquote:'`',Semicolon:';',Quote:"'",Comma:',',Period:'.',Slash:'/',Backslash:'\\',BracketLeft:'[',BracketRight:']'};
