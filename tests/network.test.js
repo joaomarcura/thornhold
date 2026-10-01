@@ -175,6 +175,31 @@ test('MODE-204: grupo élfico entra junto na fila e o Troll não aceita grupo',a
   }finally{await Promise.all(clients.map(closeClient));await app.close();}
 });
 
+test('COOP-001: líder leva a party inteira para uma sala ampla 1×5',async()=>{
+  const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false}),clients=[];
+  try{
+    const leader=await client(app.port,'Líder co-op'),ally=await client(app.port,'Aliado co-op');clients.push(leader,ally);
+    leader.send('partyCreate');const created=await leader.wait('queue',message=>message.party?.members.length===1),code=created.party.id;
+    ally.send('partyJoin',{code});await ally.wait('queue',message=>message.party?.id===code&&message.party.members.length===2);await leader.wait('queue',message=>message.party?.members.length===2);
+    leader.send('partyRoom',{fillBots:true,mapStyle:'woodland'});
+    const [leaderLobby,allyLobby]=await Promise.all([leader.wait('lobby',message=>message.room?.settings?.coop===true),ally.wait('lobby',message=>message.room?.settings?.coop===true)]),room=leaderLobby.room;
+    assert.equal(allyLobby.room.id,room.id);assert.equal(room.settings.mapSize,'large');assert.equal(room.settings.elfSlots,5);assert.equal(room.members.length,2);assert.equal(room.slots.filter(slot=>slot.occupant?.type==='human').length,2);assert.equal(room.slots.filter(slot=>slot.occupant?.type==='bot').length,4);assert.ok(room.slots.filter(slot=>slot.occupant?.type==='human').every(slot=>slot.occupant.partyId===code));
+  }finally{await Promise.all(clients.map(closeClient));await app.close();}
+});
+
+test('COOP-002: líder solo recruta e troca um Bot co-op no lobby',async()=>{
+  const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false});let leader;
+  try{
+    leader=await client(app.port,'Líder solo');leader.send('partyCreate');const created=await leader.wait('queue',message=>message.party?.members.length===1),code=created.party.id;
+    leader.send('partyRoom',{fillBots:true,mapStyle:'woodland'});const first=(await leader.wait('lobby',message=>message.room?.settings?.coop===true)).room;
+    assert.equal(first.members.length,1);assert.equal(first.settings.mapSize,'large');
+    const original=first.slots.find(slot=>slot.occupant?.coopPartner);assert.ok(original);assert.equal(original.role,'elf');assert.equal(original.occupant.partyId,code);
+    const replacement=first.slots.find(slot=>slot.role==='elf'&&slot.occupant?.type==='bot'&&slot.id!==original.id);assert.ok(replacement);
+    leader.send('slot',{slot:replacement.id,action:'coop'});const changed=(await leader.wait('lobby',message=>message.room?.slots.some(slot=>slot.id===replacement.id&&slot.occupant?.coopPartner))).room;
+    assert.equal(changed.slots.find(slot=>slot.id===original.id).occupant.partyId,null);assert.equal(changed.slots.find(slot=>slot.id===replacement.id).occupant.partyId,code);
+  }finally{if(leader)await closeClient(leader);await app.close();}
+});
+
 test('Ranqueada de teste começa imediatamente e completa ambos os times com bots',async()=>{
   const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false}),clients=[];
   try{

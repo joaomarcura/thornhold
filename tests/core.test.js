@@ -17,6 +17,17 @@ test('Seed determinística e corte de entrada única em 40 mapas',()=>{
   assert.notDeepEqual(generateMap('same').bases,generateMap('different').bases);
   for(const size of ['compact','large'])for(let seed=0;seed<20;seed++){const m=generateMap('seed-'+seed,size);assert.equal(m.validation.length,12);assert.ok(m.validation.every(v=>v.valid&&v.openings===1&&v.gateIsCutVertex));}
 });
+test('Party recebe entradas recomendadas do mesmo compound sem fundir economias',()=>{
+  const occupants=[{id:'t',role:'troll',occupant:{type:'bot',name:'Troll'}},{id:'e0',role:'elf',occupant:{type:'human',name:'A',partyId:'PARTY'}},{id:'e1',role:'elf',occupant:{type:'human',name:'B',partyId:'PARTY'}}],m=new Match({seed:'PARTY-MAP',mapSize:'large',coop:true},occupants),compound=m.map.coopCompounds[0];
+  assert.deepEqual([m.unit('e0').recommendedBaseId,m.unit('e1').recommendedBaseId],compound.baseIds);assert.equal(m.unit('e0').partyId,'PARTY');const allyGold=m.unit('e1').gold;m.unit('e0').gold+=10;assert.equal(m.unit('e1').gold,allyGold);
+  const view=m.snapshot('e0').units.find(unit=>unit.id==='e0');assert.equal(view.recommendedBaseId,compound.baseIds[0]);
+});
+test('Bot co-op inicia sua rota pela entrada recomendada da fortaleza',()=>{
+  const occupants=[{id:'t',role:'troll',occupant:{type:'bot',name:'Troll'}},{id:'e0',role:'elf',occupant:{type:'human',name:'Jogador',partyId:'PARTY'}},{id:'e1',role:'elf',occupant:{type:'bot',name:'Aliado IA',partyId:'PARTY',coopPartner:true}}],m=new Match({seed:'PARTY-BOT-ROUTE',mapSize:'large',coop:true},occupants),bot=m.unit('e1');
+  for(let i=0;i<50;i++)m.step(.1);
+  const core=m.structures.find(structure=>structure.owner===bot.id&&structure.kind==='core'),target=m.controllers.get(bot.id).relocationBaseId;
+  assert.equal(core?.baseId||target,bot.recommendedBaseId);
+});
 test('Troll enxerga até 60 metros, mas continua limitado por distância e linha de visão',()=>{
   const m=new Match({seed:'TROLL-VISION'},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}}]),t=m.unit('t');
   m.map.grid.fill(0);m.map.heights.fill(0);Object.assign(t,{x:80,z:80});

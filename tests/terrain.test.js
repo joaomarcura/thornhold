@@ -25,6 +25,30 @@ test('Protótipos de mapa preservam bases válidas e produzem topologias distint
   assert.ok(walkableCount(maps[1])<walkableCount(maps[0]));assert.ok(walkableCount(maps[2])>walkableCount(maps[0]));
 });
 
+test('Mapa co-op organiza fortalezas de duas entradas sem invalidar barricadas',()=>{
+  const map=generateMap('COOP-COMPOUNDS','large','woodland',{coop:true});
+  assert.equal(map.coop,true);assert.equal(map.coopCompounds.length,4);assert.equal(map.coopTunnels.length,4);
+  const assigned=new Set();
+  for(const compound of map.coopCompounds){
+    assert.equal(compound.baseIds.length,2);assert.equal(compound.entrances.length,2);assert.ok(compound.tunnelId);
+    const tunnel=map.coopTunnels.find(candidate=>candidate.id===compound.tunnelId),bases=compound.baseIds.map(id=>map.bases.find(base=>base.id===id));
+    const blockedEntrances=new Set(compound.entrances.map(entrance=>index(map,entrance.cx,entrance.cz)));
+    assert.ok(tunnel&&tunnel.path.length>2);assert.ok(pathfind(map,bases[0],bases[1],blockedEntrances).length,'Aliados precisam atravessar o túnel mesmo com as duas entradas externas fechadas');
+    for(const point of tunnel.path){const cell=toCell(map,point);assert.ok(walkable(map,cell.x,cell.z),'O túnel precisa ser fisicamente transitável');}
+    for(const baseId of compound.baseIds){
+      assert.equal(assigned.has(baseId),false);assigned.add(baseId);
+      const base=map.bases.find(candidate=>candidate.id===baseId),validation=map.validation.find(row=>row.base===baseId);
+      assert.equal(base.compoundId,compound.id);assert.equal(base.partnerBaseId,compound.baseIds.find(id=>id!==baseId));
+      assert.ok(validation.valid&&validation.openings===2&&validation.gateIsCutVertex);
+    }
+  }
+  assert.equal(assigned.size,8);
+  assert.equal(map.rivers.length,1);assert.ok(map.bridges.length>0&&map.bridges.length<20);
+  for(const bridge of map.bridges){const cell=toCell(map,bridge);assert.ok(walkable(map,cell.x,cell.z));}
+  const standard=generateMap('COOP-COMPOUNDS','large');assert.equal(standard.coop,false);assert.equal(standard.coopCompounds.length,0);assert.equal(standard.coopTunnels.length,0);assert.ok(standard.bases.every(base=>!base.compoundId));
+  assert.equal(standard.rivers.length,0);assert.equal(standard.bridges.length,0);
+});
+
 test('V3.1 amplia lateralmente as bases e organiza Core, Industrial e Frontline sem mover o portão',()=>{
   const legacyUsable=(rx,rz)=>{let cells=1;for(let z=-rz+1;z<rz;z++)for(let x=-rx+1;x<rx;x++)if(!(Math.abs(x)>rx-3&&Math.abs(z)>rz-3))cells++;return cells;};
   for(const size of ['compact','large'])for(let seed=0;seed<20;seed++){

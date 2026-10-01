@@ -152,6 +152,10 @@ export async function createGameServer({port=Number(process.env.PORT)||3000,host
         if(msg.type==='partyCreate'){sessions.createParty(client);broadcastQueue();return;}
         if(msg.type==='partyJoin'){sessions.joinParty(client,msg.code);broadcastQueue();return;}
         if(msg.type==='partyLeave'){sessions.leaveParty(client);broadcastQueue();return;}
+        if(msg.type==='partyRoom'){
+          if(sessions.rooms.size>=limits.maxRooms)throw new Error('Limite temporário de salas atingido.');
+          room=sessions.createPartyRoom(client,msg);room.devSpeed=1;lobby(room);return;
+        }
         if(msg.type==='rankedCancel'){sessions.dequeueRanked(client);broadcastQueue();return;}
         if(msg.type==='rankedQueue'){
           if(sessions.rooms.size>=limits.maxRooms)throw new Error('Limite temporário de salas atingido.');

@@ -32,9 +32,9 @@ export function flatGround(map,x,z,radius){
 export function traversable(map,x,z,nx,nz){return walkable(map,nx,nz)&&Math.abs((map.heights?.[index(map,x,z)]||0)-(map.heights?.[index(map,nx,nz)]||0))<=map.cell*.55;}
 
 export const MAP_STYLES=Object.freeze({woodland:{name:'Bosque clássico'},deepForest:{name:'Mata fechada'},crossroads:{name:'Rotas abertas'}});
-export function generateMap(seed='THORNHOLD',mapSize='compact',mapStyle='woodland'){
+export function generateMap(seed='THORNHOLD',mapSize='compact',mapStyle='woodland',options={}){
   const style=MAP_STYLES[mapStyle]?mapStyle:'woodland',rng=randomFor(seed),size=mapSize==='large'?125:109,cell=BALANCE.cell,mid=(size-1)/2,offset=(size-109)/2;
-  const map={seed:String(seed),version:4,style,size,cell,grid:Array(size*size).fill(1),heights:Array(size*size).fill(0),bases:[],trees:[],specialNodes:[],decor:[],pois:[],trails:[]};
+  const coop=options?.coop===true,map={seed:String(seed),version:4,style,size,cell,coop,coopCompounds:[],coopTunnels:[],rivers:[],bridges:[],grid:Array(size*size).fill(1),heights:Array(size*size).fill(0),bases:[],trees:[],specialNodes:[],decor:[],pois:[],trails:[]};
   const carve=(x,z,r=1)=>{for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++)if(x+dx>1&&z+dz>1&&x+dx<size-2&&z+dz<size-2)map.grid[index(map,x+dx,z+dz)]=0;};
   const trail=(points,width=style==='deepForest'?0:1)=>{map.trails.push(points.map(([x,z])=>world(map,x,z)));for(let i=1;i<points.length;i++){let [x,z]=points[i-1];const [tx,tz]=points[i];carve(x,z,width);while(x!==tx||z!==tz){if(x!==tx)x+=Math.sign(tx-x);else z+=Math.sign(tz-z);carve(x,z,width);}}};
   // Connected woodland loops, turns and blind branches replace radial sight lines.
@@ -86,8 +86,35 @@ export function generateMap(seed='THORNHOLD',mapSize='compact',mapStyle='woodlan
     map.specialNodes.push({id:'resource'+map.specialNodes.length,...nodeSpot,resource,amount:BALANCE.elfProgression.localStock,maxAmount:BALANCE.elfProgression.localStock,local:true,baseId:b.id});
     b.capacity=map.trees.filter(t=>t.baseId===b.id).length;b.wood=b.capacity*BALANCE.economy.treeStock;
   }
+  // A compound groups two neighbouring refuges while preserving both cores,
+  // economies and gate cut vertices. This gives allies two defensible entries
+  // without opening a hidden route around either barricade.
+  if(coop){
+    const pairs=[[1,2],[4,5],[7,8],[10,11]];
+    for(const [compoundIndex,[leftIndex,rightIndex]] of pairs.entries()){
+      const members=[map.bases[leftIndex],map.bases[rightIndex]],id=`compound${compoundIndex}`;
+      const horizontal=Math.abs(members[0].cx-members[1].cx)>=Math.abs(members[0].cz-members[1].cz),ordered=[...members].sort((a,b)=>horizontal?a.cx-b.cx:a.cz-b.cz);
+      const from=horizontal?{x:ordered[0].cx+ordered[0].rx,z:ordered[0].cz}:{x:ordered[0].cx,z:ordered[0].cz+ordered[0].rz};
+      const to=horizontal?{x:ordered[1].cx-ordered[1].rx,z:ordered[1].cz}:{x:ordered[1].cx,z:ordered[1].cz-ordered[1].rz};
+      const bend=horizontal?{x:Math.round((from.x+to.x)/2),z:from.z}:{x:from.x,z:Math.round((from.z+to.z)/2)},bend2=horizontal?{x:bend.x,z:to.z}:{x:to.x,z:bend.z};
+      const controls=[from,bend,bend2,to],cells=[];
+      for(let segment=1;segment<controls.length;segment++){
+        let {x,z}=controls[segment-1];const end=controls[segment];if(!cells.length)cells.push({x,z});
+        while(x!==end.x||z!==end.z){if(x!==end.x)x+=Math.sign(end.x-x);else z+=Math.sign(end.z-z);cells.push({x,z});}
+      }
+      const tunnel={id:`tunnel${compoundIndex}`,compoundId:id,baseIds:ordered.map(base=>base.id),path:cells.map(point=>world(map,point.x,point.z)),cells};
+      const compound={id,name:`Fortaleza cooperativa ${compoundIndex+1}`,baseIds:members.map(base=>base.id),entrances:members.map(base=>({...base.gate,baseId:base.id})),tunnelId:tunnel.id};
+      map.coopCompounds.push(compound);
+      map.coopTunnels.push(tunnel);
+      members.forEach((base,entranceIndex)=>Object.assign(base,{coop:true,compoundId:id,compoundName:compound.name,compoundEntrance:entranceIndex+1,partnerBaseId:members[1-entranceIndex].id}));
+    }
+  }
   // Later approach trails may brush a neighbouring refuge; enforce every perimeter last.
   for(const b of map.bases){for(let z=b.cz-b.rz;z<=b.cz+b.rz;z++)for(let x=b.cx-b.rx;x<=b.cx+b.rx;x++)if(Math.abs(x-b.cx)===b.rx||Math.abs(z-b.cz)===b.rz)map.grid[index(map,x,z)]=1;carve(b.gate.cx,b.gate.cz,0);b.usableCells=baseUsableCells(map,b);}
+  // Co-op refuges are one shared base: a narrow internal tunnel joins both
+  // protected courtyards without creating a third entrance from the forest.
+  for(const tunnel of map.coopTunnels){for(const point of tunnel.cells)carve(point.x,point.z,0);map.trails.push(tunnel.path);}
+  for(const b of map.bases)b.usableCells=baseUsableCells(map,b);
   // Flat platforms and continuous eight-cell earth ramps; no visual-only steps.
   for(let z=0;z<size;z++)for(let x=0;x<size;x++){
     let y=0;for(const b of map.bases){const d=Math.max(0,Math.abs(x-b.cx)-b.rx-1,Math.abs(z-b.cz)-b.rz-1);y+=b.height*Math.max(0,1-d/8);}
@@ -99,8 +126,22 @@ export function generateMap(seed='THORNHOLD',mapSize='compact',mapStyle='woodlan
   for(const b of map.bases){const dx=b.gate.axis==='x'?b.gate.sign:0,dz=b.gate.axis==='z'?b.gate.sign:0;
     for(let step=0;step<=9;step++){const longitudinal=step<=1?1:Math.max(0,1-(step-1)/8);for(let side=-4;side<=4;side++){const lateral=Math.abs(side)<=1?1:Math.max(0,1-(Math.abs(side)-1)/3),blend=longitudinal*lateral,x=b.gate.cx+dx*step+(b.gate.axis==='z'?side:0),z=b.gate.cz+dz*step+(b.gate.axis==='x'?side:0);if(x>=0&&z>=0&&x<size&&z<size){const k=index(map,x,z),y=map.heights[k]*(1-blend)+b.height*blend;map.heights[k]=Math.round(y*10000)/10000;}}}
   }
+  for(const tunnel of map.coopTunnels){
+    const [fromId,toId]=tunnel.baseIds,from=map.bases.find(base=>base.id===fromId),to=map.bases.find(base=>base.id===toId),last=Math.max(1,tunnel.cells.length-1);
+    tunnel.cells.forEach((point,i)=>{map.heights[index(map,point.x,point.z)]=Math.round((from.height+(to.height-from.height)*(i/last))*10000)/10000;});
+  }
   for(const b of map.bases){const axis=b.gate.axis,sign=b.gate.sign;
     for(const side of [-1,1]){const x=b.gate.cx+(axis==='x'?sign*4:side),z=b.gate.cz+(axis==='z'?sign*4:side);if(walkable(map,x,z))map.trees.push({id:'tree'+map.trees.length,...world(map,x,z),amount:BALANCE.economy.treeStock,rich:true,style:1});}
+  }
+  // Static water is deliberately presentation-only: existing walkable cells
+  // become visible bridge spans, so adding scenery cannot invalidate a seed or
+  // force extra pathfinding work during the match.
+  if(coop){
+    const riverZ=Math.round(mid-14),startX=28,endX=size-29;
+    map.rivers.push({id:'river0',axis:'x',start:world(map,startX,riverZ),end:world(map,endX,riverZ),width:2.5});
+    let runStart=null;
+    const finishRun=end=>{if(runStart===null)return;const count=end-runStart+1,center=(runStart+end)/2,short=count<=3;map.bridges.push({id:`bridge${map.bridges.length}`,...world(map,center,riverZ),axis:short?'z':'x',length:(short?3.4:count*cell),width:short?count*cell:3.4});runStart=null;};
+    for(let x=startX;x<=endX+1;x++){if(x<=endX&&walkable(map,x,riverZ)){if(runStart===null)runStart=x;}else finishRun(x-1);}
   }
   // One large neutral deposit of every resource keeps every specialization
   // viable after the small, safe deposit inside a refuge has been exhausted.
@@ -110,6 +151,7 @@ export function generateMap(seed='THORNHOLD',mapSize='compact',mapStyle='woodlan
   const decorRate=style==='deepForest'?.52:style==='crossroads'?.25:.35;
   for(let z=2;z<size-2;z++)for(let x=2;x<size-2;x++)if(!walkable(map,x,z)&&rng()<decorRate)map.decor.push({...world(map,x,z),scale:.8+rng()*.4,kind:rng()<.2?'rock':'tree',rotation:rng()*6.28});
   map.pois=[{...world(map,mid-5,mid),name:'Pedras ancestrais'},{...world(map,mid+5,mid+3),name:'Fonte do luar'}];
+  for(const tunnel of map.coopTunnels)delete tunnel.cells;
   map.validation=map.bases.map(b=>validateBase(map,b));
   if(map.validation.some(v=>!v.valid))throw new Error('Mapa recusado: '+JSON.stringify(map.validation.filter(v=>!v.valid)));
   return map;
@@ -120,9 +162,11 @@ export function flood(map,start,blocked=new Set()){
 }
 export function validateBase(map,b){
   const start=toCell(map,map.trollSpawn),target=index(map,b.cx,b.cz),gate=index(map,b.gate.cx,b.gate.cz);
-  const connected=flood(map,start).has(target),sealed=!flood(map,start,new Set([gate])).has(target);
+  const compound=b.compoundId&&map.coopCompounds?.find(candidate=>candidate.id===b.compoundId),blockedGates=new Set(compound?compound.entrances.map(entrance=>index(map,entrance.cx,entrance.cz)):[gate]);
+  const connected=flood(map,start).has(target),sealed=!flood(map,start,blockedGates).has(target);
   let openings=0;for(let z=b.cz-b.rz;z<=b.cz+b.rz;z++)for(let x=b.cx-b.rx;x<=b.cx+b.rx;x++)if((Math.abs(x-b.cx)===b.rx||Math.abs(z-b.cz)===b.rz)&&walkable(map,x,z))openings++;
-  return {base:b.id,connected,gateIsCutVertex:sealed,openings,valid:connected&&sealed&&openings===1};
+  const expectedOpenings=compound?2:1;
+  return {base:b.id,connected,gateIsCutVertex:sealed,openings,valid:connected&&sealed&&openings===expectedOpenings};
 }
 class PathHeap{
   constructor(){this.items=[];}

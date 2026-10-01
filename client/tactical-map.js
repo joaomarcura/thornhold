@@ -11,13 +11,18 @@ export class TacticalMap {
     if(troll)this.lastTroll={x:troll.x,z:troll.z,time:snapshot.time};
     if(snapshot.units.some(u=>u.role==='troll'&&!u.alive))this.lastTroll=null;
     const sources=viewer?[...snapshot.units.filter(a=>a.role===viewer.role&&(a.alive||a.ghost)),...(viewer.role==='elf'?snapshot.structures.filter(s=>s.progress>=1&&s.hp>0):[]),...(viewer.role==='elf'?(snapshot.reveals||[]):[])]:[];
-    const key=viewer?sources.map(p=>{const c=toCell(this.map,p);return `${c.x},${c.z}`;}).join(';'):'spectator';
+    const key=viewer?`${viewer.recommendedBaseId||''}|`+sources.map(p=>{const c=toCell(this.map,p);return `${c.x},${c.z}`;}).join(';'):'spectator';
     if(key===this.visionKey)return;this.visionKey=key;this.visible.fill(viewer?0:1);this.revision++;
     if(!viewer)this.explored.fill(1);
     const radius=B.vision[viewer?.role]||24;
     for(const source of sources){const sourceRadius=source.radius||(source.ghost?B.ghost.vision:radius),cells=Math.ceil(sourceRadius/this.map.cell),c=toCell(this.map,source);for(let z=Math.max(0,c.z-cells);z<=Math.min(this.map.size-1,c.z+cells);z++)for(let x=Math.max(0,c.x-cells);x<=Math.min(this.map.size-1,c.x+cells);x++){
       const p={x:x*this.map.cell,z:z*this.map.cell},k=index(this.map,x,z);if(distance(source,p)<=sourceRadius&&lineOfSight(this.map,source,p)){this.explored[k]=1;this.visible[k]=1;}
     }}
+    // A co-op assignment is mission information, not enemy vision. Reveal the
+    // two allied refuge footprints immediately so players can navigate there
+    // without exposing surrounding enemies or resources.
+    const recommended=this.map.bases.find(base=>base.id===viewer?.recommendedBaseId),partner=recommended&&this.map.bases.find(base=>base.id===recommended.partnerBaseId);
+    for(const base of [recommended,partner].filter(Boolean)){this.seenBases.add(base.id);for(let z=Math.max(0,base.cz-base.rz-2);z<=Math.min(this.map.size-1,base.cz+base.rz+2);z++)for(let x=Math.max(0,base.cx-base.rx-2);x<=Math.min(this.map.size-1,base.cx+base.rx+2);x++)this.explored[index(this.map,x,z)]=1;}
     for(const b of this.map.bases)if(!viewer||sources.some(a=>distance(a,b.gate)<radius&&lineOfSight(this.map,a,b.gate))||(viewer.role==='elf'&&snapshot.structures.some(s=>s.baseId===b.id)))this.seenBases.add(b.id);
   }
   point(canvas,event){const r=canvas.getBoundingClientRect(),size=(this.map.size-1)*this.map.cell;return{x:Math.max(0,Math.min(size,(event.clientX-r.left)/r.width*size)),z:Math.max(0,Math.min(size,(event.clientY-r.top)/r.height*size))};}
@@ -29,7 +34,15 @@ export class TacticalMap {
     let bg=this.backgrounds.get(w);if(!bg){bg={canvas:document.createElement('canvas'),revision:-1};bg.canvas.width=bg.canvas.height=w;this.backgrounds.set(w,bg);}
     if(bg.revision!==this.revision){const c=bg.canvas.getContext('2d');c.clearRect(0,0,w,w);for(let z=0;z<m.size;z++)for(let x=0;x<m.size;x++){const i=index(m,x,z);if(!this.explored[i])continue;const light=this.visible[i],height=m.heights?.[i]||0;c.fillStyle=m.grid[i]?light?'#263c35':'#15282a':light?(height>1?'#7c8060':height< -1?'#4c7971':'#607869'):'#334844';c.fillRect((x-.5)*m.cell*k,(z-.5)*m.cell*k,m.cell*k+.5,m.cell*k+.5);}bg.revision=this.revision;}
     ctx.drawImage(bg.canvas,0,0);
+    const recommended=m.bases.find(base=>base.id===u?.recommendedBaseId),partner=recommended&&m.bases.find(base=>base.id===recommended.partnerBaseId);
+    if(recommended&&partner){
+      ctx.save();ctx.strokeStyle='#74e0b3';ctx.fillStyle='#74e0b318';ctx.lineWidth=large?3:2;ctx.setLineDash([7,4]);ctx.beginPath();ctx.moveTo(recommended.x*k,recommended.z*k);ctx.lineTo(partner.x*k,partner.z*k);ctx.stroke();ctx.setLineDash([]);
+      for(const base of [recommended,partner]){ctx.fillRect((base.x-base.rx*m.cell)*k,(base.z-base.rz*m.cell)*k,base.rx*m.cell*2*k,base.rz*m.cell*2*k);ctx.strokeRect((base.x-base.rx*m.cell)*k,(base.z-base.rz*m.cell)*k,base.rx*m.cell*2*k,base.rz*m.cell*2*k);}
+      if(large){ctx.textAlign='center';ctx.font='bold 12px sans-serif';ctx.fillStyle='#a7f4d1';ctx.fillText('FORTALEZA CO-OP',(recommended.x+partner.x)/2*k,Math.min(recommended.z,partner.z)*k-18);}
+      ctx.restore();
+    }
     for(const b of m.bases){if(!this.seenBases.has(b.id))continue;ctx.fillStyle='#d7bf84';ctx.fillRect(b.gate.x*k-2,b.gate.z*k-2,4,4);if(large){ctx.font='10px sans-serif';ctx.textAlign='center';ctx.fillText(b.name,b.x*k,(b.z-b.rz*m.cell-2)*k);ctx.fillStyle='#b6c7b9';ctx.font='9px sans-serif';ctx.fillText(`${b.profile} · ${b.height>0?'+':''}${b.height} m`,b.x*k,(b.z+b.rz*m.cell+4)*k);}}
+    if(recommended){ctx.fillStyle='#74e0b3';ctx.fillRect(recommended.gate.x*k-6,recommended.gate.z*k-6,12,12);if(large){ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.fillText(`SUA ENTRADA ${recommended.compoundEntrance}/2`,recommended.gate.x*k,recommended.gate.z*k-11);}}
     const ring=(p,r,color,dashed=false)=>{ctx.strokeStyle=color;ctx.lineWidth=2;ctx.setLineDash(dashed?[4,3]:[]);ctx.beginPath();ctx.arc(p.x*k,p.z*k,r,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);};
     const resourceColor={ancientWood:'#d3a66d',crystal:'#7fe0dd',mana:'#b58cff'};
     for(const node of s.specialNodes||[]){if(node.amount<=0)continue;ctx.fillStyle=resourceColor[node.resource]||'#f1d38d';ctx.beginPath();ctx.moveTo(node.x*k,node.z*k-5);ctx.lineTo(node.x*k+5,node.z*k);ctx.lineTo(node.x*k,node.z*k+5);ctx.lineTo(node.x*k-5,node.z*k);ctx.closePath();ctx.fill();if(large){ctx.font='bold 9px sans-serif';ctx.textAlign='center';ctx.fillText(String(Math.floor(node.amount)),node.x*k,node.z*k-8);}}

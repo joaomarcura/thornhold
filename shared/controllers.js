@@ -252,7 +252,10 @@ export class AIController {
       const elves=match.units.filter(a=>a.role==='elf'),offset=elves.findIndex(a=>a.id===u.id);
       const claimed=new Set(match.structures.filter(s=>s.kind==='core'&&s.hp>0).map(s=>s.baseId));
       if(!this.refuges){this.refuges=distributedRefuges(match.map);this.metrics.refugeOrder=this.refuges.map(refuge=>refuge.id);}
-      const ordered=Array.from({length:this.refuges.length},(_,i)=>this.refuges[(offset+i)%this.refuges.length]),previousBaseId=u.displacedBaseId||null;
+      let ordered=Array.from({length:this.refuges.length},(_,i)=>this.refuges[(offset+i)%this.refuges.length]),previousBaseId=u.displacedBaseId||null;
+      // A party bot starts at its assigned entrance of the shared fortress.
+      // After displacement, normal safe-relocation scoring takes over.
+      if(!previousBaseId&&u.recommendedBaseId){const recommended=ordered.find(b=>b.id===u.recommendedBaseId);if(recommended)ordered=[recommended,...ordered.filter(b=>b.id!==recommended.id)];}
       const visibleThreat=match.visibleEnemies(u).find(e=>e.role==='troll'),rememberedThreat=(u.relocationThreat?.until||0)>match.time?u.relocationThreat:null,relocationThreat=visibleThreat||rememberedThreat;
       // A destination is reserved as soon as another bot commits to it. At
       // match start every Elf can see the same Troll landmark; without this
@@ -262,8 +265,8 @@ export class AIController {
       let candidates=ordered.filter(b=>!claimed.has(b.id)&&!reserved.has(b.id)&&(match.reclaimUntil.get(b.id)||0)<=match.time&&b.id!==previousBaseId);
       if(!candidates.length)candidates=ordered.filter(b=>!claimed.has(b.id)&&!reserved.has(b.id)&&(match.reclaimUntil.get(b.id)||0)<=match.time);
       if(!candidates.length)candidates=ordered.filter(b=>!claimed.has(b.id)&&(match.reclaimUntil.get(b.id)||0)<=match.time);
-      const current=candidates.find(b=>b.id===this.relocationBaseId&&(!relocationThreat||distance(b,relocationThreat)>=B.elf.evacuationThreatRange));
-      if(current)base=current;else{
+      const assigned=!previousBaseId&&u.recommendedBaseId?candidates.find(b=>b.id===u.recommendedBaseId):null,current=candidates.find(b=>b.id===this.relocationBaseId&&(!relocationThreat||distance(b,relocationThreat)>=B.elf.evacuationThreatRange));
+      if(assigned){base=assigned;this.relocationBaseId=base.id;}else if(current)base=current;else{
         if(relocationThreat)candidates.sort((a,b)=>(distance(b,relocationThreat)-distance(u,b)*.15)-(distance(a,relocationThreat)-distance(u,a)*.15));
         base=candidates[0];this.relocationBaseId=base?.id||null;
       }
