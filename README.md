@@ -4,6 +4,8 @@ Jogo 3D em primeira ou terceira pessoa: um Troll caça de um a oito Elfos que pr
 
 Arquitetura da câmera, viewmodels, áudio e arquétipos de mapa: [V3 — câmera, impacto e mundo](docs/V3-IMMERSION-ARCHITECTURE.md).
 
+Cliente nativo Unity, separado do browser e conectado ao mesmo servidor: [abrir, jogar, testar e gerar o executável](unity/README.md). A migração não substitui a simulação, IA ou economia existentes.
+
 ![Mapa de Thornhold com doze refúgios, floresta e trilhas](docs/images/mapa-thornhold.png)
 
 ## Jogar

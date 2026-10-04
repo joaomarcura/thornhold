@@ -36,7 +36,10 @@
     "audit:profiles": "node scripts/profile-lab.js",
     "audit:progression": "node scripts/progression-audit.js",
     "audit:compare": "node scripts/compare-progression.js",
-    "release:check": "npm run check && npm test"
+    "release:check": "npm run check && npm test",
+    "unity:contract": "node scripts/export-unity-contract.js",
+    "unity:test": "node scripts/test-unity-protocol.js",
+    "unity:test:build": "node scripts/test-unity-build.js"
   },
   "engines": {
     "node": ">=22"

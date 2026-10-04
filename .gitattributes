@@ -10,3 +10,10 @@
 *.cmd text eol=crlf
 *.ps1 text eol=crlf
 *.png binary
+*.cs text eol=lf
+*.csproj text eol=lf
+# Unity's serializer writes empty YAML values with a trailing space.
+unity/**/*.unity text eol=lf whitespace=-blank-at-eol
+unity/**/*.asset text eol=lf whitespace=-blank-at-eol
+unity/**/*.mat text eol=lf whitespace=-blank-at-eol
+unity/**/*.meta text eol=lf whitespace=-blank-at-eol

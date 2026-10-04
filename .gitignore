@@ -17,3 +17,16 @@ coverage/
 *.key
 .DS_Store
 Thumbs.db
+# Unity: source, settings and .meta files stay versioned; generated files do not.
+unity/Thornhold/Library/
+unity/Thornhold/Temp/
+unity/Thornhold/Obj/
+unity/Thornhold/Logs/
+unity/Thornhold/UserSettings/
+unity/Thornhold/Builds/
+unity/Thornhold/MemoryCaptures/
+unity/Thornhold/Recordings/
+unity/Thornhold/*.csproj
+unity/Thornhold/*.sln
+unity/ProtocolTests/bin/
+unity/ProtocolTests/obj/

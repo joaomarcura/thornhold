@@ -1,0 +1,1282 @@
+{
+  "release": {
+    "game": "0.6.6-alpha.1",
+    "protocol": 3,
+    "balance": 28,
+    "ai": 18
+  },
+  "balance": {
+    "tick": 20,
+    "snapshot": 10,
+    "gameSpeed": 1.25,
+    "maxElves": 8,
+    "cell": 2.2,
+    "maxTier": 20,
+    "maxStructureTier": 30,
+    "visualTier": 5,
+    "prep": 60,
+    "matchHardLimit": 3600,
+    "finalAge": 210,
+    "idlePressureAge": 480,
+    "idlePressureGrace": 45,
+    "vision": {
+      "troll": 60,
+      "elf": 24,
+      "towerRevealSeconds": 3
+    },
+    "interactRange": 6.5,
+    "movement": {
+      "sprint": 1.25,
+      "elfSprint": 1.4375,
+      "trollRadius": 0.64,
+      "elfRadius": 0.37
+    },
+    "construction": {
+      "range": 9.75,
+      "initialHealth": 0.15,
+      "breachCooldown": 45,
+      "enemyClearance": 5,
+      "gateClearance": 2.3,
+      "placementGap": 0.5,
+      "placementRadius": {
+        "wall": 0.95
+      },
+      "limits": {
+        "core": 1,
+        "wall": 1,
+        "tower": 2,
+        "mine": 1,
+        "fishery": 1,
+        "bastion": 1,
+        "arcaneTower": 1
+      },
+      "upgradeSeconds": 3
+    },
+    "economy": {
+      "treeStock": 1000,
+      "richWood": 1.65,
+      "finalRichWood": 2.5,
+      "lateTier": 9,
+      "lateStructureGrowth": 1.035,
+      "lateWispGrowth": 1.08,
+      "trollThreatRate": 0.022,
+      "trollThreatCap": 2.2,
+      "trollLateThreatStart": 900,
+      "trollLateThreatBase": 8,
+      "trollLateThreatLogScale": 30,
+      "trollLateThreatReference": 100,
+      "trollLateThreatMatureBase": 8,
+      "trollLateThreatLegendary": 3,
+      "trollLateThreatSoftCap": 50,
+      "trollLateThreatOverflowRate": 0.35,
+      "trollLateThreatCap": 100,
+      "trollLateThreatDiminishingLevel": 15,
+      "trollLateThreatLevelPressure": 0.12,
+      "trollLateThreatMinimum": 0.6,
+      "trollDamageGoldDiminishingStart": 900,
+      "trollDamageGoldDiminishingLevel": 10,
+      "trollDamageGoldLevelPressure": 0.1,
+      "trollDamageGoldMinutePressure": 0.08,
+      "trollDamageGoldMinimum": 0.32,
+      "trollObjectiveInvestmentRate": 0.1,
+      "trollObjectiveWoodRate": 0.5,
+      "trollObjectiveEssenceRate": 12,
+      "trollObjectiveIncomeSeconds": 15,
+      "trollObjective": {
+        "discovery": 75,
+        "elf": 75,
+        "wisp": 5,
+        "wall": 15,
+        "tower": 30,
+        "mine": 25,
+        "core": 60,
+        "workshop": 20,
+        "legendary": 80
+      },
+      "trollLobbyBonus": [
+        0,
+        0,
+        0.08,
+        0.12,
+        0.16,
+        0.2,
+        0.2,
+        0.2,
+        0.18
+      ],
+      "trollBountyFactor": [
+        0,
+        1.3,
+        1.5,
+        1.45,
+        1.45,
+        1.41,
+        1.4,
+        1.25,
+        1.1
+      ],
+      "trollMapBounty": {
+        "compact": 0.9,
+        "large": 1.1
+      },
+      "trollLobbySiege": [
+        1,
+        1.15,
+        1,
+        1,
+        1,
+        1.1,
+        1,
+        1,
+        1
+      ],
+      "trollScenarioBounty": {
+        "compact": {
+          "normal": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            0.94,
+            1,
+            1,
+            1.06
+          ],
+          "hard": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1.06
+          ]
+        },
+        "large": {}
+      }
+    },
+    "elfIncremental": {
+      "essenceUnlockTier": 4,
+      "essenceBaseRate": 0,
+      "essenceGrowth": 1.22,
+      "pathCost": 18,
+      "legendaryCost": 30,
+      "epicCost": 90,
+      "paths": {
+        "economy": {
+          "name": "Economia",
+          "description": "Ouro e madeira +12%.",
+          "gold": 1.12,
+          "wood": 1.12
+        },
+        "defense": {
+          "name": "Defesa",
+          "description": "Estruturas e reparos +15%.",
+          "structureHp": 1.15,
+          "repair": 1.15
+        },
+        "technology": {
+          "name": "Tecnologia",
+          "description": "Essência +30% e melhorias 20% mais rápidas.",
+          "essence": 1.3,
+          "upgradeSpeed": 1.2
+        }
+      }
+    },
+    "progression": {
+      "structureGrowth": 1.18,
+      "lateCombatGrowth": 1.07,
+      "wallLateGrowth": 1.045,
+      "costGrowth": 1.35,
+      "woodCostGrowth": 1.25,
+      "lateStructureCostGrowth": 1.14,
+      "lateStructureWoodCostGrowth": 1.14,
+      "trollDamageGrowth": 1.12,
+      "healthGrowth": 1.14
+    },
+    "wisps": {
+      "gold": 65,
+      "wood": 15,
+      "hireGrowth": 1.32,
+      "trainSeconds": 6,
+      "income": 1.4,
+      "incomeGrowth": 1.25,
+      "upgradeGold": 70,
+      "upgradeWood": 20,
+      "costGrowth": 1.5,
+      "seconds": 4,
+      "hp": 55,
+      "externalBonus": 1.6,
+      "range": 25,
+      "regrowSeconds": 35
+    },
+    "elfProgression": {
+      "unlockTier": 10,
+      "abilityCooldown": 90,
+      "abilityDuration": 12,
+      "specialGather": 4,
+      "specialWisp": {
+        "gold": 90,
+        "wood": 30,
+        "rate": 0.45,
+        "hp": 48
+      },
+      "localStock": 160,
+      "externalStock": 420,
+      "defenseUpgradeCost": {
+        "wall": {
+          "earlyGold": 0.82,
+          "earlyWood": 0.85,
+          "lateGold": 0.62,
+          "lateWood": 0.7
+        },
+        "tower": {
+          "earlyGold": 0.85,
+          "earlyWood": 0.88,
+          "lateGold": 0.68,
+          "lateWood": 0.75,
+          "epicBand": 0.78
+        },
+        "workshop": {
+          "earlyGold": 0.92,
+          "earlyWood": 0.92,
+          "lateGold": 0.82,
+          "lateWood": 0.85
+        },
+        "bastion": {
+          "earlyGold": 0.82,
+          "earlyWood": 0.85,
+          "lateGold": 0.65,
+          "lateWood": 0.72
+        },
+        "arcaneTower": {
+          "earlyGold": 0.82,
+          "earlyWood": 0.85,
+          "lateGold": 0.65,
+          "lateWood": 0.72
+        }
+      },
+      "capital": {
+        "start": 720,
+        "trollLevel": 9,
+        "minCore": 7,
+        "requiredMines": 1,
+        "targets": {
+          "economy": 10,
+          "balanced": 12,
+          "defense": 14
+        }
+      },
+      "specializations": {
+        "industrial": {
+          "name": "Industrial",
+          "resource": "crystal",
+          "structure": null,
+          "abilityStructure": "core",
+          "description": "Automação, Wisps e produção.",
+          "ability": "Sobrecarga",
+          "wispBonus": 0.2
+        },
+        "fortress": {
+          "name": "Fortaleza",
+          "resource": "crystal",
+          "structure": null,
+          "abilityStructure": "core",
+          "description": "Barricadas, resistência e recuperação.",
+          "ability": "Fortificação emergencial",
+          "regenPerTier": 0.00035,
+          "fortify": 0.25
+        },
+        "arcane": {
+          "name": "Arcano",
+          "resource": "crystal",
+          "structure": null,
+          "abilityStructure": "core",
+          "description": "Visão, energia e dano explosivo.",
+          "ability": "Pulso Arcano",
+          "revealRadius": 24,
+          "overcharge": 0.4
+        }
+      }
+    },
+    "combat": {
+      "buffer": 0.18,
+      "lightWindup": 0.1,
+      "heavyWindup": 0.32,
+      "lightVisualRecovery": 0.26,
+      "heavyVisualRecovery": 0.42,
+      "comboWindow": 2.8,
+      "comboBonus": 0.25,
+      "openingSeconds": 1.2,
+      "openingBonus": 0.2
+    },
+    "wallRecovery": {
+      "delay": 8,
+      "rate": 0.0035
+    },
+    "elf": {
+      "hp": 85,
+      "speed": 6.4,
+      "gold": 150,
+      "wood": 110,
+      "gather": 10,
+      "gatherInterval": 0.65,
+      "repair": 42,
+      "wallRepairRate": 0.005,
+      "wallRepairDiminishingTier": 8,
+      "wallRepairDiminishingRate": 0.65,
+      "repairCost": 3,
+      "stunDuration": 3,
+      "stunCooldown": 60,
+      "stunRange": 10,
+      "relocationSeconds": 60,
+      "evacuationMinSeconds": 12,
+      "evacuationClearSeconds": 10,
+      "evacuationDistance": 20,
+      "evacuationThreatRange": 28,
+      "preparationClearSeconds": 10,
+      "preparationTrollClearRadius": 25
+    },
+    "ghost": {
+      "hp": 55,
+      "vision": 8,
+      "revealRadius": 18,
+      "revealDuration": 10,
+      "revealCooldown": 60,
+      "goldReward": 25
+    },
+    "legendary": {
+      "tier": 10,
+      "coreIncome": 1.25,
+      "wallHealth": 1.2,
+      "towerDps": 190,
+      "rampPerSecond": 0.12,
+      "maxRamp": 2.5,
+      "parityRamp": 1.75,
+      "sustainTwoTowers": 0.55,
+      "sustainThreeTowers": 0.32,
+      "sustainPressureMemory": 10,
+      "swordRequiredTrollLevel": 10,
+      "swordLevels": 12,
+      "swordTotalLevels": 24,
+      "executeThreshold": 0.15,
+      "wallExecuteThreshold": 0.08,
+      "wallExecuteMaxHp": 2500,
+      "executeCooldown": 1.25
+    },
+    "epic": {
+      "tier": 20,
+      "focusLead": 2,
+      "prepareAt": 600,
+      "projectAt": 900,
+      "foundationTier": 8,
+      "recoveryGrace": 180,
+      "projectCostMultiplier": 0.55,
+      "wallHealth": 1.5,
+      "towerHealth": 1.4,
+      "towerDamage": 1.75,
+      "resourceCost": {
+        "core": 30,
+        "wall": 30,
+        "tower": 30,
+        "mine": 20,
+        "bastion": 30,
+        "arcaneTower": 30
+      },
+      "coreProduction": 1.2,
+      "mineProduction": 1.75,
+      "signaturePower": 1.6,
+      "kingdomProduction": 1.15,
+      "kingdomStructureReduction": 0.15
+    },
+    "advanced": {
+      "tier": 30
+    },
+    "tower": {
+      "specializations": false,
+      "standard": {
+        "damage": 1.45,
+        "interval": 1,
+        "range": 0,
+        "armorPierce": 0
+      }
+    },
+    "troll": {
+      "hp": 1980,
+      "speed": 6.4,
+      "travelSpeed": 1.05,
+      "damage": 21.6,
+      "interval": 1.05,
+      "range": 3.6,
+      "armor": 1,
+      "gold": 0,
+      "goldPerDamage": 0.42,
+      "combatRegenRate": 0.0012,
+      "restRegenRate": 0.0036,
+      "combatRegenPerLevel": 0.00075,
+      "restRegenPerLevel": 0.0015,
+      "regenLevelCap": 10,
+      "towerCombatRegenMultiplier": 0.5,
+      "structureDrainCap": 0.01,
+      "cardOutOfCombatDelay": 5,
+      "sanctuaryRadius": 6,
+      "sanctuaryRegenRate": 0.008,
+      "shopRange": 5,
+      "recallUnlock": 0,
+      "recallChannel": 7.5,
+      "recallCooldown": 180,
+      "recallExitBoost": 1.2,
+      "recallExitBoostDuration": 3,
+      "damageGrowth": 1.2,
+      "damageUpgradeScale": 0.88,
+      "speedFactor": 0.87,
+      "healthPerLevel": 324,
+      "armorPerLevel": 3.5,
+      "movementPerLevel": 0.08,
+      "siegePerLevel": 0.18,
+      "siegeFoundationPerLevel": 0.22,
+      "siegeDiminishingLevel": 8,
+      "siegeDiminishingPerLevel": 0.08,
+      "finalSiege": 1.35,
+      "finalSiegeUnlockSeconds": 720,
+      "finalSiegeMaxElves": 2,
+      "structureXpDiminishingLevel": 10,
+      "structureXpLevelPressure": 0.18,
+      "structureXpMinimum": 0.35,
+      "regenDelay": 4,
+      "healPercent": 0.16,
+      "healCharges": 2,
+      "healRecharge": 180,
+      "healCooldown": 75,
+      "healDuration": 6,
+      "exposureGrace": 9,
+      "exposureRate": 0.035,
+      "heavy": 2.25,
+      "heavyRecovery": 1.3,
+      "heavyCooldown": 4,
+      "dashCooldown": 7,
+      "dashDuration": 0.4,
+      "dashSpeed": 2.5,
+      "roarCooldown": 18,
+      "roarRange": 9,
+      "roarDuration": 2
+    },
+    "structures": {
+      "core": {
+        "name": "Núcleo",
+        "gold": 65,
+        "wood": 25,
+        "hp": 360,
+        "radius": 1.55,
+        "seconds": 4,
+        "income": 3,
+        "growth": 1.65,
+        "upgradeGold": 100,
+        "upgradeWood": 35,
+        "color": 14992250
+      },
+      "wall": {
+        "name": "Barricada",
+        "gold": 30,
+        "wood": 34,
+        "hp": 2541,
+        "radius": 1.05,
+        "seconds": 3,
+        "growth": 1.9,
+        "upgradeGold": 85,
+        "upgradeWood": 30,
+        "color": 10782818
+      },
+      "tower": {
+        "name": "Torre",
+        "gold": 60,
+        "wood": 30,
+        "hp": 360,
+        "radius": 0.9,
+        "seconds": 4,
+        "damage": 10.815,
+        "interval": 1.2,
+        "range": 17,
+        "retainRange": 1,
+        "muzzleHeight": 4.5,
+        "targetHeight": 2,
+        "growth": 1.65,
+        "upgradeGold": 90,
+        "upgradeWood": 40,
+        "color": 8506043
+      },
+      "mine": {
+        "name": "Mina",
+        "gold": 85,
+        "wood": 35,
+        "hp": 200,
+        "radius": 1.05,
+        "seconds": 5,
+        "income": 2.6,
+        "growth": 1.7,
+        "upgradeGold": 110,
+        "upgradeWood": 45,
+        "color": 12756300
+      },
+      "fishery": {
+        "name": "Oficina de Pesca",
+        "gold": 90,
+        "wood": 45,
+        "hp": 250,
+        "radius": 1.1,
+        "seconds": 5,
+        "growth": 1,
+        "upgradeGold": 0,
+        "upgradeWood": 0,
+        "color": 7638947
+      },
+      "workshop": {
+        "name": "Oficina",
+        "available": false,
+        "gold": 90,
+        "wood": 45,
+        "hp": 250,
+        "radius": 1.1,
+        "seconds": 5,
+        "growth": 1.6,
+        "upgradeGold": 125,
+        "upgradeWood": 45,
+        "color": 7638947
+      },
+      "refinery": {
+        "name": "Refinaria",
+        "available": false,
+        "gold": 150,
+        "wood": 85,
+        "hp": 300,
+        "radius": 1.2,
+        "seconds": 6,
+        "growth": 1.62,
+        "upgradeGold": 150,
+        "upgradeWood": 65,
+        "aura": 11,
+        "color": 14066781
+      },
+      "bastion": {
+        "name": "Bastião",
+        "available": false,
+        "gold": 120,
+        "wood": 80,
+        "hp": 520,
+        "radius": 1.25,
+        "seconds": 6,
+        "growth": 1.72,
+        "upgradeGold": 155,
+        "upgradeWood": 75,
+        "aura": 12,
+        "color": 9348512
+      },
+      "arcaneTower": {
+        "name": "Torre Arcana",
+        "available": false,
+        "gold": 145,
+        "wood": 75,
+        "hp": 310,
+        "radius": 1,
+        "seconds": 6,
+        "damage": 46,
+        "interval": 3,
+        "range": 22,
+        "retainRange": 1.5,
+        "muzzleHeight": 4.8,
+        "targetHeight": 2,
+        "growth": 1.68,
+        "upgradeGold": 170,
+        "upgradeWood": 70,
+        "color": 10911974
+      }
+    },
+    "branches": {
+      "power": {
+        "name": "Balista",
+        "description": "Mais dano por disparo",
+        "damage": 1.45,
+        "interval": 1,
+        "range": 0,
+        "armorPierce": 0
+      },
+      "rapid": {
+        "name": "Rajada",
+        "description": "Disparos mais rápidos",
+        "damage": 0.9,
+        "interval": 0.6,
+        "range": 0,
+        "armorPierce": 0
+      },
+      "frost": {
+        "name": "Gelo",
+        "description": "Reduz a velocidade do Troll",
+        "damage": 0.8,
+        "interval": 1,
+        "range": 2,
+        "armorPierce": 0,
+        "slow": 0.65
+      },
+      "pierce": {
+        "name": "Ruptura",
+        "description": "Ignora armadura e amplia alcance",
+        "damage": 1,
+        "interval": 1,
+        "range": 5,
+        "armorPierce": 1
+      }
+    },
+    "upgrades": {
+      "damage": {
+        "name": "Dano Físico",
+        "description": "Aumenta o dano de todos os ataques.",
+        "cost": 75,
+        "growth": 1.8,
+        "max": 20
+      },
+      "speed": {
+        "name": "Velocidade de Ataque",
+        "description": "Reduz o intervalo entre ataques.",
+        "cost": 90,
+        "growth": 1.85,
+        "max": 20
+      },
+      "movement": {
+        "name": "Velocidade de Movimento",
+        "description": "Aumenta a velocidade de deslocamento.",
+        "cost": 70,
+        "growth": 1.85,
+        "max": 20
+      },
+      "lifesteal": {
+        "name": "Roubo de Vida",
+        "description": "Recupera vida ao causar dano direto.",
+        "cost": 105,
+        "growth": 1.9,
+        "max": 20
+      },
+      "health": {
+        "name": "Vida Máxima",
+        "description": "Aumenta a vida máxima do Troll.",
+        "cost": 90,
+        "growth": 1.8,
+        "max": 20
+      },
+      "armor": {
+        "name": "Armadura",
+        "description": "Reduz o dano físico recebido.",
+        "cost": 85,
+        "growth": 1.8,
+        "max": 20
+      },
+      "regen": {
+        "name": "Regeneração",
+        "description": "Aumenta a recuperação dentro e fora de combate.",
+        "cost": 65,
+        "growth": 1.85,
+        "max": 20
+      },
+      "siege": {
+        "name": "Dano Estrutural",
+        "description": "Aumenta o dano causado a estruturas.",
+        "cost": 110,
+        "growth": 1.9,
+        "max": 20
+      },
+      "utility": {
+        "name": "Rugido e Esquiva",
+        "description": "Amplia o Rugido e reduz a recarga da esquiva.",
+        "cost": 80,
+        "growth": 1.8,
+        "max": 20
+      }
+    },
+    "difficulty": {
+      "easy": {
+        "think": 1.6,
+        "repair": 0.55,
+        "retreat": 0.42
+      },
+      "normal": {
+        "think": 0.7,
+        "repair": 0.68,
+        "retreat": 0.3
+      },
+      "hard": {
+        "think": 0.28,
+        "repair": 0.75,
+        "retreat": 0.18
+      }
+    }
+  },
+  "items": {
+    "maul": {
+      "name": "Machado Quebra-Muralha",
+      "slot": "weapon",
+      "line": "siege",
+      "art": "axe",
+      "cost": 220,
+      "description": "Uma lâmina brutal feita para abrir portões e concluir golpes pesados.",
+      "siege": 1.45,
+      "heavy": 1.15
+    },
+    "claws": {
+      "name": "Escopeta do Predador",
+      "slot": "weapon",
+      "line": "hunter",
+      "art": "shotgun",
+      "cost": 210,
+      "description": "Disparos curtos e rápidos para manter pressão sobre Elfos expostos.",
+      "interval": 0.82
+    },
+    "edge": {
+      "name": "Cajado Hemático",
+      "slot": "weapon",
+      "line": "sustain",
+      "art": "staff",
+      "cost": 240,
+      "description": "Canaliza energia vital e permite controlar o combate a uma distância segura.",
+      "range": 0.8,
+      "damage": 1.08
+    },
+    "totem": {
+      "name": "Elmo do Silêncio",
+      "slot": "helmet",
+      "line": "siege",
+      "art": "helmet",
+      "cost": 200,
+      "description": "Amplifica o Rugido para criar uma janela segura contra torres.",
+      "roar": 1.25
+    },
+    "hunt": {
+      "name": "Visor da Caçada",
+      "slot": "helmet",
+      "line": "hunter",
+      "art": "visor",
+      "cost": 180,
+      "description": "Marca a abertura criada pela esquiva e fortalece o primeiro golpe.",
+      "opening": 0.35
+    },
+    "amber": {
+      "name": "Coroa de Âmbar Vivo",
+      "slot": "helmet",
+      "line": "sustain",
+      "art": "crown",
+      "cost": 230,
+      "description": "Converte dano em vida durante duelos e cercos prolongados.",
+      "drain": 0.08,
+      "drainCap": 0.02,
+      "structureDrain": 0.015
+    },
+    "carapace": {
+      "name": "Couraça de Pedra",
+      "slot": "armor",
+      "line": "siege",
+      "art": "armor",
+      "cost": 190,
+      "description": "Placas pesadas para permanecer sob fogo durante a ruptura.",
+      "armor": 4
+    },
+    "moss": {
+      "name": "Manto de Musgo Vivo",
+      "slot": "armor",
+      "line": "sustain",
+      "art": "moss",
+      "cost": 200,
+      "description": "Acelera a recuperação e reduz o tempo até a regeneração começar.",
+      "regen": 1.45,
+      "regenDelay": -1
+    },
+    "heartplate": {
+      "name": "Peitoral do Predador",
+      "slot": "armor",
+      "line": "hunter",
+      "art": "heart",
+      "cost": 240,
+      "description": "Expande a reserva de vida para sustentar perseguições agressivas.",
+      "health": 1.15
+    },
+    "mantle": {
+      "name": "Botas do Vendaval",
+      "slot": "boots",
+      "line": "hunter",
+      "art": "boots",
+      "cost": 200,
+      "description": "Aumenta mobilidade e reduz o intervalo entre esquivas.",
+      "movement": 1.1,
+      "dashCooldown": 0.75
+    },
+    "warboots": {
+      "name": "Grevas de Demolição",
+      "slot": "boots",
+      "line": "siege",
+      "art": "greaves",
+      "cost": 220,
+      "description": "Permitem avançar sob pressão sem perder velocidade.",
+      "movement": 1.05,
+      "armor": 1.5
+    },
+    "rootboots": {
+      "name": "Passos Enraizados",
+      "slot": "boots",
+      "line": "sustain",
+      "art": "roots",
+      "cost": 225,
+      "description": "Mantém movimento e recuperação durante combates prolongados.",
+      "movement": 1.05,
+      "regen": 1.2
+    }
+  },
+  "cards": {
+    "bloodlust": {
+      "name": "Sede de Sangue",
+      "rarity": "rare",
+      "description": "+8% de roubo de vida contra unidades; +1,5% contra estruturas.",
+      "effects": {
+        "drain": 0.08,
+        "structureDrain": 0.015
+      },
+      "ai": {
+        "hunter": 10,
+        "sustain": 9
+      }
+    },
+    "battleRegen": {
+      "name": "Regeneração de Batalha",
+      "rarity": "rare",
+      "description": "Recupera +0,20% da vida máxima por segundo durante combate.",
+      "effects": {
+        "combatRegen": 0.002
+      },
+      "ai": {
+        "juggernaut": 10,
+        "sustain": 10,
+        "siegebreaker": 7
+      }
+    },
+    "thickHide": {
+      "name": "Couro Espesso",
+      "rarity": "common",
+      "description": "+5 de Armadura.",
+      "effects": {
+        "armor": 5
+      },
+      "ai": {
+        "juggernaut": 10,
+        "siegebreaker": 6
+      }
+    },
+    "frenzy": {
+      "name": "Frenesi",
+      "rarity": "rare",
+      "description": "Cada golpe consecutivo acelera os ataques em 7%, até 14%.",
+      "effects": {
+        "frenzy": 0.07
+      },
+      "ai": {
+        "hunter": 10,
+        "siegebreaker": 6
+      }
+    },
+    "siegebreaker": {
+      "name": "Quebra-Muralhas",
+      "rarity": "rare",
+      "description": "Golpes pesados causam +40% de dano contra estruturas.",
+      "effects": {
+        "heavyStructure": 0.4
+      },
+      "ai": {
+        "siegebreaker": 10
+      }
+    },
+    "predator": {
+      "name": "Predador",
+      "rarity": "common",
+      "description": "O primeiro golpe após a Esquiva recebe +30% de dano adicional.",
+      "effects": {
+        "opening": 0.3
+      },
+      "ai": {
+        "hunter": 10
+      }
+    },
+    "secondWind": {
+      "name": "Segundo Fôlego",
+      "rarity": "common",
+      "description": "Regeneração fora de combate começa 1,5s antes e ganha +0,15% da vida/s.",
+      "effects": {
+        "regenDelay": -1.5,
+        "restRegen": 0.0015
+      },
+      "ai": {
+        "sustain": 10,
+        "juggernaut": 7
+      }
+    },
+    "devour": {
+      "name": "Devorar",
+      "rarity": "rare",
+      "description": "Destruir uma estrutura recupera 5% da vida máxima.",
+      "effects": {
+        "structureHeal": 0.05
+      },
+      "ai": {
+        "siegebreaker": 10,
+        "sustain": 8
+      }
+    },
+    "colossusHeart": {
+      "name": "Coração Colossal",
+      "rarity": "common",
+      "description": "+12% de vida máxima.",
+      "effects": {
+        "health": 1.12
+      },
+      "ai": {
+        "juggernaut": 10
+      }
+    },
+    "longStride": {
+      "name": "Passos do Caçador",
+      "rarity": "common",
+      "description": "+10% de velocidade de movimento.",
+      "effects": {
+        "movement": 1.1
+      },
+      "ai": {
+        "hunter": 9
+      }
+    },
+    "stonebreaker": {
+      "name": "Punhos de Pedra",
+      "rarity": "common",
+      "description": "+22% de dano de cerco.",
+      "effects": {
+        "siege": 1.22
+      },
+      "ai": {
+        "siegebreaker": 9
+      }
+    },
+    "warCry": {
+      "name": "Rugido de Guerra",
+      "rarity": "common",
+      "description": "O Rugido desativa torres por mais 1,5s.",
+      "effects": {
+        "roar": 1.5
+      },
+      "ai": {
+        "siegebreaker": 8,
+        "juggernaut": 6
+      }
+    },
+    "relentless": {
+      "name": "Implacável",
+      "rarity": "rare",
+      "description": "Golpe Pesado recarrega 25% mais rápido.",
+      "effects": {
+        "heavyCooldown": 0.75
+      },
+      "ai": {
+        "siegebreaker": 9,
+        "hunter": 7
+      }
+    },
+    "unyielding": {
+      "name": "Inabalável",
+      "rarity": "rare",
+      "description": "Atordoamentos contra o Troll duram 35% menos.",
+      "effects": {
+        "stunResistance": 0.35
+      },
+      "ai": {
+        "juggernaut": 9
+      }
+    },
+    "executioner": {
+      "name": "Executor",
+      "rarity": "legendary",
+      "description": "A Espada Lendária executa estruturas abaixo de 22% da vida.",
+      "effects": {
+        "executeThreshold": 0.07
+      },
+      "ai": {
+        "siegebreaker": 10
+      }
+    },
+    "scavenger": {
+      "name": "Saqueador",
+      "rarity": "common",
+      "description": "+20% de ouro por objetivos; não altera ouro de dano.",
+      "effects": {
+        "objectiveGold": 1.2
+      },
+      "ai": {
+        "hunter": 7,
+        "siegebreaker": 7
+      }
+    },
+    "titanBlood": {
+      "name": "Sangue de Titã",
+      "rarity": "legendary",
+      "description": "+18% de vida máxima e +3 de Armadura.",
+      "effects": {
+        "health": 1.18,
+        "armor": 3
+      },
+      "ai": {
+        "juggernaut": 10
+      }
+    },
+    "cataclysm": {
+      "name": "Cataclismo",
+      "rarity": "legendary",
+      "description": "+15% de cerco e Golpe Pesado +60% contra estruturas.",
+      "effects": {
+        "siege": 1.15,
+        "heavyStructure": 0.6
+      },
+      "ai": {
+        "siegebreaker": 10
+      }
+    }
+  },
+  "specializations": {
+    "core": [
+      {
+        "id": "industrial",
+        "name": "Industrial",
+        "description": "Produção da base +15%. Sobrecarga aumenta a produção temporariamente.",
+        "color": 14200161,
+        "effects": {
+          "production": 0.15
+        },
+        "ability": "Sobrecarga"
+      },
+      {
+        "id": "fortress",
+        "name": "Fortaleza",
+        "description": "Estruturas da base recebem 10% menos dano. Fortificação protege a base temporariamente.",
+        "color": 8895652,
+        "effects": {
+          "baseReduction": 0.1
+        },
+        "ability": "Fortificação"
+      },
+      {
+        "id": "arcane",
+        "name": "Arcano",
+        "description": "Recarga da habilidade 15% menor. Pulso Arcano acelera as torres temporariamente.",
+        "color": 11048935,
+        "effects": {
+          "abilityCooldown": 0.15
+        },
+        "ability": "Pulso Arcano"
+      }
+    ],
+    "mine": [
+      {
+        "id": "yield",
+        "name": "Extração intensiva",
+        "description": "Produção de ouro desta Mina +20%.",
+        "color": 15320157,
+        "effects": {
+          "production": 0.2
+        }
+      },
+      {
+        "id": "reserve",
+        "name": "Mina fortificada",
+        "description": "Produção +10% e vida máxima +25%.",
+        "color": 9548971,
+        "effects": {
+          "production": 0.1,
+          "health": 0.25
+        }
+      },
+      {
+        "id": "logistics",
+        "name": "Logística de cristais",
+        "description": "Produção +10%. Coleta manual de cristal 25% mais rápida; não acumula entre Minas.",
+        "color": 10279143,
+        "effects": {
+          "production": 0.1,
+          "collectionSpeed": 0.25
+        }
+      }
+    ],
+    "tower": [
+      {
+        "id": "power",
+        "name": "Balista",
+        "description": "Dano +20%.",
+        "color": 15054446,
+        "effects": {
+          "damage": 0.2
+        }
+      },
+      {
+        "id": "rapid",
+        "name": "Rajada",
+        "description": "Cadência +25%, incluindo o feixe Lendário.",
+        "color": 9424568,
+        "effects": {
+          "attackSpeed": 0.25
+        }
+      },
+      {
+        "id": "arcane",
+        "name": "Torre Arcana",
+        "description": "Dano +10%, alcance +2 m e ignora 20% da armadura.",
+        "color": 11834347,
+        "effects": {
+          "damage": 0.1,
+          "range": 2,
+          "armorPierce": 0.2
+        }
+      }
+    ],
+    "wall": [
+      {
+        "id": "fortress",
+        "name": "Muralha reforçada",
+        "description": "Vida máxima +20%.",
+        "color": 12759428,
+        "effects": {
+          "health": 0.2
+        }
+      },
+      {
+        "id": "restoration",
+        "name": "Bastião vivo",
+        "description": "Regeneração passiva +35% e reparo recebido +20%.",
+        "color": 8571035,
+        "effects": {
+          "regen": 0.35,
+          "repair": 0.2
+        }
+      },
+      {
+        "id": "ward",
+        "name": "Barreira rúnica",
+        "description": "Recebe 15% menos dano.",
+        "color": 10724585,
+        "effects": {
+          "reduction": 0.15
+        }
+      }
+    ]
+  },
+  "fishingGear": {
+    "rod": {
+      "name": "Vara",
+      "levelKey": "rodLevel"
+    },
+    "bait": {
+      "name": "Isca",
+      "levelKey": "baitLevel"
+    },
+    "reel": {
+      "name": "Molinete",
+      "levelKey": "reelLevel"
+    }
+  },
+  "fishingUpgradeCosts": [
+    {
+      "gold": 125,
+      "wood": 15
+    },
+    {
+      "gold": 250,
+      "wood": 25
+    },
+    {
+      "gold": 500,
+      "wood": 40
+    },
+    {
+      "gold": 1000,
+      "wood": 65
+    }
+  ],
+  "fishSpecies": [
+    {
+      "id": "sardine",
+      "name": "Sardinha Prateada",
+      "minCm": 9,
+      "maxCm": 28,
+      "maxKg": 0.22,
+      "maxAge": 5,
+      "value": 6,
+      "color": 11851221,
+      "shape": [
+        1,
+        0.22,
+        0.18
+      ]
+    },
+    {
+      "id": "mullet",
+      "name": "Tainha Âmbar",
+      "minCm": 18,
+      "maxCm": 65,
+      "maxKg": 3.1,
+      "maxAge": 12,
+      "value": 12,
+      "color": 13345379,
+      "shape": [
+        1,
+        0.3,
+        0.25
+      ]
+    },
+    {
+      "id": "bass",
+      "name": "Robalo da Névoa",
+      "minCm": 20,
+      "maxCm": 95,
+      "maxKg": 9,
+      "maxAge": 16,
+      "value": 18,
+      "color": 7708585,
+      "shape": [
+        1,
+        0.3,
+        0.22
+      ]
+    },
+    {
+      "id": "snapper",
+      "name": "Pargo Lunar",
+      "minCm": 16,
+      "maxCm": 75,
+      "maxKg": 5,
+      "maxAge": 14,
+      "value": 24,
+      "color": 13212086,
+      "shape": [
+        1,
+        0.42,
+        0.23
+      ]
+    },
+    {
+      "id": "grouper",
+      "name": "Garoupa de Coral",
+      "minCm": 24,
+      "maxCm": 120,
+      "maxKg": 24,
+      "maxAge": 28,
+      "value": 30,
+      "color": 10391665,
+      "shape": [
+        1,
+        0.48,
+        0.35
+      ]
+    }
+  ]
+}
