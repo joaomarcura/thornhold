@@ -1,6 +1,6 @@
 export const RELEASE = Object.freeze({
-  game:'0.5.0-alpha.3',
-  protocol:2,
-  balance:25,
-  ai:16
+  game:'0.6.6-alpha.1',
+  protocol:3,
+  balance:28,
+  ai:18
 });

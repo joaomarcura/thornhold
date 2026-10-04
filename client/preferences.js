@@ -2,26 +2,28 @@ export const DEFAULT_BINDINGS=Object.freeze({
   forward:'KeyW',backward:'KeyS',left:'KeyA',right:'KeyD',sprint:'ShiftLeft',
   interact:'KeyE',repair:'KeyR',heal:'KeyR',heavy:'KeyQ',dash:'Space',ability:'KeyF',
   recall:'KeyB',shop:'KeyG',map:'KeyM',camera:'KeyC',core:'KeyN',upgrade:'KeyQ',
-  wisp:'KeyT',specialization:'KeyX',ping:'KeyV',spectate:'Tab',help:'KeyH'
+  wisp:'KeyT',specialization:'KeyX',ping:'KeyV',spectate:'Tab',help:'KeyH',cursor:'KeyZ',rod:'Digit1',fishInventory:'KeyI'
 });
 
 export const BINDING_LABELS=Object.freeze({
   forward:'Mover para frente',backward:'Mover para trás',left:'Mover à esquerda',right:'Mover à direita',sprint:'Correr',
   interact:'Interagir',repair:'Reparar / coletar / girar projeto',heal:'Cura do Troll',heavy:'Golpe pesado',dash:'Esquiva',ability:'Habilidade',
   recall:'Retorno ao Santuário',shop:'Loja do Troll',map:'Mapa tático',camera:'Voltar à câmera',core:'Núcleo / Wisps',upgrade:'Evoluir seleção',
-  wisp:'Formar Wisp',specialization:'Habilidade da especialização',ping:'Comunicação',spectate:'Trocar observado',help:'Como jogar'
+  wisp:'Formar Wisp',specialization:'Habilidade da especialização',ping:'Comunicação',spectate:'Trocar observado',help:'Como jogar',cursor:'Liberar mouse / retomar mira',rod:'Equipar / guardar vara',fishInventory:'Peixes / coleção visual'
 });
 
 const STORAGE_KEY='thornhold-preferences';
 const SCALES=[.9,1,1.1,1.25];
-const RESERVED=new Set(['Escape','Enter','Delete','F3','F10','Digit1','Digit2','Digit3','Digit4','Digit5']);
+const RESERVED=new Set(['Escape','Enter','Delete','F3','F10','Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Numpad1','Numpad2','Numpad3','Numpad4','Numpad5','Numpad6']);
 let preferences=load();
 
 function storage(){return typeof globalThis.localStorage==='undefined'?null:globalThis.localStorage;}
 function load(){
   let saved={};try{saved=JSON.parse(storage()?.getItem(STORAGE_KEY)||'{}')||{};}catch{}
   const scale=SCALES.includes(Number(saved.scale))?Number(saved.scale):1;
-  const bindings={...DEFAULT_BINDINGS,...(saved.bindings||{})};if((saved.bindingVersion||0)<2){bindings.upgrade='KeyQ';bindings.heal='KeyR';}if((saved.bindingVersion||0)<3){bindings.recall='KeyB';bindings.shop='KeyG';}
+  const bindings={...DEFAULT_BINDINGS,...(saved.bindings||{})};if((saved.bindingVersion||0)<2){bindings.upgrade='KeyQ';bindings.heal='KeyR';}if((saved.bindingVersion||0)<3){bindings.recall='KeyB';bindings.shop='KeyG';}bindings.rod='Digit1';
+  if(!saved.bindings?.cursor&&Object.entries(bindings).some(([key,code])=>key!=='cursor'&&code===bindings.cursor))bindings.cursor=['KeyZ','KeyU','KeyL'].find(code=>!Object.values(bindings).includes(code))||'Backquote';
+  for(const action of ['rod','fishInventory'])if(!saved.bindings?.[action]&&Object.entries(bindings).some(([key,code])=>key!==action&&code===bindings[action]))bindings[action]=['KeyP','KeyI','KeyU','KeyL','KeyO','Backquote'].find(code=>!Object.values(bindings).includes(code))||'BracketRight';
   return {scale,reducedMotion:saved.reducedMotion===true,cameraMode:saved.cameraMode==='third'?'third':'first',bindingVersion:3,bindings};
 }
 function save(){try{storage()?.setItem(STORAGE_KEY,JSON.stringify(preferences));}catch{}applyPreferences();return getPreferences();}
@@ -33,7 +35,7 @@ export function setScale(value){const scale=SCALES.includes(Number(value))?Numbe
 export function setReducedMotion(value){preferences={...preferences,reducedMotion:!!value};return save();}
 export function setCameraMode(value){preferences={...preferences,cameraMode:value==='third'?'third':'first'};return save();}
 export function setBinding(action,code){
-  if(!DEFAULT_BINDINGS[action]||!code||RESERVED.has(code))return {ok:false,reason:'reserved'};
+  if(action==='rod'||!DEFAULT_BINDINGS[action]||!code||RESERVED.has(code))return {ok:false,reason:'reserved'};
   const bindings={...preferences.bindings},contextual=new Set(['upgrade:heavy','heavy:upgrade','repair:heal','heal:repair']),other=Object.keys(bindings).find(key=>key!==action&&bindings[key]===code&&!contextual.has(`${action}:${key}`));
   if(other)bindings[other]=bindings[action];
   bindings[action]=code;preferences={...preferences,bindings};save();return {ok:true,swapped:other||null};

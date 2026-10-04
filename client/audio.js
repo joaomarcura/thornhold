@@ -1,3 +1,4 @@
+import { PHYSICAL_SOUNDS, soundSamples } from './sound-design.js';
 const VOLUME_KEY='thornhold-volume',ENABLED_KEY='thornhold-sound',MIX_KEY='thornhold-audio-mix';
 const DEFAULT_VOLUME=.55,MUSIC_LEVEL=.22;
 export const AUDIO_CATEGORIES=Object.freeze(['master','music','sfx','ambient','ui']);
@@ -41,17 +42,26 @@ export function getAudioSettings(){return {enabled,volume:mix.master,...mix};}
 export function setAudioEnabled(value){enabled=!!value;if(enabled&&mix.master===0)mix.master=DEFAULT_VOLUME;volume=mix.master;save();ensureAudio();applyMix();return getAudioSettings();}
 export function setAudioVolume(value){return setAudioCategory('master',value);}
 export function setAudioCategory(category,value){if(!AUDIO_CATEGORIES.includes(category))return getAudioSettings();mix={...mix,[category]:normalizeVolume(value)};volume=mix.master;enabled=mix.master>0;save();ensureAudio();applyMix();return getAudioSettings();}
-export function setThreatPresence(value){threatPresence=normalizeVolume(value);applyMix();}
+export function setThreatPresence(value){const next=normalizeVolume(value);if(Math.abs(next-threatPresence)<.01)return;threatPresence=next;applyMix();}
 
 function voice(frequency,start,duration,{type='sine',gain=.04,destination=effects,attack=.015}={}){
   const oscillator=context.createOscillator(),amp=context.createGain();oscillator.type=type;oscillator.frequency.setValueAtTime(frequency,start);
   amp.gain.setValueAtTime(.0001,start);amp.gain.exponentialRampToValueAtTime(gain,start+attack);amp.gain.exponentialRampToValueAtTime(.0001,start+duration);
-  oscillator.connect(amp);amp.connect(destination);oscillator.start(start);oscillator.stop(start+duration+.02);
+  oscillator.onended=()=>{oscillator.disconnect();amp.disconnect();};oscillator.connect(amp);amp.connect(destination);oscillator.start(start);oscillator.stop(start+duration+.02);
 }
 
-export function sound(type,{distance=0}={}){
+const soundBuffers=new Map(),activeEffects=new Set(),lastEffectAt=new Map();let variantIndex=0;
+export function audioDiagnostics(){return {activeEffects:activeEffects.size,cachedBuffers:soundBuffers.size};}
+function physicalSound(type,pan,distanceGain){
+  const now=context.currentTime;if(activeEffects.size>=16||now-(lastEffectAt.get(type)??-1)<(type==='shot'||type==='beam'?.05:.035))return;
+  lastEffectAt.set(type,now);const key=type+':'+(variantIndex++%3);let buffer=soundBuffers.get(key);
+  if(!buffer){const samples=soundSamples(type,context.sampleRate,variantIndex%3);buffer=context.createBuffer(1,samples.length,context.sampleRate);buffer.copyToChannel(samples,0);soundBuffers.set(key,buffer);}
+  const source=context.createBufferSource(),gain=context.createGain(),panner=context.createStereoPanner();source.buffer=buffer;gain.gain.value=.3*distanceGain;panner.pan.value=Math.max(-1,Math.min(1,Number(pan)||0));
+  source.connect(gain);gain.connect(panner);panner.connect(effects);activeEffects.add(source);source.onended=()=>{source.disconnect();gain.disconnect();panner.disconnect();activeEffects.delete(source);};source.start();
+}
+export function sound(type,{distance=0,pan=0}={}){
   if(!enabled||volume<=0)return;try{
-    if(!ensureAudio())return;const t=context.currentTime,harsh=['damage','swing','destroy','impact'].includes(type),uiSound=['click','purchase','complete','phase','card-chosen'].includes(type),destination=uiSound?ui:effects,distanceGain=Math.max(.18,1-Math.max(0,distance-4)/48);
+    if(!ensureAudio())return;const distanceGain=Math.max(0,1-Math.max(0,(Number(distance)||0)-4)/48);if(PHYSICAL_SOUNDS.has(type)){physicalSound(type,pan,distanceGain);return;}const t=context.currentTime,harsh=['damage','swing','destroy','impact'].includes(type),uiSound=['click','purchase','complete','phase','card-chosen'].includes(type),destination=uiSound?ui:effects;
     const frequency={impact:100,'wisp-death':210,'wisp-trained':700,click:420,build:280,gather:640,damage:110,swing:85,repair:520,purchase:740,phase:180,stun:1150,shot:950,beam:1250,'legendary-tower':1450,'legendary-execute':55,death:75,destroy:65,complete:880}[type]||350;
     voice(frequency,t,.22,{type:harsh?'triangle':'sine',gain:((type==='shot'||type==='beam')?.025:.055)*distanceGain,destination});
     if(type==='gather'){voice(165,t,.075,{type:'square',gain:.025*distanceGain,destination:effects,attack:.003});voice(82,t+.018,.16,{type:'triangle',gain:.035*distanceGain,destination:effects,attack:.004});}

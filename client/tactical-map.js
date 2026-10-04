@@ -1,10 +1,12 @@
 import { BALANCE as B, distance } from '../shared/config.js';
 import { lineOfSight, toCell, index } from '../shared/map.js';
 import { playerColor } from '../shared/player-identity.js';
+import { riverProfileAt } from '../shared/scenery.js';
+import { coastalField } from '../shared/coast.js';
 
 // Receives only the personalized snapshot. A fading sighting never follows a hidden enemy.
 export class TacticalMap {
-  constructor(map){this.map=map;this.seenBases=new Set();this.lastTroll=null;this.explored=new Uint8Array(map.size*map.size);this.visible=new Uint8Array(map.size*map.size);this.revision=0;this.backgrounds=new Map();}
+  constructor(map){this.map=map;this.seenBases=new Set();this.lastTroll=null;this.explored=new Uint8Array(map.size*map.size);this.visible=new Uint8Array(map.size*map.size);this.revision=0;this.backgrounds=new Map();this.coastCells=coastalField(map).zones;this.riverCells=new Uint8Array(map.size*map.size);for(let z=0;z<map.size;z++)for(let x=0;x<map.size;x++)if(riverProfileAt(map,x*map.cell,z*map.cell))this.riverCells[index(map,x,z)]=map.grid[index(map,x,z)]?1:2;}
   update(snapshot,viewer){
     this.snapshot=snapshot;this.viewer=viewer;
     const troll=snapshot.units.find(u=>u.role==='troll'&&u.alive);
@@ -32,7 +34,7 @@ export class TacticalMap {
     ctx.clearRect(0,0,w,w);ctx.fillStyle='#0b1c21';ctx.fillRect(0,0,w,w);
     // Cache the discovered terrain. An unexplored refuge never appears as an empty base marker.
     let bg=this.backgrounds.get(w);if(!bg){bg={canvas:document.createElement('canvas'),revision:-1};bg.canvas.width=bg.canvas.height=w;this.backgrounds.set(w,bg);}
-    if(bg.revision!==this.revision){const c=bg.canvas.getContext('2d');c.clearRect(0,0,w,w);for(let z=0;z<m.size;z++)for(let x=0;x<m.size;x++){const i=index(m,x,z);if(!this.explored[i])continue;const light=this.visible[i],height=m.heights?.[i]||0;c.fillStyle=m.grid[i]?light?'#263c35':'#15282a':light?(height>1?'#7c8060':height< -1?'#4c7971':'#607869'):'#334844';c.fillRect((x-.5)*m.cell*k,(z-.5)*m.cell*k,m.cell*k+.5,m.cell*k+.5);}bg.revision=this.revision;}
+    if(bg.revision!==this.revision){const c=bg.canvas.getContext('2d');c.clearRect(0,0,w,w);for(let z=0;z<m.size;z++)for(let x=0;x<m.size;x++){const i=index(m,x,z);if(!this.explored[i])continue;const light=this.visible[i],height=m.heights?.[i]||0;c.fillStyle=this.coastCells[i]===3?(light?'#397778':'#203d43'):this.coastCells[i]?(light?'#b8a471':'#675d43'):this.riverCells[i]===1?(light?'#397778':'#203d43'):this.riverCells[i]===2?(light?'#a58b64':'#544a39'):m.grid[i]?light?'#263c35':'#15282a':light?(height>1?'#7c8060':height< -1?'#4c7971':'#607869'):'#334844';c.fillRect((x-.5)*m.cell*k,(z-.5)*m.cell*k,m.cell*k+.5,m.cell*k+.5);}bg.revision=this.revision;}
     ctx.drawImage(bg.canvas,0,0);
     const recommended=m.bases.find(base=>base.id===u?.recommendedBaseId),partner=recommended&&m.bases.find(base=>base.id===recommended.partnerBaseId);
     if(recommended&&partner){
@@ -42,6 +44,7 @@ export class TacticalMap {
       ctx.restore();
     }
     for(const b of m.bases){if(!this.seenBases.has(b.id))continue;ctx.fillStyle='#d7bf84';ctx.fillRect(b.gate.x*k-2,b.gate.z*k-2,4,4);if(large){ctx.font='10px sans-serif';ctx.textAlign='center';ctx.fillText(b.name,b.x*k,(b.z-b.rz*m.cell-2)*k);ctx.fillStyle='#b6c7b9';ctx.font='9px sans-serif';ctx.fillText(`${b.profile} · ${b.height>0?'+':''}${b.height} m`,b.x*k,(b.z+b.rz*m.cell+4)*k);}}
+    if(large)for(const spot of m.fishingSpots||[]){if(!this.seenBases.has(spot.baseId))continue;ctx.fillStyle='#9fdbd5';ctx.beginPath();ctx.arc(spot.x*k,spot.z*k,3,0,Math.PI*2);ctx.fill();ctx.font='9px sans-serif';ctx.textAlign='center';ctx.fillText('Praia · pesca',spot.x*k,spot.z*k+12);}
     if(recommended){ctx.fillStyle='#74e0b3';ctx.fillRect(recommended.gate.x*k-6,recommended.gate.z*k-6,12,12);if(large){ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.fillText(`SUA ENTRADA ${recommended.compoundEntrance}/2`,recommended.gate.x*k,recommended.gate.z*k-11);}}
     const ring=(p,r,color,dashed=false)=>{ctx.strokeStyle=color;ctx.lineWidth=2;ctx.setLineDash(dashed?[4,3]:[]);ctx.beginPath();ctx.arc(p.x*k,p.z*k,r,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);};
     const resourceColor={ancientWood:'#d3a66d',crystal:'#7fe0dd',mana:'#b58cff'};

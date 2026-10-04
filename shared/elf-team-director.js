@@ -66,24 +66,15 @@ export function updateEpicProjectResourcePlan(match,project,targetOverride=null)
 }
 
 export function synchronizeEpicProjectSpecialization(match,owner){
-  const project=match.elfEpicProject,specialization=B.elfProgression.specializations[owner?.elfSpecialization];
-  if(!project||project.completedAt||project.ownerId!==owner?.id||!specialization)return false;
-  const oldSignature=match.structures.find(row=>row.id===project.signatureId),changed=project.signatureKind!==specialization.structure||project.resource!==specialization.resource;
-  if(oldSignature&&oldSignature.kind!==specialization.structure)oldSignature.epicProject=false;
-  project.signatureKind=specialization.structure;project.resource=specialization.resource;
-  const live=liveStructures(match,owner.id,project.baseId),signature=specialization.structure?live.filter(row=>row.kind===specialization.structure).sort((a,b)=>b.tier-a.tier||(a.createdAt||0)-(b.createdAt||0))[0]:null;
-  project.signatureId=signature?.id||null;if(signature)signature.epicProject=true;
-  for(const wisp of match.wisps.filter(row=>row.owner===owner.id&&row.alive&&row.specialResource)){
-    wisp.specialResource=specialization.resource;
-    const current=match.specialNodes.find(node=>node.id===wisp.specialNodeId&&node.resource===specialization.resource&&node.amount>0),next=current||match.specialNodes.filter(node=>node.resource===specialization.resource&&node.amount>0&&!match.wisps.some(other=>other.alive&&other.id!==wisp.id&&other.specialNodeId===node.id)).sort((a,b)=>Number(a.local)-Number(b.local)||Math.hypot(a.x-wisp.x,a.z-wisp.z)-Math.hypot(b.x-wisp.x,b.z-wisp.z))[0];
-    wisp.specialNodeId=next?.id||null;if(next)wisp.rich=!next.local;
-  }
-  project.missingSince=null;project.failureReason=null;
-  const missingEntry=epicProjectEntries(project).find(([key,id])=>!id||!match.structures.some(row=>row.id===id&&row.hp>0));
-  project.recoveringKind=missingEntry?(missingEntry[0]==='signature'?specialization.structure:missingEntry[0]):null;
-  project.specializationRevision=(project.specializationRevision||0)+(changed?1:0);project.lastSpecializationChangedAt=match.time;
-  updateEpicProjectResourcePlan(match,project);match.elfTeamProjectTick=null;match.elfTeamProjectStateKey=null;match.elfTeamProjectSnapshot=null;
-  match.emit('epic-project-specialization',{unit:owner.id,entity:signature?.id||null,x:signature?.x??owner.x,z:signature?.z??owner.z,specialization:owner.elfSpecialization,signatureKind:project.signatureKind,resource:project.resource,recovering:!!project.recoveringKind});
+  const project=match.elfEpicProject;
+  if(!project||project.completedAt||project.ownerId!==owner?.id)return false;
+  // The four construction choices are independent. Rebuilding a Core cannot
+  // change another building's specialization or introduce a retired mineral.
+  project.signatureKind=null;project.signatureId=null;project.resource='crystal';
+  const missing=epicProjectEntries(project).find(([,id])=>!match.structures.some(s=>s.id===id&&s.hp>0));
+  project.recoveringKind=missing?.[0]||null;
+  updateEpicProjectResourcePlan(match,project);
+  match.elfTeamProjectTick=null;match.elfTeamProjectStateKey=null;match.elfTeamProjectSnapshot=null;
   return true;
 }
 
@@ -166,7 +157,7 @@ export function updateElfTeamProject(match,activeElapsed,trollLevel=1){
     const structures=anchorMilestones,wall=anchorWall,specialCoverage=structures.filter(structure=>['bastion','arcaneTower'].includes(structure.kind)).length,owner=match.unit(selectedAnchor.ownerId),mine=structures.filter(structure=>structure.kind==='mine').sort((a,b)=>b.tier-a.tier)[0],signatureKind=B.elfProgression.specializations[owner?.elfSpecialization]?.structure,signature=structures.find(structure=>structure.kind===signatureKind);
     if(mine&&(!signatureKind||signature)){
       const selected=(legendaryTowers.length?legendaryTowers:[foundationTower]).slice().sort((a,b)=>b.tier-a.tier||(a.createdAt||0)-(b.createdAt||0)||a.id.localeCompare(b.id))[0],recentPressure=pressureAt(match,structures);
-      match.elfEpicProject={coreId:anchorCore.id,wallId:wall.id,towerId:selected.id,mineId:mine.id,workshopId:null,signatureId:signature?.id||null,signatureKind:signatureKind||null,resource:B.elfProgression.specializations[owner.elfSpecialization].resource,ownerId:selected.owner,baseId:selected.baseId,selection:{wallAlive:!!wall,coverage:legendaryTowers.length+specialCoverage,legendaryCoverage:legendaryTowers.length,specialCoverage,recentPressure:+recentPressure.toFixed(3)},startedAt:match.time,designatedAt:match.time,startingTier:selected.tier,replacements:0,resources:{gold:0,wood:0,essence:0,specialResources:{}}};
+      match.elfEpicProject={coreId:anchorCore.id,wallId:wall.id,towerId:selected.id,mineId:mine.id,workshopId:null,signatureId:signature?.id||null,signatureKind:signatureKind||null,resource:'crystal',ownerId:selected.owner,baseId:selected.baseId,selection:{wallAlive:!!wall,coverage:legendaryTowers.length+specialCoverage,legendaryCoverage:legendaryTowers.length,specialCoverage,recentPressure:+recentPressure.toFixed(3)},startedAt:match.time,designatedAt:match.time,startingTier:selected.tier,replacements:0,resources:{gold:0,wood:0,essence:0,specialResources:{}}};
       project=match.elfEpicProject;
       for(const {structure} of epicProjectStructures(match,project))if(structure)structure.epicProject=true;
       updateEpicProjectResourcePlan(match,project);

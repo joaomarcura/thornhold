@@ -4,7 +4,8 @@ const geometries={
   box:new T.BoxGeometry(1,1,1),
   cylinder:new T.CylinderGeometry(1,1,1,7),
   cone:new T.ConeGeometry(1,1,7),
-  sphere:new T.IcosahedronGeometry(1,0)
+  sphere:new T.IcosahedronGeometry(1,0),
+  ring:new T.TorusGeometry(1,.12,4,8)
 };
 for(const geometry of Object.values(geometries))geometry.userData.shared=true;
 const materials=new Map();
@@ -54,19 +55,38 @@ export const HELD_ITEM_DEFINITIONS={
     {shape:'cone',color:0xcbd2cc,position:[.22,.67,0],scale:[.3,.38,.12],rotation:[0,0,-Math.PI/2],metalness:.72}
   ]},
   elfHammer:{label:'Martelo de construção',parts:[
-    {shape:'cylinder',color:0x674c35,position:[0,.02,0],scale:[.07,.55,.07]},
-    {shape:'box',color:0xbcc3ba,position:[0,.62,0],scale:[.38,.2,.13],metalness:.55}
+    {shape:'cylinder',color:0x674c35,position:[0,.02,0],scale:[.06,.62,.06]},
+    {shape:'box',color:0x7e9695,position:[0,.64,0],scale:[.4,.23,.2],metalness:.7},
+    {shape:'cylinder',color:0xd3d7c7,position:[.23,.64,0],scale:[.13,.09,.13],rotation:[0,0,Math.PI/2],metalness:.85},
+    {shape:'box',color:0xd0af6b,position:[0,.64,.104],scale:[.1,.13,.014],metalness:.55},
+    {shape:'cylinder',color:0x334943,position:[0,-.12,0],scale:[.075,.28,.075]},
+    {shape:'ring',color:0xd0af6b,position:[0,.1,0],scale:[.064,.064,.064],rotation:[Math.PI/2,0,0],metalness:.6}
+  ]},
+  elfRod:{label:'Vara da praia',parts:[
+    {shape:'cylinder',color:0x674c35,position:[0,-.08,0],scale:[.035,.28,.035]},
+    {shape:'cylinder',color:0x44646a,position:[0,.7,0],scale:[.016,1.45,.016]},
+    {shape:'cylinder',color:0xb0c6b7,position:[.065,-.06,0],scale:[.07,.09,.07],rotation:[0,0,Math.PI/2],metalness:.65},
+    {shape:'box',color:0xd2b46b,position:[.1,-.13,0],scale:[.035,.14,.025],metalness:.6},
+    {shape:'sphere',color:0x4a655d,position:[.1,-.21,0],scale:[.045,.03,.04]},
+    {shape:'ring',color:0xc7cbb0,position:[0,.15,0],scale:[.025,.025,.025],rotation:[Math.PI/2,0,0],metalness:.7}
   ]}
 };
 
 export function heldItemKey(role,equipment={},tool=''){
   if(role==='troll')return equipment.weapon||'club';
+  if(tool==='fishing')return 'elfRod';
   return ['gather','gatherSpecial'].includes(tool)?'elfAxe':'elfHammer';
 }
 
 export function createHeldItem(role,equipment={},tool='',visualLevel=1){
   const key=heldItemKey(role,equipment,tool),definition=HELD_ITEM_DEFINITIONS[key]||HELD_ITEM_DEFINITIONS.club,root=new T.Group();
   for(const value of definition.parts)part(root,value);
+  if(key==='elfRod'){
+    const shaft=root.children[1],geometry=new T.CylinderGeometry(.01,.018,1.45,5,8);shaft.geometry=geometry;shaft.scale.set(1,1,1);
+    root.userData.shaft=shaft;root.userData.shaftRest=Float32Array.from(geometry.attributes.position.array);root.userData.tip=new T.Vector3(0,1.425,0);root.userData.bend=0;
+    root.userData.guides=[];for(const y of [.38,.76,1.12,1.39]){const guide=part(root,{shape:'ring',color:0xc7cbb0,position:[0,y,.025],scale:[.026,.026,.026],metalness:.7});root.userData.guides.push(guide);}
+    root.traverse(o=>{if(o.isMesh)o.castShadow=false;});
+  }
   const level=Math.max(1,Math.min(5,visualLevel||1));
   if(role==='troll'&&key!=='club'&&level>1){
     const rarityColors=[0x8fa19b,0x7fd8bc,0x79bfe8,0xe3bc63,0xb78aff],accent=rarityColors[level-1];
@@ -76,4 +96,12 @@ export function createHeldItem(role,equipment={},tool='',visualLevel=1){
   }
   root.userData.heldItemKey=key;root.userData.label=definition.label;root.userData.visualLevel=level;
   return root;
+}
+
+export function bendRod(rod,amount){
+  if(!rod?.userData.shaft||Math.abs(amount-rod.userData.bend)<.002)return;
+  const position=rod.userData.shaft.geometry.attributes.position,rest=rod.userData.shaftRest;
+  for(let i=0;i<position.count;i++){const p=(rest[i*3+1]+.725)/1.45;position.setX(i,rest[i*3]+amount*p*p);}
+  position.needsUpdate=true;rod.userData.bend=amount;rod.userData.tip.x=amount;
+  for(const guide of rod.userData.guides||[])guide.position.x=amount*((guide.position.y-.7+.725)/1.45)**2;
 }

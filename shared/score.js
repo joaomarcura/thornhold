@@ -20,5 +20,6 @@ export function playerSummary(u){
     kills:u.stats.kills||0,damage:Math.round(u.stats.damage||0),
     goldGenerated:Math.round(u.stats.goldGenerated||0),woodGenerated:Math.round(u.stats.woodGenerated||0),essenceGenerated:Math.round(u.stats.essenceGenerated||0),elfPath:u.elfPath||null,
     structuresBuilt:u.stats.structuresBuilt||0,structuresDestroyed:u.stats.structuresDestroyed||0,
+    fishingCasts:u.stats.fishingCasts||0,fishCaught:u.stats.fishCaught||0,fishLost:u.stats.fishLost||0,fishingCancelled:u.stats.fishingCancelled||0,fishingValue:u.stats.fishingValue||0,fishSold:u.stats.fishSold||0,goldFromFishing:u.stats.goldFromFishing||0,rodLevel:u.rodLevel||1,
     upgrades:u.stats.upgrades||0,technologyCards:u.stats.technologyCards||0,healing:Math.round(u.stats.healing||0),stuns:u.stats.stuns||0,relocations:u.stats.relocations||0,reveals:u.stats.reveals||0,ghostsDestroyed:u.stats.ghostsDestroyed||0};
 }

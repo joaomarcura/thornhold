@@ -233,6 +233,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'thornhold-data'
           storageType: 'AzureFile'
           storageName: environmentStorage.name
+          mountOptions: 'nobrl'
         }
       ]
       scale: {

@@ -93,9 +93,10 @@ test('Núcleo próprio na Clareira 5 sempre mostra sua progressão, inclusive du
   assert.match(html,/data-do="upgrade"/);assert.match(html,/Conclua a construção primeiro/);
   assert.match(html.match(/<button[^>]*data-do="upgrade"[^>]*>/)[0],/disabled/);
 });
-test('Painel do Núcleo mostra três tecnologias no marco 8 e informa o recurso necessário',()=>{
-  const {m,u,core}=fixture();core.tier=8;u.elfSpecialization='industrial';u.specialResources.ancientWood=29;
-  const html=selectionMarkup(core,{u,snapshot:m.snapshot(u.id),map:m.map});assert.equal((html.match(/data-do="choose-technology"/g)||[]).length,3);assert.match(html,/Madeira Ancestral: 29 \/ 30/);assert.match(html,/Produção eficiente/);
+test('Painel mostra três especializações próprias no nível 10 e custo de cristal',()=>{
+  const {m,u,core}=fixture();core.tier=10;u.specialResources.crystal=9;
+  const html=selectionMarkup(core,{u,snapshot:m.snapshot(u.id),map:m.map});
+  assert.equal((html.match(/data-do="choose-specialization"/g)||[]).length,3);assert.match(html,/10/);assert.match(html,/Industrial/);assert.ok(!html.includes('choose-technology'));
 });
 test('Exact affordability, barricade progression, and server messages share one rule',()=>{
   const {m,u,core,wall}=fixture();
@@ -113,11 +114,11 @@ test('Exact affordability, barricade progression, and server messages share one 
   assert.ok(upgradeStatus(u,core,0,STATES.END,m.structures).reasons.some(r=>r.code==='match'));
   core.owner='someone-else';assert.ok(upgradeStatus(u,core,0,STATES.ACTIVE,m.structures).reasons.some(r=>r.code==='owner'));
 });
-test('Selection changes at resource threshold without a clock tick and explains distance',()=>{
+test('Selection changes at resource threshold without a clock tick and explains remote upgrades',()=>{
   const {m,u,core}=fixture(),render=()=>selectionMarkup(core,{u,snapshot:m.snapshot('e'),map:m.map});
   u.gold=99.99;const before=render();assert.match(before,/Ouro insuficiente/);
   u.gold=100;const after=render();assert.notEqual(before,after);assert.doesNotMatch(after,/Ouro insuficiente/);
-  u.x+=10;assert.match(render(),/Aproxime-se:/);
+  u.x+=10;assert.match(render(),/Upgrade à distância disponível/);assert.doesNotMatch(render(),/Aproxime-se:/);
   const amount=resource('gold',99.99);assert.match(amount,/>99</);assert.doesNotMatch(amount,/>100</);
   const costs=resourceCost({gold:100,wood:35});assert.match(costs,/resource-gold/);assert.match(costs,/resource-wood/);assert.doesNotMatch(costs,/[◇♧]/);
 });
@@ -188,7 +189,7 @@ test('V2.1 registra estado, setores, cercos, trade, pressão e economia sem diri
   const economy=v2.economyCheckpoints.find(c=>c.time===180).elves;assert.ok(Object.hasOwn(economy,'netSpentGold'));assert.ok(Object.hasOwn(economy,'goldUtilization'));assert.ok(economy.spendByPurpose.economy);assert.ok(economy.spendByPurpose.defense);assert.ok(Array.isArray(economy.players));
   const frozen=economy.players[0].spendByPurpose;m.unit('e').stats.spendByPurpose.economy={gold:999,wood:999};assert.notDeepEqual(frozen,m.unit('e').stats.spendByPurpose);
   assert.equal(Object.hasOwn(v2.matchState,'elfPower'),true);assert.equal(Object.hasOwn(v2.matchState,'volatility'),true);
-  const report=m.result();assert.equal(report.telemetry.schema,22);assert.equal(report.telemetry.legendaryExecutions.count,0);assert.ok(Array.isArray(report.telemetry.chases));assert.ok(report.telemetry.chaseSummary);assert.ok(report.telemetry.structureDestructionTimes.wall);assert.ok(Object.hasOwn(report.telemetry.structureDestructionTimes.wall,'averageActiveSeconds'));assert.equal(report.telemetry.context.devSpeed,1);assert.deepEqual(report.telemetry.context.devSpeedHistory,[{time:0,speed:1}]);assert.equal(report.telemetry.context.difficulty,'normal');assert.ok(report.telemetry.specializations?.impact);assert.ok(report.telemetry.specializations?.specialResources);assert.ok(Array.isArray(report.telemetry.specializations?.epicProjectAttempts));assert.ok(report.telemetry.specializations?.epicProjectSummary);assert.ok(Object.hasOwn(report.telemetry.healing,'legendarySuppressed'));assert.equal(v2.maxWallHp,20);assert.ok(Array.isArray(v2.repeatedTargets));assert.ok(Object.hasOwn(v2,'worstRepeatedTarget'));assert.ok(Object.hasOwn(v2,'maxFailedSiegesTarget'));assert.ok(Array.isArray(v2.decisionDiagnostics.targetFailures));assert.ok(Array.isArray(v2.decisionDiagnostics.blockedBases));assert.ok(Object.hasOwn(v2.decisionDiagnostics,'recoveryPlan'));assert.ok(Object.hasOwn(v2.decisionDiagnostics,'repositionStreak'));assert.ok(v2.decisionDiagnostics.baseSearch);assert.ok(Array.isArray(v2.finalSiegeParity));assert.deepEqual(Object.keys(v2.outcomeMilestones),['firstElfDeathAt','thirdElfDeathAt','finalElfPhaseAt']);assert.equal(v2.formulaVersion,'v3.20-epic-project-authority');
+  const report=m.result();assert.equal(report.telemetry.schema,23);assert.equal(report.telemetry.legendaryExecutions.count,0);assert.ok(Array.isArray(report.telemetry.chases));assert.ok(report.telemetry.chaseSummary);assert.ok(report.telemetry.structureDestructionTimes.wall);assert.ok(Object.hasOwn(report.telemetry.structureDestructionTimes.wall,'averageActiveSeconds'));assert.equal(report.telemetry.context.devSpeed,1);assert.deepEqual(report.telemetry.context.devSpeedHistory,[{time:0,speed:1}]);assert.equal(report.telemetry.context.difficulty,'normal');assert.ok(report.telemetry.specializations?.impact);assert.ok(report.telemetry.specializations?.specialResources);assert.ok(Array.isArray(report.telemetry.specializations?.epicProjectAttempts));assert.ok(report.telemetry.specializations?.epicProjectSummary);assert.ok(Object.hasOwn(report.telemetry.healing,'legendarySuppressed'));assert.equal(v2.maxWallHp,20);assert.ok(Array.isArray(v2.repeatedTargets));assert.ok(Object.hasOwn(v2,'worstRepeatedTarget'));assert.ok(Object.hasOwn(v2,'maxFailedSiegesTarget'));assert.ok(Array.isArray(v2.decisionDiagnostics.targetFailures));assert.ok(Array.isArray(v2.decisionDiagnostics.blockedBases));assert.ok(Object.hasOwn(v2.decisionDiagnostics,'recoveryPlan'));assert.ok(Object.hasOwn(v2.decisionDiagnostics,'repositionStreak'));assert.ok(v2.decisionDiagnostics.baseSearch);assert.ok(Array.isArray(v2.finalSiegeParity));assert.deepEqual(Object.keys(v2.outcomeMilestones),['firstElfDeathAt','thirdElfDeathAt','finalElfPhaseAt']);assert.equal(v2.formulaVersion,'v3.20-epic-project-authority');
 });
 test('Curva de Barricada cresce no late game e respeita personalidade sem buff de atributos',()=>{
   assert.deepEqual([12,14,16,18,20].map(requiredBarricadeTier),[11,13,15,17,19]);
@@ -200,14 +201,14 @@ test('Curva de Barricada cresce no late game e respeita personalidade sem buff d
 test('Patch B21 reduz as curvas de vida e dano do Troll em 10%',()=>{
   assert.equal(B.troll.hp,1980);assert.equal(B.troll.damage,21.6);assert.equal(B.troll.healthPerLevel,324);assert.equal(B.troll.damageGrowth,1.2);
 });
-test('Stun funciona fora da base, mantém alcance e usa cooldown compartilhado',()=>{
+test('Stun funciona fora da base, mantém alcance e cada Elfo usa cooldown próprio',()=>{
   const m=new Match({seed:'STUN'},[{id:'t',role:'troll',occupant:{type:'human',name:'Troll'}},{id:'e0',role:'elf',occupant:{type:'human',name:'A'}},{id:'e1',role:'elf',occupant:{type:'human',name:'B'}}]);
   const troll=m.unit('t'),elf=m.unit('e0'),ally=m.unit('e1'),base=m.map.bases[0];m.state=STATES.ACTIVE;m.time=60;
   elf.baseId=base.id;ally.baseId=m.map.bases[1].id;Object.assign(elf,{x:base.x,z:base.z});Object.assign(troll,{x:base.x+4,z:base.z});
   troll.pendingStrike={heavy:true,at:m.time+1};troll.input={x:1,z:0};assert.equal(m.act(elf.id,{type:'elfStun'}),undefined);
   assert.equal(troll.stunnedUntil,m.time+3);assert.equal(troll.pendingStrike,null);assert.deepEqual(troll.input,{x:0,z:0});assert.equal(elf.stats.stuns,1);
   const x=troll.x;m.input(troll.id,{x:1,z:0});m.movement(troll,1);assert.equal(troll.x,x);assert.match(m.act(troll.id,{type:'attack'}),/Atordoado/);
-  Object.assign(ally,{x:troll.x,z:troll.z+2});assert.match(m.act(ally.id,{type:'elfStun'}),/recarregando/);
+  Object.assign(ally,{x:troll.x,z:troll.z+2});assert.equal(m.act(ally.id,{type:'elfStun'}),undefined);assert.equal(ally.stats.stuns,1);assert.match(m.act(ally.id,{type:'elfStun'}),/recarregando/);
   m.time+=3.01;assert.equal(troll.effects,undefined);assert.match(m.act(elf.id,{type:'elfStun'}),/recarregando/);
   const effects=m.snapshot(troll.id).units.find(u=>u.id===troll.id).effects;assert.ok(!effects.some(e=>e.id==='stunned'));
 });
@@ -248,7 +249,7 @@ test('Reassentamento libera nova especialização adequada à próxima clareira'
   const {m,u,core}=fixture(),troll=m.unit('t');m.state=STATES.ACTIVE;m.time=60;u.elfSpecialization='industrial';u.stats.specialization='industrial';
   m.damage(core,core.hp,troll,'melee');assert.equal(u.elfSpecialization,null);assert.equal(u.previousElfSpecialization,'industrial');assert.equal(u.specializationReselectionPending,true);
   const next=m.map.bases.find(base=>base.id!==core.baseId);Object.assign(u,{x:next.x+4.4,z:next.z,gold:0,wood:0});assert.equal(m.act(u.id,{type:'build',kind:'core',x:next.x,z:next.z}),undefined);
-  const replacement=m.structures.at(-1);Object.assign(replacement,{progress:1,hp:replacement.maxHp,tier:5});Object.assign(u,{x:replacement.x+2,z:replacement.z});assert.equal(m.act(u.id,{type:'chooseElfSpecialization',key:'fortress'}),null);
+  const replacement=m.structures.at(-1);Object.assign(replacement,{progress:1,hp:replacement.maxHp,tier:10});Object.assign(u,{x:replacement.x+2,z:replacement.z});assert.equal(m.act(u.id,{type:'chooseElfSpecialization',key:'fortress'}),null);
   assert.equal(u.elfSpecialization,'fortress');assert.equal(u.previousElfSpecialization,null);assert.equal(u.specializationReselectionPending,false);assert.equal(u.stats.specializationChoices,1);
 });
 test('Cada Elfo pode fundar no máximo dois Núcleos durante a partida',()=>{

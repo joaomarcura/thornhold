@@ -1,6 +1,6 @@
 {
   "name": "thornhold",
-  "version": "0.5.0-alpha.3",
+  "version": "0.6.6-alpha.1",
   "private": true,
   "type": "module",
   "description": "Thornhold — authoritative asymmetric 3D multiplayer vertical slice",

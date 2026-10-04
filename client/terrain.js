@@ -1,18 +1,23 @@
 import * as T from 'three';
 import { baseZone, heightAt, walkable, index } from '../shared/map.js';
+import { riverProfileAt } from '../shared/scenery.js';
+import { coastalField } from '../shared/coast.js';
 
-// Vertex heights and diagonal agree with heightAt(), including raycast hit positions.
-export function terrainMesh(map){
+// Roads retain the authoritative height field. At the river the presentation
+// mesh forms a real bed; bridge decks sit at the unchanged walkable elevation.
+export function terrainMesh(map,coast=coastalField(map)){
   const positions=[],colors=[],indices=[],color=new T.Color();
   const styles={woodland:{openHue:.105,openSat:.18,openLight:.30,blockedHue:.36,blockedLight:.17},deepForest:{openHue:.34,openSat:.22,openLight:.22,blockedHue:.38,blockedLight:.12},crossroads:{openHue:.12,openSat:.14,openLight:.34,blockedHue:.31,blockedLight:.2}},style=styles[map.style]||styles.woodland;
   for(let z=0;z<map.size;z++)for(let x=0;x<map.size;x++){
-    const y=heightAt(map,x*map.cell,z*map.cell),open=walkable(map,x,z);
+    const k=index(map,x,z),profile=riverProfileAt(map,x*map.cell,z*map.cell),y=coast.heights[k]-(profile?.depth||0),open=walkable(map,x,z);
     const b=map.bases.find(b=>Math.abs(x-b.cx)<b.rx&&Math.abs(z-b.cz)<b.rz),zone=b&&open?baseZone(map,b,{x:x*map.cell,z:z*map.cell}):null;
     const noise=((x*73+z*179)%17)/17;
     // Lowlands are cool moss; raised clearings are dry grass. Paths remain legible.
     const zoneHue=zone==='frontline'?.12:zone==='industrial'?.19:zone==='core'?.28:null;
     const elevationTint=Math.max(-.035,Math.min(.045,y*.006));
     color.setHSL(open?(b?(zoneHue??(y<-.5?.39:.25)):style.openHue):style.blockedHue,open?(b?.22:style.openSat):.19,open?(b?.27:style.openLight)+noise*.025+elevationTint:style.blockedLight+noise*.025+elevationTint);
+    if(profile)color.setHSL(.1,.19,.2+noise*.03);
+    if(coast.zones[k]===1||coast.zones[k]===2)color.setHSL(.115,.34,.48+noise*.035);
     positions.push(x*map.cell,y,z*map.cell);colors.push(color.r,color.g,color.b);
     if(x<map.size-1&&z<map.size-1){const a=index(map,x,z),b=a+1,c=a+map.size,d=c+1;indices.push(a,d,b,a,c,d);}
   }

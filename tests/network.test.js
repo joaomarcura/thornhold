@@ -20,9 +20,9 @@ async function client(port,name,token){
 test('Velocidade dev usa passos fixos para preservar IA e movimento em 16x',()=>{
   const calls=[],match={state:STATES.ACTIVE,step:dt=>calls.push(dt)};
   advanceMatch(match,16);
-  assert.equal(calls.length,16);
+  assert.equal(calls.length,16*B.gameSpeed);
   assert.ok(calls.every(dt=>dt===1/B.tick));
-  assert.ok(Math.abs(calls.reduce((sum,dt)=>sum+dt,0)-16/B.tick)<1e-9);
+  assert.ok(Math.abs(calls.reduce((sum,dt)=>sum+dt,0)-16*B.gameSpeed/B.tick)<1e-9);
 });
 const closeClient=c=>new Promise(resolve=>{if(c.socket.readyState===WebSocket.CLOSED)return resolve();c.socket.once('close',resolve);c.socket.close();});
 const nextTurn=()=>new Promise(resolve=>setTimeout(resolve,70));
@@ -36,7 +36,7 @@ test('Revanche alterna lado inicial e sentido da patrulha do Troll',()=>{
 for(const scenario of [
   {name:'A: humano Troll contra 5 Elfos bots',role:'troll',elves:5,humans:1,bots:true},
   {name:'B: humano Elfo + 4 bots contra Troll bot',role:'elf',elves:5,humans:1,bots:true},
-  {name:'C: Troll humano contra 2 Elfos humanos',role:'troll',elves:2,humans:3,bots:false},
+  {name:'C: Troll humano contra 5 Elfos humanos',role:'troll',elves:5,humans:6,bots:false},
   {name:'D: Troll humano contra 3 Elfos humanos + 3 bots',role:'troll',elves:6,humans:4,bots:true}
 ])test(scenario.name,async()=>{
   const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false}),clients=[];
@@ -85,7 +85,7 @@ test('Partida local permite host observador com lobby padrão 1×5 somente de bo
 test('F: desconexão, host migrado, IA no mesmo personagem e retomada por token',async()=>{
   const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false});let host,guest,resumed;
   try{
-    host=await client(app.port,'Host');guest=await client(app.port,'Aliado');host.send('create',{role:'troll',fillBots:true,settings:{elfSlots:2}});const {room}=await host.wait('lobby');guest.send('join',{code:room.id});await guest.wait('lobby');guest.send('slot',{slot:'e0',action:'claim'});await guest.wait('lobby',m=>m.room.slots.find(s=>s.id==='e0').occupant?.clientId===guest.hello.id);
+    host=await client(app.port,'Host');guest=await client(app.port,'Aliado');host.send('create',{role:'troll',fillBots:true,settings:{elfSlots:5}});const {room}=await host.wait('lobby');guest.send('join',{code:room.id});await guest.wait('lobby');guest.send('slot',{slot:'e0',action:'claim'});await guest.wait('lobby',m=>m.room.slots.find(s=>s.id==='e0').occupant?.clientId===guest.hello.id);
     host.send('ready',{ready:true});guest.send('ready',{ready:true});await host.wait('lobby',m=>m.room.errors.length===0);host.send('start');await guest.wait('map');await host.wait('map');const live=app.sessions.rooms.get(room.id),unit=live.match.unit('t0');unit.gold=123;
     await closeClient(host);await guest.wait('lobby',m=>m.room.hostId===guest.hello.id);assert.equal(unit.controller,'bot');assert.equal(unit.gold,123);
     resumed=await client(app.port,'Host',host.hello.token);const map=await resumed.wait('map');assert.equal(map.viewerId,'t0');assert.equal(unit.controller,'human');assert.equal(unit.gold,123);assert.equal(live.hostId,guest.hello.id);
@@ -132,9 +132,10 @@ test('Modo dev fica protegido por configuração e controla recursos e velocidad
   const app=await createGameServer({port:0,host:'127.0.0.1',telemetry:false,devMode:true});let host;
   try{
     host=await client(app.port,'Dev Troll');assert.equal(host.hello.devMode,true);
-    host.send('create',{role:'troll',fillBots:true,settings:{elfSlots:1,private:true,preparation:20}});const {room}=await host.wait('lobby');host.send('ready',{ready:true});await host.wait('lobby',m=>m.room.errors.length===0);host.send('start');await host.wait('map');
+    host.send('create',{role:'troll',fillBots:true,settings:{elfSlots:5,private:true,preparation:20}});const {room}=await host.wait('lobby');host.send('ready',{ready:true});await host.wait('lobby',m=>m.room.errors.length===0);host.send('start');await host.wait('map');
     const live=app.sessions.rooms.get(room.id),unit=live.match.unit('t0'),gold=unit.gold,wood=unit.wood;
-    host.send('dev',{command:'grant',gold:1000,wood:250});await host.wait('dev',m=>m.granted?.gold===1000);assert.equal(unit.gold,gold+1000);assert.equal(unit.wood,wood+250);
+    host.send('dev',{command:'grant',gold:1000});await host.wait('dev',m=>m.granted?.gold===1000);assert.equal(unit.gold,gold+1000);assert.equal(unit.wood,wood);
+    host.send('dev',{command:'grant',crystal:25});await host.wait('error',m=>/Elfos/.test(m.message));assert.equal(unit.specialResources.crystal,0);
     host.send('dev',{command:'speed',speed:8});await host.wait('dev',m=>m.speed===8);assert.equal(live.devSpeed,8);assert.equal(live.match.devSpeed,8);
     const before={x:unit.x,z:unit.z};host.send('input',{x:1,z:0});await nextTurn();assert.ok(Math.hypot(unit.x-before.x,unit.z-before.z)>.1,'WASD deve continuar ativo em velocidade DEV 8×');host.send('input',{x:0,z:0});
   }finally{if(host)await closeClient(host);await app.close();}

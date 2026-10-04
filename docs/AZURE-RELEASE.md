@@ -75,6 +75,15 @@ Depois de introduzir a plataforma competitiva, execute novamente o deploy do
 o Container Apps Environment. Apenas atualizar a imagem não cria o volume novo.
 Os releases seguintes preservam o mount e voltam a atualizar somente a imagem.
 
+A produção `thornhold-prod-pmarcura` usa o Storage Account
+`stthornholdpmarcura`, share `thornhold-data`, montado em `/app/data`.
+Ao reaplicar o Bicep nessa instalação, informe
+`storageAccountName=stthornholdpmarcura` para reutilizar o banco existente.
+O volume usa `mountOptions=nobrl` e o SQLite usa journal `DELETE`;
+sem essa opção de SMB, a inicialização apresentou `database is locked`.
+Mantenha um único processo escritor e faça releases em janela de manutenção,
+evitando sobreposição de revisões que escrevam no mesmo banco.
+
 ## 3. Validar a infraestrutura
 
 O Bicep pode ser compilado sem fazer alterações na assinatura:

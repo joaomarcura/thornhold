@@ -8,7 +8,7 @@ import { TacticalMap } from '../client/tactical-map.js';
 test('Refúgios variam em espaço, madeira e altura; núcleos e portões permanecem planos',()=>{
   for(const size of ['compact','large'])for(let seed=0;seed<20;seed++){
     const map=generateMap('terrain-'+seed,size);
-    assert.equal(map.version,4);assert.equal(map.bases.length,12);assert.ok(new Set(map.bases.map(b=>b.rx*b.rz)).size>=3);
+    assert.equal(map.version,6);assert.equal(map.bases.length,12);assert.ok(new Set(map.bases.map(b=>b.rx*b.rz)).size>=3);
     assert.equal(new Set(map.bases.map(b=>b.wood)).size,3);
     assert.ok(map.trees.every(t=>t.amount===BALANCE.economy.treeStock));
     assert.ok(map.bases.some(b=>b.height<0)&&map.bases.some(b=>b.height>0));
@@ -46,7 +46,7 @@ test('Mapa co-op organiza fortalezas de duas entradas sem invalidar barricadas',
   assert.equal(map.rivers.length,1);assert.ok(map.bridges.length>0&&map.bridges.length<20);
   for(const bridge of map.bridges){const cell=toCell(map,bridge);assert.ok(walkable(map,cell.x,cell.z));}
   const standard=generateMap('COOP-COMPOUNDS','large');assert.equal(standard.coop,false);assert.equal(standard.coopCompounds.length,0);assert.equal(standard.coopTunnels.length,0);assert.ok(standard.bases.every(base=>!base.compoundId));
-  assert.equal(standard.rivers.length,0);assert.equal(standard.bridges.length,0);
+  assert.equal(standard.rivers.length,1);assert.ok(standard.bridges.length>0);
 });
 
 test('V3.1 amplia lateralmente as bases e organiza Core, Industrial e Frontline sem mover o portão',()=>{

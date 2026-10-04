@@ -11,17 +11,7 @@ export function availableTrees(m,u,core){
 }
 export function commandWisp(m,u,cmd){
   if(u.role!=='elf')return 'Apenas Elfos cultivam Wisps.';
-  if(cmd.type==='trainSpecialWisp'){
-    const core=m.structures.find(s=>s.kind==='core'&&s.owner===u.id&&s.hp>0&&s.progress===1),node=m.specialNodes.find(n=>n.id===cmd.target&&n.amount>0);
-    if(!core||distance(core,u)>B.interactRange||!m.canSee(u,core))return 'Forme Wisps especiais perto do seu Núcleo.';
-    if(!node)return 'Selecione um depósito especial disponível.';
-    if(!m.teamSee(u,node))return 'Descubra o depósito antes de designar um Wisp.';
-    if(m.wisps.some(w=>w.alive&&w.specialNodeId===node.id))return 'Este depósito já possui um Wisp especial.';
-    const cost=B.elfProgression.specialWisp;if(u.gold<cost.gold||u.wood<cost.wood)return 'Recursos insuficientes para formar Wisp especial.';
-    u.gold-=cost.gold;u.wood-=cost.wood;u.stats.goldSpent+=cost.gold;u.stats.woodSpent+=cost.wood;u.stats.unitsCreated++;
-    const w={id:'w'+m.nextId++,role:'wisp',name:'Wisp especial',owner:u.id,specialNodeId:node.id,specialResource:node.resource,rich:!node.local,x:node.x,z:node.z,level:1,hp:cost.hp,maxHp:cost.hp,alive:true,readyAt:m.time+B.wisps.trainSeconds,upgradingUntil:0,lastHit:-100,bounty:cost.gold*.3};
-    w.job={type:'train',gold:cost.gold,wood:cost.wood,duration:B.wisps.trainSeconds,until:w.readyAt};m.wisps.push(w);m.emit('wisp-trained',{entity:w.id,unit:u.id,x:w.x,z:w.z,specialResource:node.resource});return;
-  }
+  if(cmd.type==='trainSpecialWisp')return 'Cristais são coletados manualmente; Wisps especiais foram removidos.';
   if(cmd.type==='trainWisp'){
     const core=m.structures.find(s=>s.id===cmd.target&&s.kind==='core'&&s.owner===u.id&&s.hp>0&&s.progress===1);
     if(!core||distance(core,u)>B.interactRange||!m.canSee(u,core))return 'Aproxime-se do seu núcleo concluído.';
@@ -79,14 +69,7 @@ export function stepWisps(m,dt){
     if(!owner?.alive){w.alive=false;continue;}
     if(w.job&&w.job.until<=m.time)delete w.job;
     if(w.upgradingUntil&&w.upgradingUntil<=m.time){w.upgradingUntil=0;w.level++;w.maxHp+=5;w.hp=Math.min(w.maxHp,w.hp+5);m.emit('complete',{entity:w.id,x:w.x,z:w.z});}
-    if(w.specialResource&&!w.specialNodeId){const next=m.specialNodes.filter(n=>n.resource===w.specialResource&&n.amount>0&&!m.wisps.some(other=>other.alive&&other.id!==w.id&&other.specialNodeId===n.id)).sort((a,b)=>Number(a.local)-Number(b.local)||distance(a,w)-distance(b,w))[0];if(next){w.specialNodeId=next.id;w.rich=!next.local;m.emit('wisp-transfer',{unit:owner.id,entity:w.id,x:next.x,z:next.z,resource:next.resource,external:!next.local});}else continue;}
-    if(w.specialNodeId){
-      let node=m.specialNodes.find(n=>n.id===w.specialNodeId);if(!node)continue;
-      if(node.amount<=0){const next=m.specialNodes.filter(n=>n.resource===w.specialResource&&n.amount>0&&!m.wisps.some(other=>other.alive&&other.id!==w.id&&other.specialNodeId===n.id)).sort((a,b)=>Number(a.local)-Number(b.local)||distance(a,w)-distance(b,w))[0];if(next){w.specialNodeId=next.id;node=next;m.emit('wisp-transfer',{unit:owner.id,entity:w.id,x:next.x,z:next.z,resource:next.resource,external:!next.local});}}
-      w.x=node.x;w.z=node.z;
-      if(wispActive(m,w)){const industrial=owner.elfSpecialization==='industrial'?1+B.elfProgression.specializations.industrial.wispBonus:1,rate=B.elfProgression.specialWisp.rate*industrial*(1+technologyEffects(owner).specialWisp),amount=Math.min(node.amount,rate*dt);node.amount-=amount;owner.specialResources[node.resource]=(owner.specialResources[node.resource]||0)+amount;owner.stats.specialResources=(owner.stats.specialResources||0)+amount;owner.stats.specialResourcesGenerated??={};owner.stats.specialResourcesGenerated[node.resource]=(owner.stats.specialResourcesGenerated[node.resource]||0)+amount;w.productionPulse=(w.productionPulse||0)+amount;if((w.productionPulseAt??m.time)<=m.time){m.emit('resource',{unit:owner.id,entity:w.id,x:w.x,z:w.z,resource:node.resource,amount:w.productionPulse,rate:rate*60});w.productionPulse=0;w.productionPulseAt=m.time+1;}}
-      continue;
-    }
+    if(w.specialResource||w.specialNodeId){w.alive=false;continue;}
     if(wispActive(m,w)){
       const pathMultiplier=elfPath(owner.elfPath)?.wood||1,breakdown=productionBreakdown(m,owner,w),baseRate=wispIncome(w)*pathMultiplier,rate=baseRate*breakdown.multiplier,amount=rate*dt;owner.wood+=amount;owner.stats.woodGenerated=(owner.stats.woodGenerated||0)+amount;owner.stats.wispWoodGenerated=(owner.stats.wispWoodGenerated||0)+amount;owner.stats.specializationImpact.refineryBonusWood+=baseRate*(breakdown.withoutOverdrive-breakdown.base)*dt;owner.stats.specializationImpact.overdriveBonusWood+=baseRate*(breakdown.multiplier-breakdown.withoutOverdrive)*dt;w.productionPulse=(w.productionPulse||0)+amount;
       if((w.productionPulseAt??m.time)<=m.time){m.emit('resource',{unit:owner.id,entity:w.id,x:w.x,z:w.z,resource:'wood',amount:w.productionPulse,rate:rate*60});w.productionPulse=0;w.productionPulseAt=m.time+1;}

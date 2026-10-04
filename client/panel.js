@@ -11,7 +11,7 @@ export function updatePanel(panel,html){
       if(old.nodeType===3){if(old.nodeValue!==next.nodeValue)old.nodeValue=next.nodeValue;return;}
       if(old.nodeType!==1)return;
       const value=old.tagName==='SELECT'?old.value:null;
-      for(const a of [...old.attributes])if(!next.hasAttribute(a.name))old.removeAttribute(a.name);
+      for(const a of [...old.attributes])if(!next.hasAttribute(a.name)&&!(old.tagName==='CANVAS'&&['width','height'].includes(a.name)))old.removeAttribute(a.name);
       for(const a of next.attributes)if(old.getAttribute(a.name)!==a.value)old.setAttribute(a.name,a.value);
       patch(old,next);
       if(value!==null&&[...old.options].some(o=>o.value===value))old.value=value;

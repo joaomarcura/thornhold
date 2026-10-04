@@ -1,28 +1,29 @@
+import { constructionEffects, crystalUpgradeCost } from './structure-specializations.js';
 export const STATES = Object.freeze({ MENU:'MAIN_MENU', LOBBY:'LOBBY', LOADING:'LOADING', PREP:'PREPARATION', ACTIVE:'MATCH_ACTIVE', END:'MATCH_END', RETURN:'RETURN_TO_LOBBY' });
 export const BALANCE = {
-  tick: 20, snapshot: 10, maxElves: 8, cell: 2.2, maxTier: 20, maxStructureTier: 30, visualTier: 5,
+  tick: 20, snapshot: 10, gameSpeed: 1.25, maxElves: 8, cell: 2.2, maxTier: 20, maxStructureTier: 30, visualTier: 5,
   prep: 60, matchHardLimit: 3600, finalAge: 210, idlePressureAge: 480, idlePressureGrace: 45,
   // The Troll needs enough sight to discover a refuge from the surrounding
   // trail without being given hidden base coordinates.
   vision: { troll: 60, elf: 24, towerRevealSeconds: 3 }, interactRange: 6.5,
   movement:{sprint:1.25,elfSprint:1.4375,trollRadius:.64,elfRadius:.37},
-  construction:{range:9.75,initialHealth:.15,breachCooldown:45,enemyClearance:5,gateClearance:2.3,placementGap:.5,placementRadius:{wall:.95},limits:{core:1,wall:1,tower:2,mine:5,bastion:1,arcaneTower:1},upgradeSeconds:3},
+  construction:{range:9.75,initialHealth:.15,breachCooldown:45,enemyClearance:5,gateClearance:2.3,placementGap:.5,placementRadius:{wall:.95},limits:{core:1,wall:1,tower:2,mine:1,fishery:1,bastion:1,arcaneTower:1},upgradeSeconds:3},
   economy:{treeStock:1000,richWood:1.65,finalRichWood:2.5,lateTier:9,lateStructureGrowth:1.035,lateWispGrowth:1.08,trollThreatRate:.022,trollThreatCap:2.2,trollLateThreatStart:900,trollLateThreatBase:8,trollLateThreatLogScale:30,trollLateThreatReference:100,trollLateThreatMatureBase:8,trollLateThreatLegendary:3,trollLateThreatSoftCap:50,trollLateThreatOverflowRate:.35,trollLateThreatCap:100,trollLateThreatDiminishingLevel:15,trollLateThreatLevelPressure:.12,trollLateThreatMinimum:.6,trollDamageGoldDiminishingStart:900,trollDamageGoldDiminishingLevel:10,trollDamageGoldLevelPressure:.1,trollDamageGoldMinutePressure:.08,trollDamageGoldMinimum:.32,trollObjectiveInvestmentRate:.1,trollObjectiveWoodRate:.5,trollObjectiveEssenceRate:12,trollObjectiveIncomeSeconds:15,trollObjective:{discovery:75,elf:75,wisp:5,wall:15,tower:30,mine:25,core:60,workshop:20,legendary:80},trollLobbyBonus:[0,0,.08,.12,.16,.2,.2,.2,.18],trollBountyFactor:[0,1.3,1.5,1.45,1.45,1.41,1.4,1.25,1.1],trollMapBounty:{compact:.9,large:1.1},trollLobbySiege:[1,1.15,1,1,1,1.1,1,1,1],trollScenarioBounty:{
     compact:{normal:[1,1,1,1,1,.94,1,1,1.06],hard:[1,1,1,1,1,1,1,1,1.06]},
     large:{}
   }},
-  elfIncremental:{essenceUnlockTier:4,essenceBaseRate:.06,essenceGrowth:1.22,pathCost:18,legendaryCost:30,epicCost:90,paths:{economy:{name:'Economia',description:'Ouro e madeira +12%.',gold:1.12,wood:1.12},defense:{name:'Defesa',description:'Estruturas e reparos +15%.',structureHp:1.15,repair:1.15},technology:{name:'Tecnologia',description:'Essência +30% e melhorias 20% mais rápidas.',essence:1.3,upgradeSpeed:1.2}}},
+  elfIncremental:{essenceUnlockTier:4,essenceBaseRate:0,essenceGrowth:1.22,pathCost:18,legendaryCost:30,epicCost:90,paths:{economy:{name:'Economia',description:'Ouro e madeira +12%.',gold:1.12,wood:1.12},defense:{name:'Defesa',description:'Estruturas e reparos +15%.',structureHp:1.15,repair:1.15},technology:{name:'Tecnologia',description:'Essência +30% e melhorias 20% mais rápidas.',essence:1.3,upgradeSpeed:1.2}}},
   progression:{structureGrowth:1.18,lateCombatGrowth:1.07,wallLateGrowth:1.045,costGrowth:1.35,woodCostGrowth:1.25,lateStructureCostGrowth:1.14,lateStructureWoodCostGrowth:1.14,trollDamageGrowth:1.12,healthGrowth:1.14},
   wisps:{gold:65,wood:15,hireGrowth:1.32,trainSeconds:6,income:1.4,incomeGrowth:1.25,upgradeGold:70,upgradeWood:20,costGrowth:1.5,seconds:4,hp:55,externalBonus:1.6,range:25,regrowSeconds:35},
-  elfProgression:{unlockTier:5,abilityCooldown:90,abilityDuration:12,specialGather:4,specialWisp:{gold:90,wood:30,rate:.45,hp:48},localStock:160,externalStock:420,
+  elfProgression:{unlockTier:10,abilityCooldown:90,abilityDuration:12,specialGather:4,specialWisp:{gold:90,wood:30,rate:.45,hp:48},localStock:160,externalStock:420,
     // Defensive upgrades need to compete with five independent economic trees.
     // Keep economy prices intact and discount only fortification investments.
     defenseUpgradeCost:{wall:{earlyGold:.82,earlyWood:.85,lateGold:.62,lateWood:.7},tower:{earlyGold:.85,earlyWood:.88,lateGold:.68,lateWood:.75,epicBand:.78},workshop:{earlyGold:.92,earlyWood:.92,lateGold:.82,lateWood:.85},bastion:{earlyGold:.82,earlyWood:.85,lateGold:.65,lateWood:.72},arcaneTower:{earlyGold:.82,earlyWood:.85,lateGold:.65,lateWood:.72}},
-    capital:{start:720,trollLevel:9,minCore:7,requiredMines:2,targets:{economy:10,balanced:12,defense:14}},
+    capital:{start:720,trollLevel:9,minCore:7,requiredMines:1,targets:{economy:10,balanced:12,defense:14}},
     specializations:{
-      industrial:{name:'Industrial',resource:'ancientWood',structure:null,abilityStructure:'core',description:'Automação, Wisps e produção.',ability:'Sobrecarga',wispBonus:.2},
-      fortress:{name:'Fortaleza',resource:'crystal',structure:'bastion',description:'Barricadas, resistência e recuperação.',ability:'Fortificação emergencial',regenPerTier:.00035,fortify:.25},
-      arcane:{name:'Arcano',resource:'mana',structure:'arcaneTower',description:'Visão, energia e dano explosivo.',ability:'Pulso Arcano',revealRadius:24,overcharge:.4}
+      industrial:{name:'Industrial',resource:'crystal',structure:null,abilityStructure:'core',description:'Automação, Wisps e produção.',ability:'Sobrecarga',wispBonus:.2},
+      fortress:{name:'Fortaleza',resource:'crystal',structure:null,abilityStructure:'core',description:'Barricadas, resistência e recuperação.',ability:'Fortificação emergencial',regenPerTier:.00035,fortify:.25},
+      arcane:{name:'Arcano',resource:'crystal',structure:null,abilityStructure:'core',description:'Visão, energia e dano explosivo.',ability:'Pulso Arcano',revealRadius:24,overcharge:.4}
     }},
   combat:{buffer:.18,lightWindup:.1,heavyWindup:.32,lightVisualRecovery:.26,heavyVisualRecovery:.42,comboWindow:2.8,comboBonus:.25,openingSeconds:1.2,openingBonus:.2},
   wallRecovery:{delay:8,rate:.0035},
@@ -37,20 +38,21 @@ export const BALANCE = {
   },
   advanced:{tier:30},
   tower:{specializations:false,standard:{damage:1.45,interval:1,range:0,armorPierce:0}},
-  troll: { hp: 1980, speed: 6.4, travelSpeed:1.05, damage: 21.6, interval: 1.05, range: 3.6, armor: 1, gold: 0, goldPerDamage: 0.42, combatRegenRate:.0012,restRegenRate:.0036,combatRegenPerLevel:.00075,restRegenPerLevel:.0015,regenLevelCap:10,towerCombatRegenMultiplier:.5,structureDrainCap:.01,cardOutOfCombatDelay:5,sanctuaryRadius:6,sanctuaryRegenRate:.008,shopRange:5,recallUnlock:0,recallChannel:5,recallCooldown:180,recallExitBoost:1.2,recallExitBoostDuration:3,damageGrowth:1.2,damageUpgradeScale:.88,speedFactor:.87,healthPerLevel:324,armorPerLevel:3.5,movementPerLevel:.08,siegePerLevel:.18,siegeFoundationPerLevel:.22,siegeDiminishingLevel:8,siegeDiminishingPerLevel:.08,finalSiege:1.35,finalSiegeUnlockSeconds:720,finalSiegeMaxElves:2,structureXpDiminishingLevel:10,structureXpLevelPressure:.18,structureXpMinimum:.35,regenDelay:4,healPercent:.16,healCharges:2,healRecharge:180,healCooldown:75,healDuration:6,exposureGrace:9,exposureRate:.035,heavy: 2.25,heavyRecovery:1.3, heavyCooldown: 4, dashCooldown: 7,dashDuration:.4,dashSpeed:2.5, roarCooldown: 18,roarRange:9,roarDuration:2 },
+  troll: { hp: 1980, speed: 6.4, travelSpeed:1.05, damage: 21.6, interval: 1.05, range: 3.6, armor: 1, gold: 0, goldPerDamage: 0.42, combatRegenRate:.0012,restRegenRate:.0036,combatRegenPerLevel:.00075,restRegenPerLevel:.0015,regenLevelCap:10,towerCombatRegenMultiplier:.5,structureDrainCap:.01,cardOutOfCombatDelay:5,sanctuaryRadius:6,sanctuaryRegenRate:.008,shopRange:5,recallUnlock:0,recallChannel:7.5,recallCooldown:180,recallExitBoost:1.2,recallExitBoostDuration:3,damageGrowth:1.2,damageUpgradeScale:.88,speedFactor:.87,healthPerLevel:324,armorPerLevel:3.5,movementPerLevel:.08,siegePerLevel:.18,siegeFoundationPerLevel:.22,siegeDiminishingLevel:8,siegeDiminishingPerLevel:.08,finalSiege:1.35,finalSiegeUnlockSeconds:720,finalSiegeMaxElves:2,structureXpDiminishingLevel:10,structureXpLevelPressure:.18,structureXpMinimum:.35,regenDelay:4,healPercent:.16,healCharges:2,healRecharge:180,healCooldown:75,healDuration:6,exposureGrace:9,exposureRate:.035,heavy: 2.25,heavyRecovery:1.3, heavyCooldown: 4, dashCooldown: 7,dashDuration:.4,dashSpeed:2.5, roarCooldown: 18,roarRange:9,roarDuration:2 },
   structures: {
     core: { name:'Núcleo', gold:65, wood:25, hp:360, radius:1.55, seconds:4, income:3, growth:1.65, upgradeGold:100, upgradeWood:35, color:0xe4c37a },
     wall: { name:'Barricada', gold:30, wood:34, hp:2541, radius:1.05, seconds:3, growth:1.9, upgradeGold:85, upgradeWood:30, color:0xa48862 },
     tower: { name:'Torre', gold:60, wood:30, hp:360, radius:0.9, seconds:4, damage:10.815, interval:1.2, range:17, retainRange:1, muzzleHeight:4.5, targetHeight:2, growth:1.65, upgradeGold:90, upgradeWood:40, color:0x81cabb },
-    mine: { name:'Mina', gold:85, wood:35, hp:200, radius:1.05, seconds:5, income:1.3, growth:1.7, upgradeGold:110, upgradeWood:45, color:0xc2a54c },
+    mine: { name:'Mina', gold:85, wood:35, hp:200, radius:1.05, seconds:5, income:2.6, growth:1.7, upgradeGold:110, upgradeWood:45, color:0xc2a54c },
+    fishery: {name:'Oficina de Pesca',gold:90,wood:45,hp:250,radius:1.1,seconds:5,growth:1,upgradeGold:0,upgradeWood:0,color:0x748fa3},
     // Legacy-only definition for historical snapshots. Essence and path
     // selection now belong to the Core, so new matches cannot build Workshops.
     workshop: { name:'Oficina', available:false, gold:90, wood:45, hp:250, radius:1.1, seconds:5, growth:1.6, upgradeGold:125, upgradeWood:45, color:0x748fa3 },
     // Kept only so historical match snapshots containing a Refinery remain
     // renderable. New matches cannot build or progress this retired structure.
     refinery: { name:'Refinaria', available:false, gold:150, wood:85, hp:300, radius:1.2, seconds:6, growth:1.62, upgradeGold:150, upgradeWood:65, aura:11, color:0xd6a45d },
-    bastion: { name:'Bastião', gold:120, wood:80, hp:520, radius:1.25, seconds:6, growth:1.72, upgradeGold:155, upgradeWood:75, aura:12, color:0x8ea5a0 },
-    arcaneTower: { name:'Torre Arcana', gold:145, wood:75, hp:310, radius:1, seconds:6, damage:46, interval:3, range:22, retainRange:1.5, muzzleHeight:4.8, targetHeight:2, growth:1.68, upgradeGold:170, upgradeWood:70, color:0xa680e6 }
+    bastion: { name:'Bastião', available:false, gold:120, wood:80, hp:520, radius:1.25, seconds:6, growth:1.72, upgradeGold:155, upgradeWood:75, aura:12, color:0x8ea5a0 },
+    arcaneTower: { name:'Torre Arcana', available:false, gold:145, wood:75, hp:310, radius:1, seconds:6, damage:46, interval:3, range:22, retainRange:1.5, muzzleHeight:4.8, targetHeight:2, growth:1.68, upgradeGold:170, upgradeWood:70, color:0xa680e6 }
   },
   branches: {
     power:{name:'Balista',description:'Mais dano por disparo',damage:1.45,interval:1,range:0,armorPierce:0},
@@ -112,15 +114,18 @@ export const repairPower=structure=>{
   return BALANCE.elf.repair+(structure.maxHp||0)*BALANCE.elf.wallRepairRate*diminishing;
 };
 export const arcaneTowerDamage=tier=>BALANCE.structures.arcaneTower.damage*combatTierScale(BALANCE.structures.arcaneTower.growth,tier);
-export const towerProfile=s=>BALANCE.tower.specializations?(BALANCE.branches[s?.branch]||BALANCE.branches.power):BALANCE.tower.standard;
+export const towerProfile=s=>{const e=constructionEffects(s),base=BALANCE.tower.standard;return {...base,damage:base.damage*(1+(e.damage||0)),interval:1/(1+(e.attackSpeed||0)),range:e.range||0,armorPierce:Math.min(.8,e.armorPierce||0)};};
 export const elfPath=id=>BALANCE.elfIncremental.paths[id]||null;
 export const essenceIncome=s=>s?.kind==='core'&&s.tier>=BALANCE.elfIncremental.essenceUnlockTier?BALANCE.elfIncremental.essenceBaseRate*Math.pow(BALANCE.elfIncremental.essenceGrowth,s.tier-BALANCE.elfIncremental.essenceUnlockTier):0;
 export const placementRadius=kind=>BALANCE.construction.placementRadius[kind]??BALANCE.structures[kind].radius;
-export const mineEconomy=coreTier=>{const tier=Math.max(1,Math.min(BALANCE.construction.limits.mine,Math.floor(coreTier||1))),costFactor=1+.25*(tier-1);return {tier,capacity:tier,cost:{gold:Math.round(BALANCE.structures.mine.gold*costFactor),wood:Math.round(BALANCE.structures.mine.wood*costFactor)},productionFactor:1+.3*(tier-1)};};
-export const income=s=>(BALANCE.structures[s.kind].income||0)*lateTierScale(BALANCE.structures[s.kind].growth,s.tier)*(s.kind==='mine'?(s.coreTier>0?mineEconomy(s.coreTier).productionFactor:0)*(s.tier>=BALANCE.epic.tier?BALANCE.epic.mineProduction:1):1)*(s.kind==='core'&&legendaryStructure(s.kind,s.tier)?BALANCE.legendary.coreIncome:1);
+export const mineEconomy=coreTier=>{const tier=Math.max(1,Math.min(5,Math.floor(coreTier||1))),costFactor=1+.25*(tier-1);return {tier,capacity:1,cost:{gold:Math.round(BALANCE.structures.mine.gold*costFactor),wood:Math.round(BALANCE.structures.mine.wood*costFactor)},productionFactor:1+.3*(tier-1)};};
+export const income=s=>(1+(constructionEffects(s).production||0))*(BALANCE.structures[s.kind].income||0)*lateTierScale(BALANCE.structures[s.kind].growth,s.tier)*(s.kind==='mine'?(s.coreTier>0?mineEconomy(s.coreTier).productionFactor:0)*(s.tier>=BALANCE.epic.tier?BALANCE.epic.mineProduction:1):1)*(s.kind==='core'&&legendaryStructure(s.kind,s.tier)?BALANCE.legendary.coreIncome:1);
 export const resourceProducer=s=>{const amount=income(s);return amount?{resource:'gold',amount,perMinute:amount*60,interval:1,active:true}:null;};
 export const specializationResource=key=>BALANCE.elfProgression.specializations[key]?.resource||null;
-export const upgradeCost=(s,pathId=null,specializationId=null)=>{const target=(s?.tier||0)+1,technology=pathId==='technology',essence=target===BALANCE.legendary.tier?BALANCE.elfIncremental.legendaryCost:0,epicResource=target===BALANCE.epic.tier?specializationResource(specializationId):null,epicAmount=target===BALANCE.epic.tier?(BALANCE.epic.resourceCost[s.kind]||30):0,lateStart=BALANCE.economy.lateTier,earlyLevels=Math.max(0,Math.min(lateStart-4,s.tier-4)),lateLevels=Math.max(0,s.tier-lateStart),goldScale=Math.pow(BALANCE.progression.costGrowth,earlyLevels)*Math.pow(BALANCE.progression.lateStructureCostGrowth,lateLevels),woodScale=Math.pow(BALANCE.progression.woodCostGrowth,earlyLevels)*Math.pow(BALANCE.progression.lateStructureWoodCostGrowth,lateLevels),discount=BALANCE.elfProgression.defenseUpgradeCost[s.kind],late=target>BALANCE.economy.lateTier,goldDiscount=discount?(late?discount.lateGold:discount.earlyGold):1,woodDiscount=discount?(late?discount.lateWood:discount.earlyWood):1,epicBand=s.kind==='tower'&&target>=16&&target<=BALANCE.epic.tier?(discount?.epicBand||1):1,projectEfficiency=s.epicProject&&target<=BALANCE.epic.tier?BALANCE.epic.projectCostMultiplier:1;return {gold:Math.round(BALANCE.structures[s.kind].upgradeGold*Math.pow(1.9,Math.min(3,s.tier-1))*goldScale*goldDiscount*epicBand*projectEfficiency),wood:Math.round(BALANCE.structures[s.kind].upgradeWood*Math.pow(1.5,Math.min(3,s.tier-1))*woodScale*woodDiscount*epicBand*projectEfficiency),...(essence?{essence:technology?Math.ceil(essence*.75):essence}:{}),...(epicAmount?{specialResource:epicResource,specialAmount:epicAmount}:{})};};
+export const upgradeCost=(s,pathId=null,specializationId=null)=>{
+  const target=(s?.tier||0)+1,lateStart=BALANCE.economy.lateTier,earlyLevels=Math.max(0,Math.min(lateStart-4,s.tier-4)),lateLevels=Math.max(0,s.tier-lateStart),goldScale=Math.pow(BALANCE.progression.costGrowth,earlyLevels)*Math.pow(BALANCE.progression.lateStructureCostGrowth,lateLevels),discount=BALANCE.elfProgression.defenseUpgradeCost[s.kind],late=target>lateStart,goldDiscount=discount?(late?discount.lateGold:discount.earlyGold):1,epicBand=s.kind==='tower'&&target>=16&&target<=BALANCE.epic.tier?(discount?.epicBand||1):1,woodScale=Math.pow(BALANCE.progression.woodCostGrowth,earlyLevels)*Math.pow(BALANCE.progression.lateStructureWoodCostGrowth,lateLevels),woodDiscount=discount?(late?discount.lateWood:discount.earlyWood):1,projectEfficiency=s.epicProject&&target<=BALANCE.epic.tier?BALANCE.epic.projectCostMultiplier:1,crystal=crystalUpgradeCost(s,target);
+  return {gold:Math.round(BALANCE.structures[s.kind].upgradeGold*Math.pow(1.9,Math.min(3,s.tier-1))*goldScale*goldDiscount*epicBand*projectEfficiency),wood:Math.round(BALANCE.structures[s.kind].upgradeWood*Math.pow(1.5,Math.min(3,s.tier-1))*woodScale*woodDiscount*epicBand*projectEfficiency),...(crystal?{specialResource:'crystal',specialAmount:crystal}:{})};
+};
 export const trollCost=(key,level)=>Math.round(scaled(BALANCE.upgrades[key].cost*Math.pow(BALANCE.upgrades[key].growth,Math.min(4,level)),BALANCE.progression.costGrowth,level-4));
 export const trollUpgradeBranch=key=>Object.entries(TROLL_UPGRADE_BRANCHES).find(([,branch])=>branch.keys.includes(key))?.[0]||null;
 export const trollBranchPoints=(levels,branchId)=>TROLL_UPGRADE_BRANCHES[branchId]?.keys.reduce((sum,key)=>sum+(levels?.[key]||0),0)||0;

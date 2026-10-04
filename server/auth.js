@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
+import { isGameAdmin } from './game-admin.js';
 import { promisify } from 'node:util';
 
 const now=()=>new Date().toISOString();
@@ -27,7 +28,7 @@ export function parseCookies(header=''){return Object.fromEntries(String(header)
 
 export class AuthService{
   constructor(database,{sessionDays=30}={}){this.database=database;this.db=database.db;this.sessionDays=sessionDays;}
-  publicUser(row){return row?{id:row.id,username:row.username,email:row.email,displayName:row.display_name,avatar:row.avatar,region:row.region,createdAt:row.created_at}:null;}
+  publicUser(row){return row?{id:row.id,username:row.username,email:row.email,displayName:row.display_name,avatar:row.avatar,region:row.region,createdAt:row.created_at,gameAdmin:isGameAdmin(this.database,row.id)}:null;}
   async register(input){
     const data=validateAccount(input),id=randomUUID(),timestamp=now(),passwordHash=await hashPassword(data.password);
     try{this.database.transaction(()=>{this.db.prepare('INSERT INTO users(id,username,username_norm,email,email_norm,password_hash,display_name,avatar,region,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(id,data.username,normalize(data.username),data.email,normalize(data.email),passwordHash,data.displayName,data.avatar,data.region,timestamp,timestamp);this.db.prepare('INSERT INTO players(id,user_id,display_name,player_type,created_at,updated_at) VALUES(?,?,?,?,?,?)').run('user:'+id,id,data.displayName,'human',timestamp,timestamp);});}

@@ -67,7 +67,7 @@ test('Orçamento de recompensa compensa lobbies sem vazar no snapshot',()=>{
 });
 test('Ferramentas dev concedem recursos com limites e não aceitam valores falsos',()=>{
   const m=match(),u=m.unit('e0'),before={gold:u.gold,wood:u.wood};
-  assert.equal(m.devGrant('e0',{gold:1000,wood:250,essence:25}),null);assert.equal(u.gold,before.gold+1000);assert.equal(u.wood,before.wood+250);assert.equal(u.essence,25);
+  assert.equal(m.devGrant('e0',{gold:1000,wood:250,crystal:25}),null);assert.equal(u.gold,before.gold+1000);assert.equal(u.wood,before.wood+250);assert.equal(u.essence,0);assert.equal(u.specialResources.crystal,125);
   assert.match(m.devGrant('e0',{gold:-1}),/Quantidade/);assert.match(m.devGrant('e0',{gold:1.5}),/Quantidade/);assert.match(m.devGrant('e0',{gold:1_000_001}),/Quantidade/);assert.match(m.devGrant('missing',{gold:1}),/Jogador/);
 });
 test('Targeting de torres é determinístico e explica borda, cooldown e estado',()=>{
@@ -189,12 +189,12 @@ test('IA usa os mesmos atributos em fácil, normal e difícil',()=>{
   for(const difficulty of Object.keys(B.difficulty)){const m=new Match({difficulty},slots(2,'bot'));assert.equal(m.unit('t').maxHp,B.troll.hp);assert.equal(m.unit('e0').gold,B.elf.gold);assert.equal(m.unit('e0').maxHp,B.elf.hp);}
 });
 test('Lobby: autorização, slots, readiness, sessão privada e revanche',()=>{
-  const service=new SessionService(),host=service.addClient('host','Host'),guest=service.addClient('guest','Guest'),r=service.create(host,{role:'troll',settings:{elfSlots:2,private:true},password:'secret',fillBots:true});
+  const service=new SessionService(),host=service.addClient('host','Host'),guest=service.addClient('guest','Guest'),r=service.create(host,{role:'troll',settings:{elfSlots:5,private:true},password:'secret',fillBots:true});
   assert.equal(service.list().length,0);assert.throws(()=>service.join(guest,{code:r.id,password:'wrong'}),/Senha/);service.join(guest,{code:r.id,password:'secret'});
   assert.throws(()=>service.start(r,host),/prontos/);assert.throws(()=>service.configure(r,guest,{elfSlots:8}),/host/);
   service.changeSlot(r,guest,{slot:'e0',action:'claim'});assert.equal(r.slots.filter(s=>s.occupant?.clientId==='guest').length,1);
   assert.throws(()=>service.changeSlot(r,guest,{slot:'t0',action:'claim'}),/indisponível/);
-  for(const m of r.members.values())m.ready=true;service.start(r,host);assert.equal(r.match.units.length,3);assert.throws(()=>service.changeSlot(r,host,{slot:'e1',action:'remove'}),/bloqueada/);
+  for(const m of r.members.values())m.ready=true;service.start(r,host);assert.equal(r.match.units.length,6);assert.throws(()=>service.changeSlot(r,host,{slot:'e1',action:'remove'}),/bloqueada/);
   service.disconnect(guest);assert.equal(r.match.unit('e0').controller,'bot');service.resume(guest);assert.equal(r.match.unit('e0').controller,'human');
   r.match.unit('t0').alive=false;r.match.step(.05);r.state=r.match.state;service.returnToLobby(r,host);assert.equal(r.state,STATES.LOBBY);assert.equal(r.members.size,2);assert.ok([...r.members.values()].every(m=>!m.ready));for(const m of r.members.values())m.ready=true;service.start(r,host);assert.equal(r.match.time,0);
 });

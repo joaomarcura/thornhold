@@ -86,7 +86,15 @@ const migrations=[
    ALTER TABLE player_statistics ADD COLUMN first_kill_seconds_total REAL NOT NULL DEFAULT 0;
    ALTER TABLE player_statistics ADD COLUMN first_kill_samples INTEGER NOT NULL DEFAULT 0;
    ALTER TABLE player_statistics ADD COLUMN first_tower_seconds_total REAL NOT NULL DEFAULT 0;
-   ALTER TABLE player_statistics ADD COLUMN first_tower_samples INTEGER NOT NULL DEFAULT 0;`
+   ALTER TABLE player_statistics ADD COLUMN first_tower_samples INTEGER NOT NULL DEFAULT 0;`,
+  `CREATE TABLE game_admins(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, granted_at TEXT NOT NULL);`,
+  `CREATE TABLE fishing_collection(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    collection_key TEXT NOT NULL, count INTEGER NOT NULL, best_json TEXT NOT NULL,
+    PRIMARY KEY(user_id,collection_key));
+   CREATE TABLE fishing_captures(capture_id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE);`,
+  `ALTER TABLE fishing_captures ADD COLUMN fish_json TEXT;
+   ALTER TABLE fishing_captures ADD COLUMN captured_at TEXT;
+   CREATE INDEX idx_fishing_captures_user ON fishing_captures(user_id,captured_at);`
 ];
 
 const achievements=[

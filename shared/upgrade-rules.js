@@ -19,7 +19,7 @@ export const strategicBarricadeTier=(coreTier,trollLevel,profile='balanced',diff
 export const requiredEpicWallTier=targetTowerTier=>targetTowerTier>=20?14:targetTowerTier>=17?12:targetTowerTier>=13?11:9;
 
 // Pure rules used by both the authoritative command and its UI preview.
-export function upgradeStatus(u,s,time,state,structures=[]){
+export function upgradeStatus(u,s,time,state,structures=[],{remote=false}={}){
   const cost=s?.kind&&Object.hasOwn(B.structures,s.kind)?upgradeCost(s,u?.elfPath,u?.elfSpecialization):null;
   const reasons=[];
   const block=(code,message)=>reasons.push({code,message});
@@ -27,8 +27,11 @@ export function upgradeStatus(u,s,time,state,structures=[]){
   if(!u?.alive)block('player','Você foi eliminado.');
   if(!cost||u?.role!=='elf'||s.owner!==u?.id)block('owner','Selecione uma estrutura sua.');
   if(cost){
+    if(B.structures[s.kind].available===false)block('removed','Esta construção foi removida da nova progressão.');
+    if(s.kind==='fishery')block('workshop','Evolua a vara dentro da Oficina, não o prédio.');
+    if(s.tier>=10&&!s.specialization&&['core','wall','tower','mine'].includes(s.kind))block('specialization','Escolha uma especialização por 10 cristais antes de avançar além do nível 10.');
     if(s.hp<=0)block('destroyed','Estrutura destruída.');
-    if(u&&distance(u,s)>B.interactRange)block('distance',`Aproxime-se: ${distance(u,s).toFixed(1)} m / alcance ${B.interactRange.toFixed(1)} m.`);
+    if(!remote&&u&&distance(u,s)>B.interactRange)block('distance',`Aproxime-se: ${distance(u,s).toFixed(1)} m / alcance ${B.interactRange.toFixed(1)} m.`);
     if(s.progress<1)block('construction','Conclua a construção primeiro.');
     if(s.upgrading>0)block('upgrading',`Melhoria em andamento: ${Math.ceil(s.upgrading)}s.`);
     if(s.tier>=B.maxStructureTier)block('maximum','Estrutura no nível máximo.');
@@ -38,8 +41,6 @@ export function upgradeStatus(u,s,time,state,structures=[]){
     }
     if(!s.upgrading&&(u?.gold??0)<cost.gold)block('gold',`Ouro insuficiente: ${Math.floor(u?.gold||0)} / ${cost.gold}.`);
     if(!s.upgrading&&(u?.wood??0)<cost.wood)block('wood',`Madeira insuficiente: ${Math.floor(u?.wood||0)} / ${cost.wood}.`);
-    if(!s.upgrading&&(u?.essence??0)<(cost.essence||0))block('essence',`Essência insuficiente: ${Math.floor(u?.essence||0)} / ${cost.essence}.`);
-    if(cost.specialAmount&&!cost.specialResource)block('specialization','Escolha uma especialização antes de iniciar uma melhoria Épica.');
     if(!s.upgrading&&cost.specialResource&&(u?.specialResources?.[cost.specialResource]??0)<cost.specialAmount){const info=SPECIAL_RESOURCES[cost.specialResource];block('special-resource',`${info?.name||cost.specialResource} insuficiente: ${Math.floor(u?.specialResources?.[cost.specialResource]||0)} / ${cost.specialAmount}.`);}
   }
   return {allowed:reasons.length===0,cost,reasons};

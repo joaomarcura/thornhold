@@ -1,4 +1,6 @@
 import { BALANCE } from './config.js';
+import { populateScenery } from './scenery.js';
+import { populateCoast } from './coast.js';
 export function randomFor(seed) {
   let h=2166136261;for(const c of String(seed))h=Math.imul(h^c.charCodeAt(0),16777619);
   return ()=>{h+=0x6D2B79F5;let t=h;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;};
@@ -34,7 +36,7 @@ export function traversable(map,x,z,nx,nz){return walkable(map,nx,nz)&&Math.abs(
 export const MAP_STYLES=Object.freeze({woodland:{name:'Bosque clássico'},deepForest:{name:'Mata fechada'},crossroads:{name:'Rotas abertas'}});
 export function generateMap(seed='THORNHOLD',mapSize='compact',mapStyle='woodland',options={}){
   const style=MAP_STYLES[mapStyle]?mapStyle:'woodland',rng=randomFor(seed),size=mapSize==='large'?125:109,cell=BALANCE.cell,mid=(size-1)/2,offset=(size-109)/2;
-  const coop=options?.coop===true,map={seed:String(seed),version:4,style,size,cell,coop,coopCompounds:[],coopTunnels:[],rivers:[],bridges:[],grid:Array(size*size).fill(1),heights:Array(size*size).fill(0),bases:[],trees:[],specialNodes:[],decor:[],pois:[],trails:[]};
+  const coop=options?.coop===true,map={seed:String(seed),version:6,style,size,cell,coop,coopCompounds:[],coopTunnels:[],rivers:[],bridges:[],grid:Array(size*size).fill(1),heights:Array(size*size).fill(0),bases:[],trees:[],specialNodes:[],decor:[],pois:[],trails:[]};
   const carve=(x,z,r=1)=>{for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++)if(x+dx>1&&z+dz>1&&x+dx<size-2&&z+dz<size-2)map.grid[index(map,x+dx,z+dz)]=0;};
   const trail=(points,width=style==='deepForest'?0:1)=>{map.trails.push(points.map(([x,z])=>world(map,x,z)));for(let i=1;i<points.length;i++){let [x,z]=points[i-1];const [tx,tz]=points[i];carve(x,z,width);while(x!==tx||z!==tz){if(x!==tx)x+=Math.sign(tx-x);else z+=Math.sign(tz-z);carve(x,z,width);}}};
   // Connected woodland loops, turns and blind branches replace radial sight lines.
@@ -133,16 +135,6 @@ export function generateMap(seed='THORNHOLD',mapSize='compact',mapStyle='woodlan
   for(const b of map.bases){const axis=b.gate.axis,sign=b.gate.sign;
     for(const side of [-1,1]){const x=b.gate.cx+(axis==='x'?sign*4:side),z=b.gate.cz+(axis==='z'?sign*4:side);if(walkable(map,x,z))map.trees.push({id:'tree'+map.trees.length,...world(map,x,z),amount:BALANCE.economy.treeStock,rich:true,style:1});}
   }
-  // Static water is deliberately presentation-only: existing walkable cells
-  // become visible bridge spans, so adding scenery cannot invalidate a seed or
-  // force extra pathfinding work during the match.
-  if(coop){
-    const riverZ=Math.round(mid-14),startX=28,endX=size-29;
-    map.rivers.push({id:'river0',axis:'x',start:world(map,startX,riverZ),end:world(map,endX,riverZ),width:2.5});
-    let runStart=null;
-    const finishRun=end=>{if(runStart===null)return;const count=end-runStart+1,center=(runStart+end)/2,short=count<=3;map.bridges.push({id:`bridge${map.bridges.length}`,...world(map,center,riverZ),axis:short?'z':'x',length:(short?3.4:count*cell),width:short?count*cell:3.4});runStart=null;};
-    for(let x=startX;x<=endX+1;x++){if(x<=endX&&walkable(map,x,riverZ)){if(runStart===null)runStart=x;}else finishRun(x-1);}
-  }
   // One large neutral deposit of every resource keeps every specialization
   // viable after the small, safe deposit inside a refuge has been exhausted.
   const neutralSpots=[[mid-12,mid-8],[mid+12,mid-7],[mid,mid+14]];
@@ -150,8 +142,14 @@ export function generateMap(seed='THORNHOLD',mapSize='compact',mapStyle='woodlan
   // Scenery stays on blocked cells; the visible trail is also the collision corridor.
   const decorRate=style==='deepForest'?.52:style==='crossroads'?.25:.35;
   for(let z=2;z<size-2;z++)for(let x=2;x<size-2;x++)if(!walkable(map,x,z)&&rng()<decorRate)map.decor.push({...world(map,x,z),scale:.8+rng()*.4,kind:rng()<.2?'rock':'tree',rotation:rng()*6.28});
+  populateScenery(map,randomFor);
   map.pois=[{...world(map,mid-5,mid),name:'Pedras ancestrais'},{...world(map,mid+5,mid+3),name:'Fonte do luar'}];
   for(const tunnel of map.coopTunnels)delete tunnel.cells;
+  // Resource schema 2: only refuge trees are harvestable. Exterior scenery stays.
+  map.trees=map.trees.filter(tree=>baseAt(map,tree));
+  map.specialNodes=[];for(const base of map.bases)delete base.localResource;
+  map.resourceVersion=2;
+  if(options.coast!==false)populateCoast(map);
   map.validation=map.bases.map(b=>validateBase(map,b));
   if(map.validation.some(v=>!v.valid))throw new Error('Mapa recusado: '+JSON.stringify(map.validation.filter(v=>!v.valid)));
   return map;

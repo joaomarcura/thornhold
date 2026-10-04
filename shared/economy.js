@@ -5,6 +5,7 @@ export function recordSpend(unit,cost={},purpose='other',action='other'){
   unit.stats.goldSpent=(unit.stats.goldSpent||0)+gold;
   unit.stats.woodSpent=(unit.stats.woodSpent||0)+wood;
   unit.stats.essenceSpent=(unit.stats.essenceSpent||0)+essence;
+  if(specialResource==='crystal')unit.stats.crystalSpent=(unit.stats.crystalSpent||0)+special;
   if(specialResource&&special){unit.stats.specialResourcesSpent??={};unit.stats.specialResourcesSpent[specialResource]=(unit.stats.specialResourcesSpent[specialResource]||0)+special;}
   unit.stats.spendByPurpose??={};unit.stats.spendByAction??={};
   const add=(ledger,key)=>{ledger[key]??={gold:0,wood:0};ledger[key].gold+=gold;ledger[key].wood+=wood;if(essence)ledger[key].essence=(ledger[key].essence||0)+essence;if(specialResource&&special){ledger[key].specialResources??={};ledger[key].specialResources[specialResource]=(ledger[key].specialResources[specialResource]||0)+special;}};
